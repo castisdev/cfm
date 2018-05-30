@@ -1,12 +1,12 @@
 package tasker
 
 import (
-	"cfm/common"
 	"container/ring"
 	"errors"
 	"sort"
 	"time"
 
+	"github.com/castisdev/cfm/common"
 	"github.com/castisdev/cilog"
 )
 
@@ -82,7 +82,7 @@ func init() {
 	DstServers = common.NewHosts()
 	SourcePath = common.NewSourceDirs()
 
-	tasks = NewTasks(15)
+	tasks = NewTasks()
 }
 
 // RunForever is to run tasker as go routine
@@ -107,7 +107,7 @@ func RunForever() {
 
 		// 2. task queue 에 있는 src ip는 할당된 상태로 변경
 		n := 0
-		for _, task := range tasks.TaskList {
+		for _, task := range tasks.TaskMap {
 			for _, src := range *SrcServers {
 				if src.IP == task.SrcIP {
 					src.selected = true
@@ -203,7 +203,7 @@ func CleanTask(tasks *Tasks) {
 
 	tl := make([]Task, 0, 10)
 
-	for _, task := range tasks.TaskList {
+	for _, task := range tasks.TaskMap {
 
 		if task.Status == DONE {
 			tl = append(tl, *task)

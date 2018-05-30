@@ -81,19 +81,19 @@ type Task struct {
 
 // Tasks is slice of Task struct
 type Tasks struct {
-	mutex    *sync.Mutex
-	TaskList []*Task
+	mutex   *sync.Mutex
+	TaskMap map[int64]*Task
 }
 
 // NewTasks is constructor of Tasks
-func NewTasks(size int) *Tasks {
+func NewTasks() *Tasks {
 	/*
 		for i:=0; i<size; i++ {
 
 		}
 		new(Task)
 	*/
-	tmp := make([]*Task, 0, size)
+	tmp := make(map[int64]*Task)
 	return &Tasks{&sync.Mutex{}, tmp}
 }
 
@@ -103,7 +103,7 @@ func (tasks Tasks) FindTaskByID(id int64) (Task, bool) {
 	tasks.mutex.Lock()
 	defer tasks.mutex.Unlock()
 
-	for _, task := range tasks.TaskList {
+	for _, task := range tasks.TaskMap {
 		if task.ID == id {
 			return *task, true
 		}
@@ -118,7 +118,7 @@ func (tasks Tasks) FindTaskByFileName(name string) (Task, bool) {
 	tasks.mutex.Lock()
 	defer tasks.mutex.Unlock()
 
-	for _, task := range tasks.TaskList {
+	for _, task := range tasks.TaskMap {
 		if task.FileName == name {
 			return *task, true
 		}
@@ -138,7 +138,7 @@ func (tasks *Tasks) UpdateStatus(id int64, s Status) error {
 		return fmt.Errorf("invalid request (try to change to %d)", READY)
 
 	case WORKING:
-		for _, task := range tasks.TaskList {
+		for _, task := range tasks.TaskMap {
 			if task.ID == id {
 
 				if task.Status == WORKING {
@@ -156,7 +156,7 @@ func (tasks *Tasks) UpdateStatus(id int64, s Status) error {
 		return fmt.Errorf("(%d) task not found", id)
 
 	case DONE:
-		for _, task := range tasks.TaskList {
+		for _, task := range tasks.TaskMap {
 			if task.ID == id {
 				task.Status = s
 				task.Mtime = time.Now().Unix()
@@ -181,7 +181,7 @@ func (tasks *Tasks) CreateTask(task *Task) Task {
 
 	tasks.mutex.Lock()
 	defer tasks.mutex.Unlock()
-	tasks.TaskList = append(tasks.TaskList, task)
+	tasks.TaskMap[task.ID] = task
 	cilog.Infof("create task,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),Ctime(%d),Mtime(%d)",
 		task.ID, task.Grade, task.FilePath, task.SrcIP, task.DstIP, task.Ctime, task.Mtime)
 
@@ -194,14 +194,15 @@ func (tasks *Tasks) DeleteTask(id int64) error {
 	tasks.mutex.Lock()
 	defer tasks.mutex.Unlock()
 
-	for i, task := range tasks.TaskList {
-		if task.ID == id {
-			cilog.Infof("delete task,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),Ctime(%d),Mtime(%d),Status(%s)",
-				task.ID, task.Grade, task.FilePath, task.SrcIP, task.DstIP, task.Ctime, task.Mtime, task.Status)
-			tasks.TaskList = append(tasks.TaskList[:i], tasks.TaskList[i+1:]...)
-			return nil
-		}
+	t, exists := tasks.TaskMap[id]
+	if !exists {
+		return fmt.Errorf("could not find Task with id(%d) to delete", id)
 	}
 
-	return fmt.Errorf("could not find Task with id(%d) to delete", id)
+	delete(tasks.TaskMap, id)
+
+	cilog.Infof("delete task,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),Ctime(%d),Mtime(%d),Status(%s)",
+		t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.Ctime, t.Mtime, t.Status)
+	return nil
+
 }

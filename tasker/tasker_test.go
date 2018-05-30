@@ -1,7 +1,6 @@
 package tasker
 
 import (
-	"cfm/common"
 	"fmt"
 	"net"
 	"net/http"
@@ -10,33 +9,34 @@ import (
 	"testing"
 	"time"
 
+	"github.com/castisdev/cfm/common"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCleanTask(t *testing.T) {
 
-	ts := NewTasks(5)
+	ts := NewTasks()
 
-	ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg", FileName: "A.mpg"})
-	ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/B.mpg", FileName: "B.mpg"})
+	t1 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg", FileName: "A.mpg"})
+	t2 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/B.mpg", FileName: "B.mpg"})
 	ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/C.mpg", FileName: "C.mpg"})
 	ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/D.mpg", FileName: "D.mpg"})
 	ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/E.mpg", FileName: "E.mpg"})
 
-	ts.TaskList[0].Status = DONE
-	ts.TaskList[1].Status = DONE
+	ts.TaskMap[t1.ID].Status = DONE
+	ts.TaskMap[t2.ID].Status = DONE
 
 	CleanTask(ts)
 
 	// 2개의 DONE task 삭제된 후 task 개수
-	assert.Equal(t, 3, len(ts.TaskList))
+	assert.Equal(t, 3, len(ts.TaskMap))
 
 	SetTaskTimeout(time.Second * 1)
 	time.Sleep(time.Second * 2)
 	CleanTask(ts)
 
 	// 3개의 task 가 timeout 으로 삭제된 후 task 개수
-	assert.Equal(t, 0, len(ts.TaskList))
+	assert.Equal(t, 0, len(ts.TaskMap))
 
 }
 

@@ -1,11 +1,11 @@
 package main
 
 import (
-	"cfm/remover"
-	"cfm/tasker"
 	"net/http"
 	"time"
 
+	"github.com/castisdev/cfm/remover"
+	"github.com/castisdev/cfm/tasker"
 	"github.com/castisdev/cilog"
 )
 

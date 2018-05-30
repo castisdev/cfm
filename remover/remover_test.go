@@ -1,13 +1,13 @@
 package remover
 
 import (
-	"cfm/common"
 	"encoding/json"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/castisdev/cfm/common"
 	"github.com/stretchr/testify/assert"
 )
 

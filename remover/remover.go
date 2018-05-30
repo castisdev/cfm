@@ -1,12 +1,12 @@
 package remover
 
 import (
-	"cfm/common"
 	"errors"
 	"fmt"
 	"sort"
 	"time"
 
+	"github.com/castisdev/cfm/common"
 	"github.com/castisdev/cilog"
 )
 

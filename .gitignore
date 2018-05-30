@@ -32,3 +32,5 @@ gradle-app.setting
 cscope.*
 *.sln
 *.vcproj
+
+cfm
