@@ -1,0 +1,27 @@
+adv_prefixes:
+- M64
+- MN1
+
+source_dirs:
+- /data2
+- /data3
+
+hitcount_history_file: /data2/FailOver/.hitcount.history
+grade_info_file: /data2/FailOver/.grade.info
+
+storage_usage_limit_percent: 90
+log_dir: /var/log/castis/cfm_log
+# 1:debug  2:report  3:info 4:success 5:warning 6:error 7:fail 8:exception 9:critical
+log_level: 3 
+
+task_timeout_sec: 3600
+
+servers:
+  sources:
+    - 172.18.0.101:8080
+    - 172.18.0.102:8080
+    - 172.18.0.103:8080
+  destinations:
+    - 172.18.0.101:8080
+    - 172.18.0.102:8080
+    - 172.18.0.103:8080
