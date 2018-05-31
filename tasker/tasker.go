@@ -96,6 +96,9 @@ func RunForever() {
 		cilog.Debugf("add to ring (%s)", s.IP)
 	}
 
+	// elapsed time : 소요 시간
+	var est time.Time
+
 	for {
 
 		CleanTask(tasks)
@@ -125,18 +128,20 @@ func RunForever() {
 		// 4. 파일 등급 list 생성
 		fileMetaMap := make(map[string]*common.FileMeta)
 
+		est = time.Now()
 		if err := common.ParseGradeFile(gradeInfoFile, fileMetaMap); err != nil {
 			cilog.Debugf("fail to parse file(%s), error(%s)", gradeInfoFile, err.Error())
 			break
 		} else {
-			cilog.Debugf("parse file(%s)", gradeInfoFile)
+			cilog.Debugf("parse file(%s),time(%s)", gradeInfoFile, time.Since(est))
 		}
 
+		est = time.Now()
 		if err := common.ParseHitcountFile(hitcountHistoryFile, fileMetaMap); err != nil {
 			cilog.Debugf("fail to parse file(%s), error(%s)", hitcountHistoryFile, err.Error())
 			break
 		} else {
-			cilog.Debugf("parse file(%s)", hitcountHistoryFile)
+			cilog.Debugf("parse file(%s),time(%s)", hitcountHistoryFile, time.Since(est))
 		}
 
 		// 5. 모든 서버의 파일 리스트 수집
@@ -164,20 +169,20 @@ func RunForever() {
 
 			// 9. 이미 task queue 에 있는 파일이면 skip
 			if _, exists := tasks.FindTaskByFileName(file.Name); exists {
-				//cilog.Debugf("%s is already in task queue", file.Name)
+				cilog.Debugf("%s is already in task queue", file.Name)
 				continue
 			}
 
 			// 10. 이미 remote file list 에 있는 파일이면 skip
 			if _, exists := remoteFileSet[file.Name]; exists {
-				//cilog.Debugf("%s is already in remote file list", file.Name)
+				cilog.Debugf("%s is already in remote file list", file.Name)
 				continue
 			}
 
 			// 11. SAN 에 없는 파일이면 제외
 			filePath, exists := SourcePath.IsExistOnSource(file.Name)
 			if exists != true {
-				//cilog.Debugf("%s not found in sources", file.Name)
+				cilog.Debugf("%s not found in sources", file.Name)
 				continue
 			}
 
@@ -190,7 +195,9 @@ func RunForever() {
 
 			// 13. task 생성
 			dstIP := string(dstRing.Value.(string))
-			tasks.CreateTask(&Task{FilePath: filePath, FileName: file.Name, SrcIP: srcIP, DstIP: dstIP, Grade: file.Grade})
+			t := tasks.CreateTask(&Task{FilePath: filePath, FileName: file.Name, SrcIP: srcIP, DstIP: dstIP, Grade: file.Grade})
+			cilog.Infof("create task,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),Ctime(%d),Mtime(%d)",
+				t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.Ctime, t.Mtime)
 			dstRing = dstRing.Next()
 		}
 
@@ -218,6 +225,18 @@ func CleanTask(tasks *Tasks) {
 	}
 
 	for _, t := range tl {
+
+		switch t.Status {
+		case DONE:
+			cilog.Infof("task is done,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),Ctime(%d),Mtime(%d),Status(%s)",
+				t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.Ctime, t.Mtime, t.Status)
+		case TIMEOUT:
+			cilog.Warningf("task timeout!!,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),Ctime(%d),Mtime(%d),Status(%s)",
+				t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.Ctime, t.Mtime, t.Status)
+		default:
+			cilog.Warningf("unexpected task status,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),Ctime(%d),Mtime(%d),Status(%s)",
+				t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.Ctime, t.Mtime, t.Status)
+		}
 		tasks.DeleteTask(t.ID)
 	}
 }
@@ -249,7 +268,7 @@ func SetTaskTimeout(t time.Duration) error {
 	}
 
 	taskTimeout = t
-	cilog.Infof("set task timeout : (%d) seconds", taskTimeout)
+	cilog.Infof("set task timeout : (%s)", taskTimeout)
 	return nil
 }
 

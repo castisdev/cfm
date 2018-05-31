@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"sync"
 	"time"
-
-	"github.com/castisdev/cilog"
 )
 
 // Status is custom type for const
@@ -182,8 +180,6 @@ func (tasks *Tasks) CreateTask(task *Task) Task {
 	tasks.mutex.Lock()
 	defer tasks.mutex.Unlock()
 	tasks.TaskMap[task.ID] = task
-	cilog.Infof("create task,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),Ctime(%d),Mtime(%d)",
-		task.ID, task.Grade, task.FilePath, task.SrcIP, task.DstIP, task.Ctime, task.Mtime)
 
 	return *task
 }
@@ -194,15 +190,13 @@ func (tasks *Tasks) DeleteTask(id int64) error {
 	tasks.mutex.Lock()
 	defer tasks.mutex.Unlock()
 
-	t, exists := tasks.TaskMap[id]
+	_, exists := tasks.TaskMap[id]
 	if !exists {
 		return fmt.Errorf("could not find Task with id(%d) to delete", id)
 	}
 
 	delete(tasks.TaskMap, id)
 
-	cilog.Infof("delete task,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),Ctime(%d),Mtime(%d),Status(%s)",
-		t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.Ctime, t.Mtime, t.Status)
 	return nil
 
 }

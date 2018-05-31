@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/spf13/viper"
 )
 
@@ -38,4 +41,17 @@ func ReadConfig(configFile string) (*Config, error) {
 	}
 
 	return &c, nil
+}
+
+// ValidationConfig :
+func ValidationConfig(c Config) {
+
+	// Source 경로가 존재하지 않을 경우 프로세스 중지
+	for _, sdir := range c.SourceDirs {
+		if _, err := os.Stat(sdir); os.IsNotExist(err) {
+			fmt.Printf("not exists source dir (%s)\n", err)
+			os.Exit(-1)
+		}
+	}
+
 }

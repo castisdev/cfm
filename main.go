@@ -18,6 +18,8 @@ func main() {
 		panic(err)
 	}
 
+	ValidationConfig(*c)
+
 	moduleName := "cfm"
 	moduleVersion := "1.0.0"
 	logLevel, err := cilog.LevelFromString(c.LogLevel)
