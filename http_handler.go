@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"html/template"
 	"net/http"
 	"strconv"
 
@@ -10,6 +11,12 @@ import (
 
 	"github.com/gorilla/mux"
 )
+
+// DashBoard :
+func DashBoard(w http.ResponseWriter, r *http.Request) {
+	tpl := template.Must(template.ParseFiles("dashboard/layout.html"))
+	tpl.Execute(w, tasks.GetTaskList())
+}
 
 // TaskIndex is http handler for GET /tasks route
 func TaskIndex(w http.ResponseWriter, r *http.Request) {

@@ -95,6 +95,18 @@ func NewTasks() *Tasks {
 	return &Tasks{&sync.Mutex{}, tmp}
 }
 
+// GetTaskList is to get task list as Task slice
+func (tasks Tasks) GetTaskList() (tl []Task) {
+	tasks.mutex.Lock()
+	defer tasks.mutex.Unlock()
+
+	for _, v := range tasks.TaskMap {
+		tl = append(tl, *v)
+	}
+
+	return
+}
+
 // FindTaskByID is to find task with task ID
 func (tasks Tasks) FindTaskByID(id int64) (Task, bool) {
 

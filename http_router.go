@@ -59,4 +59,10 @@ var routes = Routes{
 		Pattern:     "/tasks/{taskId}",
 		HandlerFunc: TaskUpdate,
 	},
+	Route{
+		Name:        "DashBoard",
+		Method:      "GET",
+		Pattern:     "/dashboard",
+		HandlerFunc: DashBoard,
+	},
 }

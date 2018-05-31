@@ -130,3 +130,17 @@ func TestTasks_UpdateStatus(t *testing.T) {
 	}
 
 }
+
+func TestTasks_GetTaskList(t *testing.T) {
+	tasks := NewTasks()
+
+	t1 := tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg", FileName: "A.mpg"})
+	t2 := tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/B.mpg", FileName: "B.mpg"})
+	t3 := tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/C.mpg", FileName: "C.mpg"})
+
+	tl := tasks.GetTaskList()
+
+	assert.Equal(t, t1.ID, tl[0].ID)
+	assert.Equal(t, t2.ID, tl[1].ID)
+	assert.Equal(t, t3.ID, tl[2].ID)
+}
