@@ -8,12 +8,10 @@ import (
 
 // DiskUsage is a struct for disk usage(df)
 type DiskUsage struct {
-	FileSystem  string `json:"file_system"`
-	TotalSize   int64  `json:"total_size,string"`
-	UsedSize    int64  `json:"used_size,string"`
-	FreeSize    int64  `json:"free_size,string"`
-	UsedPercent int    `json:"used_percent"`
-	MountPoint  string `json:"mount_point"`
+	TotalSize   int64 `json:"total_size,string"`
+	UsedSize    int64 `json:"used_size,string"`
+	FreeSize    int64 `json:"free_size,string"`
+	UsedPercent int   `json:"used_percent"`
 }
 
 /*******************************************************************/

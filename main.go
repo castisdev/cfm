@@ -22,10 +22,7 @@ func main() {
 
 	moduleName := "cfm"
 	moduleVersion := "1.0.0"
-	logLevel, err := cilog.LevelFromString(c.LogLevel)
-	if err != nil {
-		panic(err)
-	}
+	logLevel, _ := cilog.LevelFromString(c.LogLevel)
 
 	cilog.Set(cilog.NewLogWriter(c.LogDir, moduleName, 10*1024*1024), moduleName, moduleVersion, logLevel)
 

@@ -169,20 +169,20 @@ func RunForever() {
 
 			// 9. 이미 task queue 에 있는 파일이면 skip
 			if _, exists := tasks.FindTaskByFileName(file.Name); exists {
-				cilog.Debugf("%s is already in task queue", file.Name)
+				//cilog.Debugf("%s is already in task queue", file.Name)
 				continue
 			}
 
 			// 10. 이미 remote file list 에 있는 파일이면 skip
 			if _, exists := remoteFileSet[file.Name]; exists {
-				cilog.Debugf("%s is already in remote file list", file.Name)
+				//cilog.Debugf("%s is already in remote file list", file.Name)
 				continue
 			}
 
 			// 11. SAN 에 없는 파일이면 제외
 			filePath, exists := SourcePath.IsExistOnSource(file.Name)
 			if exists != true {
-				cilog.Debugf("%s not found in sources", file.Name)
+				//cilog.Debugf("%s not found in sources", file.Name)
 				continue
 			}
 
@@ -228,7 +228,7 @@ func CleanTask(tasks *Tasks) {
 
 		switch t.Status {
 		case DONE:
-			cilog.Infof("task is done,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),Ctime(%d),Mtime(%d),Status(%s)",
+			cilog.Successf("task is done,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),Ctime(%d),Mtime(%d),Status(%s)",
 				t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.Ctime, t.Mtime, t.Status)
 		case TIMEOUT:
 			cilog.Warningf("task timeout!!,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),Ctime(%d),Mtime(%d),Status(%s)",

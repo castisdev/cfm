@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/castisdev/cilog"
 	"github.com/spf13/viper"
 )
 
@@ -52,6 +53,10 @@ func ValidationConfig(c Config) {
 			fmt.Printf("not exists source dir (%s)\n", err)
 			os.Exit(-1)
 		}
+	}
+
+	if _, err := cilog.LevelFromString(c.LogLevel); err != nil {
+		fmt.Printf("invalid log level : error(%s)", err)
 	}
 
 }

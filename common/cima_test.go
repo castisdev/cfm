@@ -43,12 +43,10 @@ func TestGetRemoteFileList(t *testing.T) {
 func TestGetRemoteDiskUsage(t *testing.T) {
 
 	duSample := DiskUsage{
-		FileSystem:  "ostype",
 		TotalSize:   100,
 		UsedSize:    80,
 		FreeSize:    20,
 		UsedPercent: 80,
-		MountPoint:  "/data",
 	}
 
 	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
