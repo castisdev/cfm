@@ -1,6 +1,8 @@
 package common
 
 import (
+	"errors"
+	"fmt"
 	"net"
 	"os"
 	"strconv"
@@ -97,4 +99,41 @@ func SplitHostPort(str string) (Host, error) {
 	port := int(port64)
 	host := Host{IP: ip, Port: port}
 	return host, nil
+}
+
+// GetIPv4ByInterfaceName :
+func GetIPv4ByInterfaceName(ifname string) (string, error) {
+
+	ifs, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+
+	for _, i := range ifs {
+		if i.Name == ifname {
+
+			addrs, err := i.Addrs()
+
+			if err != nil {
+				return "", err
+			}
+
+			for _, addr := range addrs {
+
+				switch ip := addr.(type) {
+
+				}
+				ip, ok := addr.(*net.IPNet)
+				if !ok {
+					return "", errors.New("it is not *net.IPNet type")
+				}
+
+				if ip.IP.DefaultMask() != nil {
+					return ip.IP.String(), nil
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("%s not found", ifname)
 }

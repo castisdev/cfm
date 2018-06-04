@@ -102,3 +102,13 @@ func TestSplitHostPort(t *testing.T) {
 		})
 	}
 }
+
+// TestGetIPv4ByInterfaceName : 이 테스트는 테스트 환경마다 결과 값이 달라질 수 있다.
+func TestGetIPv4ByInterfaceName(t *testing.T) {
+	ip, err := GetIPv4ByInterfaceName("en0")
+
+	if err != nil {
+		t.Errorf("error : (%s)", err)
+	}
+	assert.Equal(t, "192.168.0.28", ip)
+}
