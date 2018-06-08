@@ -98,11 +98,6 @@ func main() {
 
 	tasks = tasker.GetTaskListInstance()
 
-	// dummy data
-	//tasks.CreateTask(&tasker.Task{FilePath: "/data2/a.mpg", FileName: "a.mpg", SrcIP: "127.0.0.1"})
-	//tasks.CreateTask(&tasker.Task{FilePath: "/data3/b.mpg", FileName: "b.mpg", SrcIP: "127.0.0.2"})
-	//tasks.CreateTask(&tasker.Task{FilePath: "/data2/c.mpg", FileName: "c.mpg", SrcIP: "127.0.0.3"})
-
 	router := NewRouter()
 	s := &http.Server{
 		Addr:         ":8080",

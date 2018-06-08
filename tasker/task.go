@@ -80,7 +80,7 @@ type Task struct {
 
 // Tasks is slice of Task struct
 type Tasks struct {
-	mutex   *sync.Mutex
+	mutex   *sync.RWMutex
 	TaskMap map[int64]*Task
 }
 
@@ -93,13 +93,13 @@ func NewTasks() *Tasks {
 		new(Task)
 	*/
 	tmp := make(map[int64]*Task)
-	return &Tasks{&sync.Mutex{}, tmp}
+	return &Tasks{&sync.RWMutex{}, tmp}
 }
 
 // GetTaskList is to get task list as Task slice
 func (tasks Tasks) GetTaskList() (tl []Task) {
-	tasks.mutex.Lock()
-	defer tasks.mutex.Unlock()
+	tasks.mutex.RLock()
+	defer tasks.mutex.RUnlock()
 
 	for _, v := range tasks.TaskMap {
 		tl = append(tl, *v)
@@ -111,8 +111,8 @@ func (tasks Tasks) GetTaskList() (tl []Task) {
 // FindTaskByID is to find task with task ID
 func (tasks Tasks) FindTaskByID(id int64) (Task, bool) {
 
-	tasks.mutex.Lock()
-	defer tasks.mutex.Unlock()
+	tasks.mutex.RLock()
+	defer tasks.mutex.RUnlock()
 
 	for _, task := range tasks.TaskMap {
 		if task.ID == id {
@@ -126,8 +126,8 @@ func (tasks Tasks) FindTaskByID(id int64) (Task, bool) {
 // FindTaskByFileName is to find task with task ID
 func (tasks Tasks) FindTaskByFileName(name string) (Task, bool) {
 
-	tasks.mutex.Lock()
-	defer tasks.mutex.Unlock()
+	tasks.mutex.RLock()
+	defer tasks.mutex.RUnlock()
 
 	for _, task := range tasks.TaskMap {
 		if task.FileName == name {
