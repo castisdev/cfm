@@ -1,28 +1,52 @@
+# 광고 파일은 배포/삭제 대상에서 제외해야 한다.
+# KT 에서 사용하는 광고 파일은 이름에 특별한 규칙이 있다. (M64 또는 MN1 으로 시작함)
+# 이를 이용하여 광고 파일 여부를 결정한다.
 adv_prefixes:
 - M64
 - MN1
 
+# 배포할 파일들이 존재하는 경로
 source_dirs:
 - /data2
 - /data3
 
+# 파일 우선순위,크기를 구하기 위해 이용하는 파일들의 경로
 hitcount_history_file: /data2/FailOver/.hitcount.history
 grade_info_file: /data2/FailOver/.grade.info
 
+# cfw 의 용량 제한 %
+# 이 값을 기준으로 cfw 에서 파일 삭제
 storage_usage_limit_percent: 90
-log_dir: /var/log/castis/cfm_log
-# 1:debug  2:report  3:info 4:success 5:warning 6:error 7:fail 8:exception 9:critical
-log_level: 3 
 
+# 유효한 log_level : debug,report,info,success,warning,error,fail,exception,critical
+log_level: info
+log_dir: /var/log/castis/cfm_log
+
+# cfw 가 배포 스케줄을 시작해놓고 비정상 종료해버리거나
+# cfw 가 아예 구동이 안되는 등의 예외 상황이 생길 경우
+# 해당 cfw 에 대한 배포 스케줄을 취소해야 한다.
+# 이를 위해 task 마다 timeout 을 설정한다.
 task_timeout_sec: 3600
 task_copy_speed_bps: 10000000
 
 servers:
-  sources:
-    - 172.18.0.101:8080
-    - 172.18.0.102:8080
-    - 172.18.0.103:8080
-  destinations:
-    - 172.18.0.101:8080
-    - 172.18.0.102:8080
-    - 172.18.0.103:8080
+  sources: # 배포 시 source 로 선택할 서버
+    - 172.18.0.101:8888
+    - 172.18.0.102:8888
+    - 172.18.0.103:8888
+  destinations: # 배포 대상 서버
+    - 172.18.0.101:8888
+    - 172.18.0.102:8888
+    - 172.18.0.103:8888
+
+# LB EventLog 가 존재하는 경로
+watch_dir: /var/log/castis/lb_log
+
+# LB EventLog 에서 watch_term_min 동안의 로그 중
+# watch_ip_string 에 match되는 로그를 찾아
+# 해당 서버에서 서비스 되는 파일들의 hit 수를 구한다.
+# hit 수가 watch_hit_base 보다 크거나 같으면
+# 해당 파일은 grade 에 상관없이 최우선으로 배포한다.
+watch_ip_string: 125.159.40.3
+watch_hit_base: 5              # 10분 동안 hit >= 5 이면 배포
+watch_term_min: 10             # 10분 동안의 로그만 파싱

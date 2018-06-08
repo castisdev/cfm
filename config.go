@@ -26,6 +26,10 @@ type Config struct {
 	Servers                  Server   `mapstructure:"servers"`
 	TaskTimeout              int64    `mapstructure:"task_timeout_sec"`
 	TaskCopySpeedBPS         string   `mapstructure:"task_copy_speed_bps"`
+	WatchDir                 string   `mapstructure:"watch_dir"`
+	WatchIPString            string   `mapstructure:"watch_ip_string"`
+	WatchTermMin             int      `mapstructure:"watch_term_min"`
+	WatchHitBase             int      `mapstructure:"watch_hit_base"`
 	EnableCoreDump           bool     `mapstructure:"enable_coredump"`
 }
 

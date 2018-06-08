@@ -85,6 +85,10 @@ func main() {
 	tasker.SetGradeInfoFile(c.GradeInfoFile)
 	tasker.SetTaskCopySpeed(c.TaskCopySpeedBPS)
 	tasker.SetAdvPrefix(c.AdvPrefixes)
+	tasker.Tail.SetWatchDir(c.WatchDir)
+	tasker.Tail.SetWatchIPString(c.WatchIPString)
+	tasker.Tail.SetWatchTermMin(c.WatchTermMin)
+	tasker.Tail.SetWatchHitBase(c.WatchHitBase)
 
 	for _, s := range c.SourceDirs {
 		tasker.SourcePath.Add(s)

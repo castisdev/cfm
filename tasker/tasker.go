@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/castisdev/cfm/common"
+	"github.com/castisdev/cfm/tailer"
 	"github.com/castisdev/cilog"
 )
 
@@ -27,6 +28,9 @@ var DstServers *common.Hosts
 
 // SrcServers : 배포할 파일들을 갖고 있는 서버
 var SrcServers *SrcHosts
+
+// Tail :: LB EventLog 를 tailing 하며 SAN 에서 Hit 되는 파일 목록 추출
+var Tail *tailer.Tailer
 
 var tasks *Tasks
 var advPrefixes []string
@@ -84,6 +88,7 @@ func init() {
 	SourcePath = common.NewSourceDirs()
 
 	tasks = NewTasks()
+	Tail = tailer.NewTailer()
 }
 
 // RunForever is to run tasker as go routine
@@ -145,56 +150,91 @@ func RunForever() {
 			cilog.Debugf("parse file(%s),time(%s)", hitcountHistoryFile, time.Since(est))
 		}
 
-		// 5. 모든 서버의 파일 리스트 수집
-		remoteFileSet := make(map[string]int)
-		CollectRemoteFileList(DstServers, remoteFileSet)
-
-		// 6. 높은 등급 순서로 정렬하기 위해 빈 Slice 생성 (map->slice)
+		// 5. 높은 등급 순서로 정렬하기 위해 빈 Slice 생성 (map->slice)
 		sortedFileList := make([]*common.FileMeta, 0, len(fileMetaMap))
 
 		for _, v := range fileMetaMap {
 
-			// 7. 광고 파일은 제외
+			// 6. 광고 파일은 제외
 			if common.IsADFile(v.Name, advPrefixes) {
 				continue
 			}
 			sortedFileList = append(sortedFileList, v)
 		}
 
-		// 8. 높은 등급 순서로 정렬 (가장 높은 등급:1)
+		// 7. 높은 등급 순서로 정렬 (가장 높은 등급:1)
 		sort.Slice(sortedFileList, func(i, j int) bool {
 			return sortedFileList[i].Grade < sortedFileList[j].Grade
 		})
 
+		// 8. 모든 서버의 파일 리스트 수집
+		remoteFileSet := make(map[string]int)
+		CollectRemoteFileList(DstServers, remoteFileSet)
+
+		// 9. LB EventLog 에서 특정 IP 에 할당된 파일 목록 추출
+		hitMapFromLBLog := make(map[string]int)
+		Tail.Tail(&hitMapFromLBLog)
+
+		sortByHit := make([]*common.FileMeta, 0, len(hitMapFromLBLog))
+		for fileName := range hitMapFromLBLog {
+
+			// file size 셋팅 (.hitcount.history 에서 파싱한 정보)
+			// .hitcount.history 에 없을 수도 있음(파일 갱신 주기 때문에)
+			// 그럴 경우 Size = -1
+			fileSize := int64(-1)
+			if fm, exists := fileMetaMap[fileName]; exists {
+				fileSize = fm.Size
+			}
+
+			// file grade 셋팅 (.grade.info 에서 파싱한 정보)
+			// .grade.info 에 없을 수도 있음(파일 갱신 주기 때문에)
+			// 그럴 경우 Grade = -1
+			fileGrade := int32(-1)
+			if fm, exists := fileMetaMap[fileName]; exists {
+				fileGrade = fm.Grade
+			}
+
+			fileMeta := common.FileMeta{Name: fileName, Grade: fileGrade, Size: fileSize}
+			sortByHit = append(sortByHit, &fileMeta)
+		}
+
+		// 10. Hit 수가 많은 순서대로 정렬
+		sort.Slice(sortByHit, func(i, j int) bool {
+			return hitMapFromLBLog[sortByHit[i].Name] > hitMapFromLBLog[sortByHit[j].Name]
+		})
+
+		// 11. LB EventLog 에서 찾은 파일을 먼저 배포하고, 그 후에 .grade.info 등급 순으로 배포하기 위한 file list 정렬
+		sortedFileList = append(sortByHit, sortedFileList...)
+
 		for _, file := range sortedFileList {
 
-			// 9. 이미 task queue 에 있는 파일이면 skip
+			// 12. 이미 task queue 에 있는 파일이면 skip
 			if _, exists := tasks.FindTaskByFileName(file.Name); exists {
-				//cilog.Debugf("%s is already in task queue", file.Name)
+				// cilog.Debugf("%s is already in task queue", file.Name)
 				continue
 			}
 
-			// 10. 이미 remote file list 에 있는 파일이면 skip
+			// 13. 이미 remote file list 에 있는 파일이면 skip
 			if _, exists := remoteFileSet[file.Name]; exists {
-				//cilog.Debugf("%s is already in remote file list", file.Name)
+				// cilog.Debugf("%s is already in remote file list", file.Name)
 				continue
 			}
 
-			// 11. SAN 에 없는 파일이면 제외
+			// 14. SAN 에 없는 파일이면 제외
 			filePath, exists := SourcePath.IsExistOnSource(file.Name)
 			if exists != true {
-				//cilog.Debugf("%s not found in sources", file.Name)
+				// cilog.Debugf("%s not found in sources", file.Name)
 				continue
 			}
 
-			// 12. src ip 선택, 없으면 loop 종료
+			// 15. src ip 선택, 없으면 loop 종료
 			srcIP, exists := SrcServers.selectSourceServer()
 			if exists != true {
 				cilog.Debugf("src is full")
 				break
 			}
 
-			// 13. task 생성
+			// 16. task 생성
 			dstIP := string(dstRing.Value.(string))
 			t := tasks.CreateTask(&Task{FilePath: filePath, FileName: file.Name, SrcIP: srcIP, DstIP: dstIP, Grade: file.Grade, CopySpeed: taskCopySpeed})
 			cilog.Infof("create task,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),CopySpeed(%s),Ctime(%d),Mtime(%d)",
