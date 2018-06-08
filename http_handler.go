@@ -70,6 +70,18 @@ func TaskUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
+	t, _ := tasks.FindTaskByID(ID)
+	switch s.Status {
+	case tasker.WORKING:
+		cilog.Infof("start task,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),CopySpeed(%s),Ctime(%d),Mtime(%d)",
+			t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.CopySpeed, t.Ctime, t.Mtime)
+	case tasker.DONE:
+		cilog.Successf("task is done,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),CopySpeed(%s),Ctime(%d),Mtime(%d)",
+			t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.CopySpeed, t.Ctime, t.Mtime)
+	default:
+		cilog.Warningf("unexpected status(%s)", s.Status.String())
+	}
+
 	if err := tasks.UpdateStatus(ID, s.Status); err != nil {
 		w.WriteHeader(http.StatusConflict)
 		return

@@ -15,6 +15,7 @@ log_dir: /var/log/castis/cfm_log
 log_level: 3 
 
 task_timeout_sec: 3600
+task_copy_speed_bps: 10000000
 
 servers:
   sources:

@@ -66,15 +66,16 @@ func (s Status) String() string {
 
 // Task is struct for copy task
 type Task struct {
-	ID       int64  `json:"id,string"`
-	Ctime    int64  `json:"ctime"`
-	Mtime    int64  `json:"mtime"`
-	Status   Status `json:"status"`
-	SrcIP    string `json:"src_ip"`
-	DstIP    string `json:"dst_ip"`
-	FilePath string `json:"file_path"`
-	FileName string `json:"file_name"`
-	Grade    int32  `json:"grade"`
+	ID        int64  `json:"id,string"`
+	Ctime     int64  `json:"ctime"`
+	Mtime     int64  `json:"mtime"`
+	Status    Status `json:"status"`
+	SrcIP     string `json:"src_ip"`
+	DstIP     string `json:"dst_ip"`
+	FilePath  string `json:"file_path"`
+	FileName  string `json:"file_name"`
+	Grade     int32  `json:"grade"`
+	CopySpeed string `json:"copy_speed"`
 }
 
 // Tasks is slice of Task struct

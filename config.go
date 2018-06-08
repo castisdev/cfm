@@ -25,6 +25,7 @@ type Config struct {
 	LogLevel                 string   `mapstructure:"log_level"`
 	Servers                  Server   `mapstructure:"servers"`
 	TaskTimeout              int64    `mapstructure:"task_timeout_sec"`
+	TaskCopySpeedBPS         string   `mapstructure:"task_copy_speed_bps"`
 	EnableCoreDump           bool     `mapstructure:"enable_coredump"`
 }
 

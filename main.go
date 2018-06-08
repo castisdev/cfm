@@ -79,6 +79,7 @@ func main() {
 	tasker.SetTaskTimeout(time.Duration(c.TaskTimeout) * time.Second)
 	tasker.SetHitcountHistoryFile(c.HitcountHistoryFile)
 	tasker.SetGradeInfoFile(c.GradeInfoFile)
+	tasker.SetTaskCopySpeed(c.TaskCopySpeedBPS)
 
 	for _, s := range c.SourceDirs {
 		tasker.SourcePath.Add(s)

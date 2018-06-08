@@ -32,6 +32,7 @@ var tasks *Tasks
 var advPrefixes []string
 var hitcountHistoryFile string
 var gradeInfoFile string
+var taskCopySpeed string
 
 // GetTaskListInstance is to get global task list structure's addr
 func GetTaskListInstance() *Tasks {
@@ -195,9 +196,9 @@ func RunForever() {
 
 			// 13. task 생성
 			dstIP := string(dstRing.Value.(string))
-			t := tasks.CreateTask(&Task{FilePath: filePath, FileName: file.Name, SrcIP: srcIP, DstIP: dstIP, Grade: file.Grade})
-			cilog.Infof("create task,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),Ctime(%d),Mtime(%d)",
-				t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.Ctime, t.Mtime)
+			t := tasks.CreateTask(&Task{FilePath: filePath, FileName: file.Name, SrcIP: srcIP, DstIP: dstIP, Grade: file.Grade, CopySpeed: taskCopySpeed})
+			cilog.Infof("create task,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),CopySpeed(%s),Ctime(%d),Mtime(%d)",
+				t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.CopySpeed, t.Ctime, t.Mtime)
 			dstRing = dstRing.Next()
 		}
 
@@ -278,4 +279,10 @@ func SetHitcountHistoryFile(f string) {
 func SetGradeInfoFile(f string) {
 	cilog.Debugf("set gradeInfo file path : (%s)", f)
 	gradeInfoFile = f
+}
+
+// SetTaskCopySpeed :
+func SetTaskCopySpeed(speed string) {
+	cilog.Debugf("set task copy speed : (%s)", speed)
+	taskCopySpeed = speed
 }
