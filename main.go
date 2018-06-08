@@ -1,7 +1,11 @@
 package main
 
 import (
+	"flag"
+	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/castisdev/cfm/common"
@@ -12,7 +16,28 @@ import (
 
 var tasks *tasker.Tasks
 
+// App constant
+const (
+	AppName      = "cfm"
+	AppVersion   = "1.0.0"
+	AppPreRelVer = "-rc1"
+)
+
 func main() {
+
+	printSimpleVer := flag.Bool("v", false, "print version")
+	printVer := flag.Bool("version", false, "print version includes pre-release version")
+	flag.Parse()
+
+	if *printSimpleVer {
+		fmt.Println(AppName + " " + AppVersion)
+		os.Exit(0)
+	}
+
+	if *printVer {
+		fmt.Println(AppName + " " + AppVersion + AppPreRelVer)
+		os.Exit(0)
+	}
 
 	c, err := ReadConfig("cfm.yml")
 	if err != nil {
@@ -29,7 +54,8 @@ func main() {
 
 	logLevel, _ := cilog.LevelFromString(c.LogLevel)
 
-	cilog.Set(cilog.NewLogWriter(c.LogDir, moduleName, 10*1024*1024), moduleName, moduleVersion, logLevel)
+	cilog.Set(cilog.NewLogWriter(c.LogDir, AppName, 10*1024*1024), AppName, AppVersion, logLevel)
+	cilog.Infof("process start")
 
 	for _, s := range c.Servers.Destinations {
 		remover.Servers.Add(s)
