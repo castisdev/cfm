@@ -36,19 +36,18 @@ func RunForever() {
 
 		// diskUsageMap's key = ip:port
 		// 1. disk 용량 확인
-		cilog.Debugf("collect disk usage...")
 		collectRemoteDiskUsage(Servers, diskUsageMap)
 
 		for ipPort, diskUsage := range diskUsageMap {
 
 			// 2. 지워야 하는 사이즈 구하고, 용량 충분하면 skip
-			allowedDiskSize := diskUsage.TotalSize * int64(diskUsageLimitPercent/100)
+			allowedDiskSize := diskUsage.TotalSize * int64(diskUsageLimitPercent) / 100
 			sizeToDelete := diskUsage.UsedSize - allowedDiskSize
 			if sizeToDelete <= 0 {
 				cilog.Debugf("size to delete is less than 0 (%d), so skip (%s)", sizeToDelete, ipPort)
 				continue
 			}
-			cilog.Debugf("size to delete is (%d) on (%s)", sizeToDelete, ipPort)
+			cilog.Debugf("size to delete is (%d) on (%s),total(%d),allowedSize(%d)", sizeToDelete, ipPort, diskUsage.TotalSize, allowedDiskSize)
 
 			// grade.info 와 hitcount.history 의 라인 수가 상당하여 한번만 파싱하도록
 			if isAlreadyParsed == false {
