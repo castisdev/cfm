@@ -1,0 +1,29 @@
+- 배포 스케줄 생성
+    - 우선 순위가 높은 순서대로 생성되는지 확인
+    - SAN 에 없는 파일(DAS 에만 있는 파일)은 제외 되는지 확인
+    - src 당 1개씩만 생성되는지 확인
+    - 이미 DAS 에 있는 파일은 skip 하는지 확인
+
+- 삭제 스케줄 생성
+    - 우선 순위가 낮은 순서대로 삭제 하는지 확인
+    - 용량 제한 설정이 정상적인지 확인
+    - SAN 에 없는 파일은 제외 되는지 확인
+    - SAN 와 DAS 모두에 존재하지만 .hitcount.history 또는 .grade.info 에 없는 파일은 제외하는지 확인
+
+- 스케줄 큐 관리
+    - 완료된 task 삭제 확인
+    - timeout task 삭제 확인
+    - 완료된 task 삭제 후 바로 다음 task 생성 되는 지 확인
+
+- worker 들에게 골고루 task 를 줄 방법은?
+    - RR 방식
+    - task 에 dst_ip 명시
+
+- http 인터페이스
+    - task 조회
+    - task 업데이트
+
+- 예외 처리
+    - task 업데이트
+        - status working->working 변경 시도 시 에러 리턴
+        - status ready 로 변경 시도 시 에러 리턴
