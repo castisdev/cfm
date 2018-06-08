@@ -221,22 +221,12 @@ func CleanTask(tasks *Tasks) {
 		if diff > taskTimeout {
 			task.Status = TIMEOUT
 			tl = append(tl, *task)
+			cilog.Warningf("task timeout!!,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),Ctime(%d),Mtime(%d),Status(%s)",
+				task.ID, task.Grade, task.FilePath, task.SrcIP, task.DstIP, task.Ctime, task.Mtime, task.Status)
 		}
 	}
 
 	for _, t := range tl {
-
-		switch t.Status {
-		case DONE:
-			cilog.Successf("task is done,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),Ctime(%d),Mtime(%d),Status(%s)",
-				t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.Ctime, t.Mtime, t.Status)
-		case TIMEOUT:
-			cilog.Warningf("task timeout!!,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),Ctime(%d),Mtime(%d),Status(%s)",
-				t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.Ctime, t.Mtime, t.Status)
-		default:
-			cilog.Warningf("unexpected task status,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),Ctime(%d),Mtime(%d),Status(%s)",
-				t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.Ctime, t.Mtime, t.Status)
-		}
 		tasks.DeleteTask(t.ID)
 	}
 }
@@ -274,15 +264,18 @@ func SetTaskTimeout(t time.Duration) error {
 
 // SetAdvPrefix :
 func SetAdvPrefix(p []string) {
+	cilog.Debugf("set adv prefixes : (%v)", p)
 	advPrefixes = p
 }
 
 // SetHitcountHistoryFile :
 func SetHitcountHistoryFile(f string) {
+	cilog.Debugf("set hitcountHistory file path : (%s)", f)
 	hitcountHistoryFile = f
 }
 
 // SetGradeInfoFile :
 func SetGradeInfoFile(f string) {
+	cilog.Debugf("set gradeInfo file path : (%s)", f)
 	gradeInfoFile = f
 }

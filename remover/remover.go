@@ -92,9 +92,8 @@ func RunForever() {
 			if err != nil {
 				cilog.Errorf("fail to get remote file list (%s:%d), error(%s)", host.IP, host.Port, err.Error())
 				break
-			} else {
-				cilog.Infof("get remote file list (%s:%d)", host.IP, host.Port)
 			}
+			cilog.Debugf("get remote file list (%s:%d)", host.IP, host.Port)
 
 			// 5. 서버별 파일 리스트 구조 변환 []string -> []common.FileMeta
 			var fileList []common.FileMeta
@@ -110,8 +109,6 @@ func RunForever() {
 			for i, file := range fileList {
 				if _, exists := fileMetaMap[file.Name]; exists {
 					fileList[i].Grade = fileMetaMap[file.Name].Grade
-				} else {
-					cilog.Debugf("(%s) not exists in grade.info")
 				}
 			}
 
@@ -119,8 +116,6 @@ func RunForever() {
 			for i, file := range fileList {
 				if _, exists := fileMetaMap[file.Name]; exists {
 					fileList[i].Size = fileMetaMap[file.Name].Size
-				} else {
-					cilog.Debugf("(%s) not exists in hitcount.history")
 				}
 			}
 
@@ -150,7 +145,6 @@ func RunForever() {
 
 				sizeToDelete -= file.Size
 				fileListToDelete = append(fileListToDelete, file.Name)
-				cilog.Debugf("%s will be deleted. (-%d), (%d)\n", file.Name, file.Size, sizeToDelete)
 			}
 
 			for _, file := range fileListToDelete {
@@ -158,7 +152,11 @@ func RunForever() {
 				if err := common.DeleteFileOnRemote(&host, file); err != nil {
 					cilog.Errorf("fail to delete file(%s) on (%s:%d),error(%s)", file, host.IP, host.Port, err.Error())
 				} else {
-					cilog.Infof("delete file(%s) on (%s:%d)", file, host.IP, host.Port)
+					if grade, exists := fileMetaMap[file]; exists {
+						cilog.Successf("success to delete,file(%s),grade(%d),server(%s:%d)", file, grade.Grade, host.IP, host.Port)
+					} else {
+						cilog.Successf("success to delete,file(%s),server(%s:%d)", file, host.IP, host.Port)
+					}
 				}
 			}
 		}
@@ -173,7 +171,7 @@ func collectRemoteDiskUsage(hostList *common.Hosts, diskUsageMap map[string]*com
 		du := new(common.DiskUsage)
 		err := common.GetRemoteDiskUsage(host, du)
 		if err != nil {
-			cilog.Errorf("fail to connect to (%s:%d)", host.IP, host.Port)
+			cilog.Errorf("fail to connect to (%s:%d),error(%s)", host.IP, host.Port, err.Error())
 		} else {
 			cilog.Debugf("get remote(%s:%d) disk usage", host.IP, host.Port)
 		}

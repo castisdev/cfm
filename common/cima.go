@@ -70,7 +70,6 @@ func GetRemoteDiskUsage(host *Host, du *DiskUsage) error {
 
 	res, getErr := httpClient.Do(req)
 	if getErr != nil {
-		log.Printf("%s:%d HTTP GET Error(%s)", host.IP, host.Port, getErr)
 		return getErr
 	}
 	defer res.Body.Close()
