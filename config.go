@@ -25,11 +25,13 @@ type Config struct {
 	LogLevel                 string   `mapstructure:"log_level"`
 	Servers                  Server   `mapstructure:"servers"`
 	TaskTimeout              int64    `mapstructure:"task_timeout_sec"`
+	EnableCoreDump           bool     `mapstructure:"enable_coredump"`
 }
 
 // ReadConfig :
 func ReadConfig(configFile string) (*Config, error) {
 
+	viper.SetDefault("enable_coredump", false)
 	var c Config
 	viper.SetConfigFile(configFile)
 

@@ -3,9 +3,11 @@ package common
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"strconv"
+	"syscall"
 )
 
 // DiskUsage is a struct for disk usage(df)
@@ -136,4 +138,28 @@ func GetIPv4ByInterfaceName(ifname string) (string, error) {
 	}
 
 	return "", fmt.Errorf("%s not found", ifname)
+}
+
+// SetFDLimit :
+func SetFDLimit(n uint64) error {
+	var rlimit syscall.Rlimit
+	err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rlimit)
+	if err != nil {
+		return err
+	}
+	rlimit.Max = n
+	rlimit.Cur = n
+	return syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rlimit)
+}
+
+// EnableCoreDump :
+func EnableCoreDump() error {
+	var rlimit syscall.Rlimit
+	err := syscall.Getrlimit(syscall.RLIMIT_CORE, &rlimit)
+	if err != nil {
+		return err
+	}
+	rlimit.Max = math.MaxUint64
+	rlimit.Cur = rlimit.Max
+	return syscall.Setrlimit(syscall.RLIMIT_CORE, &rlimit)
 }
