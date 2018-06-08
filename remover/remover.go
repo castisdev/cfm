@@ -53,28 +53,19 @@ func RunForever() {
 			if isAlreadyParsed == false {
 
 				// 3. 파일 등급 list 생성
-				fileName := "/Users/hsyang/go/src/cfm/remover/grade.info"
-				if err := common.ParseGradeFile(fileName, fileMetaMap); err != nil {
-					cilog.Debugf("fail to parse file(%s), error(%s)", fileName, err.Error())
+				if err := common.ParseGradeFile(gradeInfoFile, fileMetaMap); err != nil {
+					cilog.Errorf("fail to parse file(%s), error(%s)", gradeInfoFile, err.Error())
 					break
-				} else {
-					cilog.Debugf("parse file(%s)", fileName)
 				}
+				cilog.Infof("parse file(%s)", gradeInfoFile)
 
-				fileName = "/Users/hsyang/go/src/cfm/remover/hitcount.history"
-				if err := common.ParseHitcountFile(fileName, fileMetaMap); err != nil {
-					cilog.Debugf("fail to parse file(%s), error(%s)", fileName, err.Error())
+				if err := common.ParseHitcountFile(hitcountHistoryFile, fileMetaMap); err != nil {
+					cilog.Errorf("fail to parse file(%s), error(%s)", hitcountHistoryFile, err.Error())
 					break
-				} else {
-					cilog.Debugf("parse file(%s)", fileName)
 				}
+				cilog.Infof("parse file(%s)", hitcountHistoryFile)
 
 				isAlreadyParsed = true
-				/*
-					for k, v := range fileMetaMap {
-						cilog.Debugf("%s:%d:%d\n", k, v.grade, v.size)
-					}
-				*/
 			}
 
 			host, err := common.SplitHostPort(ipPort)

@@ -60,13 +60,17 @@ func main() {
 	for _, s := range c.Servers.Destinations {
 		remover.Servers.Add(s)
 	}
-	remover.SetDiskUsageLimitPercent(c.StorageUsageLimitPercent)
 
 	for _, s := range c.SourceDirs {
 		remover.SourcePath.Add(s)
 	}
 
-	//go remover.RunForever()
+	remover.SetDiskUsageLimitPercent(c.StorageUsageLimitPercent)
+	remover.SetGradeInfoFile(c.GradeInfoFile)
+	remover.SetHitcountHistoryFile(c.HitcountHistoryFile)
+	remover.SetAdvPrefix(c.AdvPrefixes)
+
+	go remover.RunForever()
 
 	for _, s := range c.Servers.Sources {
 		tasker.SrcServers.Add(s)
@@ -80,6 +84,7 @@ func main() {
 	tasker.SetHitcountHistoryFile(c.HitcountHistoryFile)
 	tasker.SetGradeInfoFile(c.GradeInfoFile)
 	tasker.SetTaskCopySpeed(c.TaskCopySpeedBPS)
+	tasker.SetAdvPrefix(c.AdvPrefixes)
 
 	for _, s := range c.SourceDirs {
 		tasker.SourcePath.Add(s)
