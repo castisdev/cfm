@@ -11,7 +11,6 @@ import (
 	"github.com/castisdev/cilog"
 )
 
-var maxTaskCount int
 var taskTimeout time.Duration
 
 // SrcHost 구조체에 src 선택 여부를 알기 위한 bool 변수 추가
@@ -80,7 +79,6 @@ var SourcePath *common.SourceDirs
 
 func init() {
 
-	maxTaskCount = 10
 	taskTimeout = 30 * time.Minute
 
 	SrcServers = NewHosts()
@@ -176,7 +174,7 @@ func RunForever() {
 		Tail.Tail(&hitMapFromLBLog)
 
 		sortByHit := make([]*common.FileMeta, 0, len(hitMapFromLBLog))
-		for fileName := range hitMapFromLBLog {
+		for fileName, hitCount := range hitMapFromLBLog {
 
 			// file size 셋팅 (.hitcount.history 에서 파싱한 정보)
 			// .hitcount.history 에 없을 수도 있음(파일 갱신 주기 때문에)
@@ -194,7 +192,7 @@ func RunForever() {
 				fileGrade = fm.Grade
 			}
 
-			fileMeta := common.FileMeta{Name: fileName, Grade: fileGrade, Size: fileSize}
+			fileMeta := common.FileMeta{Name: fileName, Grade: fileGrade, Size: fileSize, HitCount: hitCount}
 			sortByHit = append(sortByHit, &fileMeta)
 		}
 
@@ -237,9 +235,16 @@ func RunForever() {
 			// 16. task 생성
 			dstIP := string(dstRing.Value.(string))
 			t := tasks.CreateTask(&Task{FilePath: filePath, FileName: file.Name, SrcIP: srcIP, DstIP: dstIP, Grade: file.Grade, CopySpeed: taskCopySpeed})
-			cilog.Infof("create task,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),CopySpeed(%s),Ctime(%d),Mtime(%d)",
-				t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.CopySpeed, t.Ctime, t.Mtime)
 			dstRing = dstRing.Next()
+
+			if file.HitCount > 0 {
+				cilog.Infof("create task for rising HIT(%d) content,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),CopySpeed(%s),Ctime(%d),Mtime(%d)",
+					file.HitCount, t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.CopySpeed, t.Ctime, t.Mtime)
+			} else {
+				cilog.Infof("create task,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),CopySpeed(%s),Ctime(%d),Mtime(%d)",
+					t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.CopySpeed, t.Ctime, t.Mtime)
+			}
+
 		}
 
 		time.Sleep(time.Second * 5)

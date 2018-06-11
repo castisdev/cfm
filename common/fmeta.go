@@ -12,6 +12,10 @@ type FileMeta struct {
 	Name  string
 	Grade int32
 	Size  int64
+
+	// LB EventLog 에서 Hit 가 급격하게 오른 파일들의 Hit 수
+	// Refactoring 필요한듯... 여기 말고 다른 곳에 있어야 할 것 같음...
+	HitCount int
 }
 
 // ParseHitcountFile is to parse file name, file size from .hitcount.history
