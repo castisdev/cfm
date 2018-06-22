@@ -1,0 +1,100 @@
+@startuml
+title "CFM Sequence Diagram"
+
+box "ADC/LSM"
+participant cfm
+end box
+
+box "VOD"
+participant cw as "cfw"
+end box
+
+box "VOD(source)"
+participant cw2 as "cfw"
+participant dfs as "DFS"
+end box
+
+group file-remover-thread
+loop endless
+autonumber 1 "<b>[0]"
+cfm->cfm: file meta 정보 생성
+    note right
+        - .hitcount.history 에서 file size 추출
+        - .grade.info 에서 file 순위 추출
+    end note
+
+cfm->cw: GET /df
+    note right
+        디스크 용량 체크
+    end note
+cfm->cw2: GET /df
+cfm->cw: GET /files
+    note right
+        서버별 file list 확인
+    end note
+cfm->cw2: GET /files
+cfm->cw: GET /files/a.mpg
+    note right
+        file 삭제
+    end note
+cfm->cw2: GET /files/a.mpg
+end
+end
+
+group task-manager-thread
+loop endless
+autonumber 1 "<b>[0]"
+cfm->cfm: file meta 정보 생성
+    note right
+        - .hitcount.history 에서 file size 추출
+        - .grade.info 에서 file 순위 추출
+    end note
+cfm->cfm: check task queue
+    note right
+        배포 schedule 조회
+    end note
+cfm->cfm: clean task queue
+    note right
+        schedule 삭제
+        - 완료되었거나 (status = done)
+        - timeout ( mtime + 30분 =< current time )
+    end note
+cfm->cw: GET /files
+    note right
+        서버별 file list 확인
+    end note
+cfm->cw2: GET /files
+cfm->cfm: create task
+    note right
+        배포 schedule 생성
+        - 순위가 높은 순서부터 조건 확인
+        - task queue 에 없고
+        - VOD 서버에 없고
+        - SAN 에 존재하는 파일인 경우 선택
+        - 모든 src 가 선택될 때까지 생성
+    end note
+end
+end
+
+group cfw
+loop endless
+autonumber 1 "<b>[0]"
+cw->cfm: GET /tasks
+    note left
+        배포 schedule 조회
+    end note
+cw->cfm: PATCH /tasks/${task_id}
+    note left
+        file 다운로드 시작 전 schedule 상태 변경
+        - status:ready -> status:working
+    end note
+cw->dfs: file 다운로드 요청
+cw->cfm: PATCH /tasks/${task_id}
+    note left
+        file 다운로드 완료 후 schedule 상태 변경
+        - status:working -> status:done
+    end note
+end
+end
+
+@enduml

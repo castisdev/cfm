@@ -6,12 +6,14 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"time"
 
 	"github.com/castisdev/cfm/common"
 	"github.com/castisdev/cfm/remover"
 	"github.com/castisdev/cfm/tasker"
 	"github.com/castisdev/cilog"
+	"github.com/kardianos/osext"
 )
 
 var tasks *tasker.Tasks
@@ -39,9 +41,14 @@ func main() {
 		os.Exit(0)
 	}
 
-	c, err := ReadConfig("cfm.yml")
+	execDir, err := osext.ExecutableFolder()
 	if err != nil {
-		panic(err)
+		log.Fatalf("fail to get executable folder, %s", err)
+	}
+
+	c, err := ReadConfig(path.Join(execDir, "cfm.yml"))
+	if err != nil {
+		log.Fatalf("fail to read config,err(%s)", err)
 	}
 
 	ValidationConfig(*c)
