@@ -121,10 +121,6 @@ func GetIPv4ByInterfaceName(ifname string) (string, error) {
 			}
 
 			for _, addr := range addrs {
-
-				switch ip := addr.(type) {
-
-				}
 				ip, ok := addr.(*net.IPNet)
 				if !ok {
 					return "", errors.New("it is not *net.IPNet type")
