@@ -1,0 +1,24 @@
+[version 1.0.0.QR1]
+릴리즈 날짜 : 2019-11-12
+
+컴파일 환경
+- go version go1.13 linux/amd64
+
+개발자 - 윤상훈
+
+- 개발 내역
+	1. core 생성 기능 추가
+	2. lb eventlog, grade.info, hitcount.history read 시 빈칸이 있을시 비정상 종료 문제 수정
+	3. task 생성 주기를 5초 -> 1분으로 변경
+	4. lb eventlog read 시 전체 parsing 하도록 변경
+	5. grade.info, hitcount.history read 실패 시 더이상 task 생성하지 않는 문제 수정
+
+[version 1.0.0.RC1]
+릴리즈 날짜 : 
+
+컴파일 환경
+- 
+
+개발자 - 양희성
+
+- 초기 버전 개발
