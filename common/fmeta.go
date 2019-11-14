@@ -30,7 +30,17 @@ func ParseHitcountFile(fileName string, fmm map[string]*FileMeta) error {
 	scanner := bufio.NewScanner(file)
 	scanner.Scan() // remove header
 	for scanner.Scan() {
+
+		if scanner.Text() == "" {
+			continue
+		}
+
 		cols := strings.Split(scanner.Text(), ",")
+
+		if len(cols) < 4 {
+			continue
+		}
+
 		fileName := cols[0]
 		fileSize := cols[3]
 
@@ -59,6 +69,9 @@ func ParseGradeFile(fileName string, fmm map[string]*FileMeta) error {
 	scanner.Scan() // remove header
 	i := int32(1)
 	for scanner.Scan() {
+		if scanner.Text() == "" {
+			continue
+		}
 		cols := strings.Split(scanner.Text(), "\t")
 		fileName := cols[0]
 		// hitcount.history 에서 파일 사이즈를 가져오게 되는데,
