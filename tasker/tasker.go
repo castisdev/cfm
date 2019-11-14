@@ -135,7 +135,8 @@ func RunForever() {
 		est = time.Now()
 		if err := common.ParseGradeFile(gradeInfoFile, fileMetaMap); err != nil {
 			cilog.Debugf("fail to parse file(%s), error(%s)", gradeInfoFile, err.Error())
-			break
+			time.Sleep(time.Second * 5)
+			continue
 		} else {
 			cilog.Debugf("parse file(%s),time(%s)", gradeInfoFile, time.Since(est))
 		}
@@ -143,7 +144,8 @@ func RunForever() {
 		est = time.Now()
 		if err := common.ParseHitcountFile(hitcountHistoryFile, fileMetaMap); err != nil {
 			cilog.Debugf("fail to parse file(%s), error(%s)", hitcountHistoryFile, err.Error())
-			break
+			time.Sleep(time.Second * 5)
+			continue
 		} else {
 			cilog.Debugf("parse file(%s),time(%s)", hitcountHistoryFile, time.Since(est))
 		}
@@ -247,7 +249,7 @@ func RunForever() {
 
 		}
 
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 60)
 	}
 }
 
