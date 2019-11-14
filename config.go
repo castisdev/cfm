@@ -36,7 +36,7 @@ type Config struct {
 // ReadConfig :
 func ReadConfig(configFile string) (*Config, error) {
 
-	viper.SetDefault("enable_coredump", false)
+	viper.SetDefault("enable_coredump", true)
 	var c Config
 	viper.SetConfigFile(configFile)
 

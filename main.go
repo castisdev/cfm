@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"runtime/debug"
 	"time"
 
 	"github.com/castisdev/cfm/common"
@@ -22,10 +23,12 @@ var tasks *tasker.Tasks
 const (
 	AppName      = "cfm"
 	AppVersion   = "1.0.0"
-	AppPreRelVer = "-rc1"
+	AppPreRelVer = "-qr1"
 )
 
 func main() {
+
+	debug.SetTraceback("crash")
 
 	printSimpleVer := flag.Bool("v", false, "print version")
 	printVer := flag.Bool("version", false, "print version includes pre-release version")
