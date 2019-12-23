@@ -65,4 +65,10 @@ var routes = Routes{
 		Pattern:     "/dashboard",
 		HandlerFunc: DashBoard,
 	},
+	Route{
+		Name:        "HostStateDashBoard",
+		Method:      "GET",
+		Pattern:     "/dashboard/hb",
+		HandlerFunc: HostStateDashBoard,
+	},
 }

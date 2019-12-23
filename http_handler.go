@@ -6,11 +6,16 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/castisdev/cfm/heartbeater"
 	"github.com/castisdev/cfm/tasker"
-	"github.com/castisdev/cilog"
 
 	"github.com/gorilla/mux"
 )
+
+func HostStateDashBoard(w http.ResponseWriter, r *http.Request) {
+	tpl := template.Must(template.ParseFiles("dashboard/hoststate.html"))
+	tpl.Execute(w, heartbeater.GetList())
+}
 
 // DashBoard :
 func DashBoard(w http.ResponseWriter, r *http.Request) {
@@ -64,37 +69,28 @@ func TaskUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
-		cilog.Errorf("decode json fail : %s", err)
+		api.Errorf("decode json fail : %s", err)
 		w.WriteHeader(http.StatusNotAcceptable)
 		return
 	}
 	defer r.Body.Close()
 
 	t, exists := tasks.FindTaskByID(ID)
-	if exists {
-
-		switch s.Status {
-		case tasker.WORKING:
-			cilog.Infof("start task,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),CopySpeed(%s),Ctime(%d),Mtime(%d)",
-				t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.CopySpeed, t.Ctime, t.Mtime)
-		case tasker.DONE:
-			cilog.Successf("finish task,ID(%d),Grade(%d),FilePath(%s),SrcIP(%s),DstIP(%s),CopySpeed(%s),Ctime(%d),Mtime(%d)",
-				t.ID, t.Grade, t.FilePath, t.SrcIP, t.DstIP, t.CopySpeed, t.Ctime, t.Mtime)
-		default:
-			cilog.Warningf("unexpected status(%s)", s.Status.String())
-		}
-
-		if err := tasks.UpdateStatus(ID, s.Status); err != nil {
-			w.WriteHeader(http.StatusConflict)
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-
-	} else {
-
-		cilog.Warningf("received request to update status for invalid task,ID(%d),Status(%s)", ID, s.Status)
+	if !exists {
+		api.Warningf("receive update task status(%s) request for invalid task,ID(%d)",
+			s.Status, ID)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
+
+	if err := tasks.UpdateStatus(ID, s.Status); err != nil {
+		api.Errorf("fail to update task status(%s),task(%s),error(%s)",
+			s.Status, t, err.Error())
+		w.WriteHeader(http.StatusConflict)
+		return
+	}
+
+	api.Infof("success updating task status(%s),task(%s)",
+		s.Status, t)
+	w.WriteHeader(http.StatusOK)
 }

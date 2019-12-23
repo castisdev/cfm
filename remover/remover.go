@@ -7,182 +7,345 @@ import (
 	"time"
 
 	"github.com/castisdev/cfm/common"
+	"github.com/castisdev/cfm/tailer"
 	"github.com/castisdev/cilog"
 )
+
+// map: file name -> *common.FileMeta
+type FileMetaPtrMap map[string]*common.FileMeta
+
+// map: common.Host.addr -> (map : filename -> *common.FileMeta)
+type ServerFileMetaPtrMap map[string]FileMetaPtrMap
+
+// map : common.Host.addr -> *common.DiskUsage
+type ServerDiskUsagePtrMap map[string]*common.DiskUsage
+
+type DServer struct {
+	*common.Host
+	du common.DiskUsage
+}
 
 // Servers : 파일 삭제 대상 서버 리스트
 var Servers *common.Hosts
 
 // SourcePath : 파일 삭제 시 Source 에 없는 파일이면 삭제 대상에서 제외하기 위해 사용
 var SourcePath *common.SourceDirs
-var diskUsageLimitPercent int
+var diskUsageLimitPercent uint
 
 var advPrefixes []string
 var hitcountHistoryFile string
 var gradeInfoFile string
+var sleepSec uint
+
+// Tail :: LB EventLog 를 tailing 하며 SAN 에서 Hit 되는 파일 목록 추출
+var Tail *tailer.Tailer
+
+var remover common.MLogger
 
 func init() {
 	Servers = common.NewHosts()
 	SourcePath = common.NewSourceDirs()
+
+	Tail = tailer.NewTailer()
+	sleepSec = 30
+
+	remover = common.MLogger{
+		Logger: cilog.StdLogger(),
+		Mod:    "remover"}
 }
 
-// RunForever is to run remover as go routine
+// SetSleepSec :
+func SetSleepSec(s uint) {
+	remover.Debugf("set sleepSec(%d)", s)
+	sleepSec = s
+}
+
+// selectFileMetas :
+// param 으로 받은 file meta들 중에,
+// server에 있는 file들의 file meta pointer만 모아놓은 map을 반환함
+func selectFileMetas(server *common.Host,
+	fileMetaMap FileMetaPtrMap) (FileMetaPtrMap, error) {
+
+	sfm := make(FileMetaPtrMap)
+
+	fl := make([]string, 0, 10000)
+	err := common.GetRemoteFileList(server, &fl)
+	if err != nil {
+		s := fmt.Sprintf("fail to get remote file list, error(%s)", err.Error())
+		return sfm, errors.New(s)
+	}
+	for _, filename := range fl {
+		// 예외처리 : 아직 해당 서버의 파일 내용이 반영이 안된 상황 등으로 인해서
+		// 서버에 있지만 전체 파일 목록에서 찾을 수 없으면 제외
+		fm, ok := fileMetaMap[filename]
+		if !ok {
+			//			remover.Debugf("[%s] skip file, with no grade or no size, file(%s)", server, filename)
+			continue
+		}
+		// 등급이나 크기 중 하나만 있거나, 값이 잘못된 경우 제외
+		if fm.Grade <= 0 || fm.Size <= 0 {
+			// remover.Debugf("[%s] skip file, with wrong grade(%d) or wrong size(%d),"+
+			// 	" file(%s)", server, fm.Grade, fm.Size, filename)
+			continue
+		}
+		// 파일이 위치한 server list에 현재 서버가 없다면 제외
+		n, exist := fm.ServerIPs[server.IP]
+		if !exist || (exist && n == 0) {
+			// remover.Debugf("[%s] skip file, not found in the serverlist, file(%s)"+
+			// 	", exist(%t), count(%d)",
+			// 	server, filename, exist, n)
+			continue
+		}
+
+		sfm[filename] = fm
+	}
+	return sfm, nil
+}
+
+// getServerFileMetas :
+// 전체 파일 목록 중에
+// 서버 별로 있는 파일 목록을 구해서 반환
+// 서버 파일 목록을 구하다 에러가 난 경우, 해당 서버의 목록은 비어있게 됨
+func getServerFileMetas(allfmm FileMetaPtrMap) ServerFileMetaPtrMap {
+	sfmm := make(ServerFileMetaPtrMap)
+	for _, server := range *Servers {
+		sfms, err := selectFileMetas(server, allfmm)
+		sfmm[server.Addr] = sfms
+		if err != nil {
+			remover.Errorf("[%s] fail to get server file meatas, erorr(%s)",
+				server, err.Error())
+		}
+	}
+	return sfmm
+}
+
+// 현재 서버와 통신이 안되서, 또는
+// 현재 서버에는 없지만, 아직 전체 파일 목록에 반영이 안되서
+// 중복 파일의 서버 list에 현재 서버 정보가 있는 경우
+// file meta 정보에서 현재 서버 정보 삭제
+func updateAllFileMetasForDuplicatedFiles(fileMetaMap FileMetaPtrMap,
+	duplicatedFileMap FileMetaPtrMap, ssfms ServerFileMetaPtrMap) {
+	for _, server := range *Servers {
+		sfms := ssfms[server.Addr]
+		for dfn, _ := range duplicatedFileMap {
+			_, ok := sfms[dfn]
+			if !ok {
+				// 중복 파일의 서버 list에 현재 서버 정보가 있는 경우,
+				// file meta 정보에서 현재 서버 정보 삭제
+				_, e := fileMetaMap[dfn].ServerIPs[server.IP]
+				if e {
+					// remover.Debugf("[%s] delete in the serverlist, not found in the server, file(%s)",
+					// 	server, dfn)
+					fileMetaMap[dfn].ServerCount--
+					fileMetaMap[dfn].ServerIPs[server.IP]--
+				}
+				continue
+			}
+		}
+	}
+}
+
+// 서버 파일 중에 중복 서버 list에 있는 파일 목록 구해서 delete 요청 하기
+func requestRemoveServerDuplicatedFiles(duplicatedFileMap FileMetaPtrMap,
+	ssfms ServerFileMetaPtrMap) {
+	// 서버 파일 중에 중복 서버 list에 있는 파일 목록 구해서 delete 요청 하기
+	for _, server := range *Servers {
+		sfms := ssfms[server.Addr]
+		for dfn, _ := range duplicatedFileMap {
+			fm, ok := sfms[dfn]
+			if !ok {
+				// remover.Debugf("[%s] skip removing duplicated files, not found in the server"+
+				// 	", file(%s)", server, dfn)
+				continue
+			}
+			if fm.ServerCount < 2 {
+				// remover.Debugf("[%s] skip removing duplicated files, one copy left"+
+				// 	", file(%s)", server, dfn)
+				continue
+			}
+			if err := common.DeleteFileOnRemote(server, fm.Name); err != nil {
+				remover.Errorf("[%s] fail to request delete duplicated, file(%s), error(%s)",
+					server, fm, err.Error())
+				continue
+			}
+			remover.Infof("[%s] success requesting delete duplicated, file(%s)", server, fm)
+			// 현재 server에 delete 요청 성공한 파일에 대해서
+			// file meta 정보에서 현재 서버 정보 삭제
+			fm.ServerCount--
+			fm.ServerIPs[server.IP]--
+		}
+	}
+}
+
+// 서버 중에 disk 용량이 충분하지 않는 서버 구함
+func getServerWithNotEnoughDisk(serverList *common.Hosts) []DServer {
+	s := make([]DServer, 0, len(*serverList))
+	for _, server := range *serverList {
+		du := new(common.DiskUsage)
+		err := common.GetRemoteDiskUsage(server, du)
+		if err != nil {
+			remover.Errorf("[%s] fail to get disk usage, error(%s)", server, err.Error())
+			continue
+		}
+		// limit used size 까지 사용하지 않았으면 skip
+		limitUsedSize := du.GetLimitUsedSize(diskUsageLimitPercent)
+		if du.UsedSize <= limitUsedSize {
+			remover.Debugf("[%s] enough free disk space, used(%s) <= limit(%s)"+
+				", limitPercent(%d), diskUsage(%s)",
+				server, du.UsedSize, limitUsedSize, diskUsageLimitPercent, du)
+			continue
+		}
+
+		remover.Debugf("[%s] not enough free disk space, used(%s) > limit(%s)"+
+			", limitPercent(%d), diskUsage(%s)",
+			server, du.UsedSize, limitUsedSize, diskUsageLimitPercent, du)
+
+		ds := DServer{server, *du}
+		s = append(s, ds)
+	}
+
+	return s
+}
+
+// RunForever :
 func RunForever() {
+	serverIPMap := make(map[string]int)
+	for _, server := range *Servers {
+		serverIPMap[server.IP]++
+	}
+
+	// 서버 순서를 일정하게 유지할 수 있도록 sort 해서 사용함
+	sort.Slice(*Servers, func(i, j int) bool {
+		return (*Servers)[i].Addr > (*Servers)[j].Addr
+	})
+
 	for {
+		var fileMetaMap = make(FileMetaPtrMap)
+		duplicatedFileMap := make(FileMetaPtrMap)
+		risingHitFileMap := make(map[string]int)
 
-		var diskUsageMap = make(map[string]*common.DiskUsage)
-		var fileMetaMap = make(map[string]*common.FileMeta)
-		isAlreadyParsed := false
+		// 전체 파일 정보 목록 구하기
+		// 서버 별로 구할 필요 없음
+		// 구하지 못하는 경우, 다음 번 주기로 넘어감
+		// 파일 이름, 파일 등급, file size, 파일 위치 정보 구하기
+		est := time.Now()
+		err := common.MakeAllFileMetas(gradeInfoFile, hitcountHistoryFile,
+			fileMetaMap, serverIPMap, duplicatedFileMap)
+		if err != nil {
+			remover.Errorf("fail to make file metas, error(%s)", err.Error())
+			time.Sleep(time.Second * time.Duration(sleepSec))
+			continue
+		}
+		remover.Debugf("success making file metas, time(%s)", time.Since(est))
 
-		// diskUsageMap's key = ip:port
-		// 1. disk 용량 확인
-		collectRemoteDiskUsage(Servers, diskUsageMap)
+		// 급 hit 상승 파일 목록 구하기
+		// LB EventLog 에서 특정 IP 에 할당된 파일 목록 추출
+		Tail.Tail(&risingHitFileMap)
 
-		for ipPort, diskUsage := range diskUsageMap {
+		// 현재 destination 서버에 있는 파일 목록에
+		// meta 정보 연결된 서버별 파일 목록 생성
+		serverFileMetaMap := getServerFileMetas(fileMetaMap)
 
-			// 2. 지워야 하는 사이즈 구하고, 용량 충분하면 skip
-			allowedDiskSize := diskUsage.TotalSize * int64(diskUsageLimitPercent) / 100
-			sizeToDelete := diskUsage.UsedSize - allowedDiskSize
-			if sizeToDelete <= 0 {
-				cilog.Debugf("size to delete is less than 0 (%d), so skip (%s)", sizeToDelete, ipPort)
+		// 전체 파일목록의 중복 파일 정보에
+		// 현재 destination 서버에 없는 파일 정보 제거
+		updateAllFileMetasForDuplicatedFiles(fileMetaMap, duplicatedFileMap, serverFileMetaMap)
+
+		// destination 서버에 중복 파일 삭제 요청
+		requestRemoveServerDuplicatedFiles(duplicatedFileMap, serverFileMetaMap)
+
+		// disk 용량이 부족한 서버 구하기
+		servers := getServerWithNotEnoughDisk(Servers)
+
+		// disk 용량이 부족한 server 에 대해서 disk 지워야할 file 목록 만들고,
+		// 지워야 할 file 목록이 있는 경우 요청
+		for _, server := range servers {
+
+			sfmm, ok := serverFileMetaMap[server.Addr]
+			// 서버 목록이 없는 경우, 지울 것도 없음
+			if !ok {
+				remover.Debugf("[%s] skip removing files, no file to delete", server)
 				continue
 			}
-			cilog.Debugf("size to delete is (%d) on (%s),total(%d),allowedSize(%d)", sizeToDelete, ipPort, diskUsage.TotalSize, allowedDiskSize)
+			// 서버의 파일 목록 중 지워야할 목록 구해서 delete 요청하기
+			fileList := make([]*common.FileMeta, 0, len(sfmm))
+			for filename, fm := range sfmm {
+				//remover.Debugf("[%s] file(%s) in the server", server, filename)
 
-			// grade.info 와 hitcount.history 의 라인 수가 상당하여 한번만 파싱하도록
-			if isAlreadyParsed == false {
-
-				// 3. 파일 등급 list 생성
-				if err := common.ParseGradeFile(gradeInfoFile, fileMetaMap); err != nil {
-					cilog.Errorf("fail to parse file(%s), error(%s)", gradeInfoFile, err.Error())
-					break
-				}
-				cilog.Infof("parse file(%s)", gradeInfoFile)
-
-				if err := common.ParseHitcountFile(hitcountHistoryFile, fileMetaMap); err != nil {
-					cilog.Errorf("fail to parse file(%s), error(%s)", hitcountHistoryFile, err.Error())
-					break
-				}
-				cilog.Infof("parse file(%s)", hitcountHistoryFile)
-
-				isAlreadyParsed = true
-			}
-
-			host, err := common.SplitHostPort(ipPort)
-
-			if err != nil {
-				cilog.Exceptionf("cannot split string(%s) to host,error(%s)", ipPort, err.Error())
-				continue
-			}
-
-			// 4. 서버별 파일 리스트 확인
-			fl := make([]string, 0, 10000)
-			err = common.GetRemoteFileList(&host, &fl)
-
-			if err != nil {
-				cilog.Errorf("fail to get remote file list (%s:%d), error(%s)", host.IP, host.Port, err.Error())
-				break
-			}
-			cilog.Debugf("get remote file list (%s:%d)", host.IP, host.Port)
-
-			// 5. 서버별 파일 리스트 구조 변환 []string -> []common.FileMeta
-			var fileList []common.FileMeta
-			for _, file := range fl {
-				// 5-1. 광고 파일은 제외
-				if common.IsADFile(file, advPrefixes) {
+				// 서버 파일 중 광고 파일은 제외
+				if common.IsADFile(filename, advPrefixes) {
+					remover.Debugf("[%s] skip adfile, file(%s)", server, filename)
 					continue
 				}
-				fileList = append(fileList, common.FileMeta{Name: file, Grade: -1, Size: -1})
-			}
-
-			// 6. 파일들의 등급 확인
-			for i, file := range fileList {
-				if _, exists := fileMetaMap[file.Name]; exists {
-					fileList[i].Grade = fileMetaMap[file.Name].Grade
+				// SAN 에 없는 파일이면 삭제 대상에서 제외
+				if _, exists := SourcePath.IsExistOnSource(filename); exists != true {
+					remover.Debugf("[%s] skip file, not found in source paths, file(%s)", server, filename)
+					continue
 				}
-			}
-
-			// 7. 파일들의 크기 확인
-			for i, file := range fileList {
-				if _, exists := fileMetaMap[file.Name]; exists {
-					fileList[i].Size = fileMetaMap[file.Name].Size
+				// 급 hit 상승 파일 목록에 속하는 파일이면 삭제 대상에 제외
+				if _, exists := risingHitFileMap[filename]; exists {
+					remover.Debugf("[%s] skip file, found in rising hit files, file(%s)", server, filename)
+					continue
 				}
+				fileList = append(fileList, fm)
 			}
-
-			// 8. 낮은 등급순으로 정렬 (999999->1 순으로)
+			if len(fileList) == 0 {
+				remover.Debugf("[%s] skip removing files, no file to delete", server)
+				continue
+			}
+			// 낮은 등급순(999999->1 순으로) 정렬
 			sort.Slice(fileList, func(i, j int) bool {
 				return fileList[i].Grade > fileList[j].Grade
 			})
 
-			fileListToDelete := make([]string, 0, 10)
-			// 9. 용량 확보될때까지 삭제할 파일 걸러내고
-			for _, file := range fileList {
-
-				if sizeToDelete <= 0 {
+			fileListToDelete := make([]*common.FileMeta, 0, len(fileList)/10)
+			// 용량 확보될때까지 삭제할 파일에 추가
+			overUsedSize := server.du.GetOverUsedSize(diskUsageLimitPercent)
+			deletingSize := common.Disksize(0)
+			for _, fm := range fileList {
+				if deletingSize >= overUsedSize {
 					break
 				}
-
-				// hitcount.history 에 없어서 파일 크기를 못구한 경우 size = -1
-				// hitcount.history 에 없다면(hitcount.history 반영 전) 이제 막 서버에 생성된 파일이라는 의미
-				// 신규 생성된 파일들은 삭제 대상에서 제외
-				if file.Size < 0 {
-					continue
-				}
-				// 10. SAN 에 없는 파일이면 삭제 대상에서 제외하고
-				if _, exists := SourcePath.IsExistOnSource(file.Name); exists != true {
-					continue
-				}
-
-				sizeToDelete -= file.Size
-				fileListToDelete = append(fileListToDelete, file.Name)
+				deletingSize += common.Disksize(fm.Size)
+				// remover.Debugf("[%s] deleting size(%d/%d), added to delete list"+
+				// 	", file(%s)", server, deletingSize, overUsedSize, fm)
+				fileListToDelete = append(fileListToDelete, fm)
+			}
+			if len(fileListToDelete) == 0 {
+				remover.Debugf("[%s] skip removing files, no file to delete", server)
+				continue
 			}
 
-			for _, file := range fileListToDelete {
-
-				if err := common.DeleteFileOnRemote(&host, file); err != nil {
-					cilog.Errorf("fail to delete file(%s) on (%s:%d),error(%s)", file, host.IP, host.Port, err.Error())
+			for _, fm := range fileListToDelete {
+				deletingSize := common.Disksize(0)
+				if err := common.DeleteFileOnRemote(server.Host, fm.Name); err != nil {
+					remover.Errorf("[%s] fail to request delete, file(%s), error(%s)",
+						server, fm, err.Error())
 				} else {
-					if grade, exists := fileMetaMap[file]; exists {
-						cilog.Successf("success to delete,file(%s),grade(%d),server(%s:%d)", file, grade.Grade, host.IP, host.Port)
-					} else {
-						cilog.Successf("success to delete,file(%s),server(%s:%d)", file, host.IP, host.Port)
-					}
+					remover.Infof("[%s] success requesting delete, file(%s)", server, fm)
+					deletingSize = deletingSize + common.Disksize(fm.Size)
 				}
 			}
+			if deletingSize > 0 {
+				remover.Infof("[%s] deleting diskSize(%s)", server, deletingSize)
+			}
 		}
-
-		time.Sleep(time.Second * 3)
-	}
-}
-
-func collectRemoteDiskUsage(hostList *common.Hosts, diskUsageMap map[string]*common.DiskUsage) {
-
-	for _, host := range *hostList {
-		du := new(common.DiskUsage)
-		err := common.GetRemoteDiskUsage(host, du)
-		if err != nil {
-			cilog.Errorf("fail to connect to (%s:%d),error(%s)", host.IP, host.Port, err.Error())
-		} else {
-			cilog.Debugf("get remote(%s:%d) disk usage", host.IP, host.Port)
-		}
-
-		key := fmt.Sprintf("%s:%d", host.IP, host.Port)
-		diskUsageMap[key] = du
+		time.Sleep(time.Second * time.Duration(sleepSec))
 	}
 }
 
 // SetDiskUsageLimitPercent is to set the limitation of disk used size
 // min is 0, max is 100
-func SetDiskUsageLimitPercent(limit int) error {
+func SetDiskUsageLimitPercent(limit uint) error {
 
 	if limit < 0 {
-		return errors.New("limit must be greater than 0")
+		return errors.New("disk usage limit percent must be greater than 0")
 	}
 
 	if limit > 100 {
-		return errors.New("limit must be less than 100")
+		return errors.New("disk usage limit percent must be less than 100")
 	}
 
+	remover.Debugf("set diskUsageLimitPercent(%d)", limit)
 	diskUsageLimitPercent = limit
 
 	return nil

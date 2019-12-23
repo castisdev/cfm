@@ -34,7 +34,7 @@ func Test_ParseHitcountFile(t *testing.T) {
 	fmm["AAAAAAAAAAAAAAAAAA.mpg"] = &FileMeta{Name: "AAAAAAAAAAAAAAAAAA.mpg", Grade: 1, Size: 0}
 	fmm["BBBBBBBBBBBBBBBBBB_K20180501000000.mpg"] = &FileMeta{Name: "BBBBBBBBBBBBBBBBBB_K20180501000000.mpg", Grade: 2, Size: 0}
 	fmm["CCCCCCCCCCCCCCCCCC_K20180501000000.mpg"] = &FileMeta{Name: "CCCCCCCCCCCCCCCCCC_K20180501000000.mpg", Grade: 3, Size: 0}
-	ParseHitcountFile(tmpFile, fmm)
+	ParseHitcountFileOld(tmpFile, fmm)
 
 	assert.Equal(t, int64(15870), fmm["AAAAAAAAAAAAAAAAAA.mpg"].Size)
 	assert.Equal(t, int64(16080), fmm["BBBBBBBBBBBBBBBBBB_K20180501000000.mpg"].Size)

@@ -3,6 +3,7 @@ package tasker
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 )
@@ -60,43 +61,50 @@ func (s Status) String() string {
 		WORKING: "working",
 		TIMEOUT: "timeout",
 	}
-
 	return m[s]
 }
 
+type TaskTime int64
+
 // Task is struct for copy task
+// CTime : created time
+// MTime : modified time
 type Task struct {
-	ID        int64  `json:"id,string"`
-	Ctime     int64  `json:"ctime"`
-	Mtime     int64  `json:"mtime"`
-	Status    Status `json:"status"`
-	SrcIP     string `json:"src_ip"`
-	DstIP     string `json:"dst_ip"`
-	FilePath  string `json:"file_path"`
-	FileName  string `json:"file_name"`
-	Grade     int32  `json:"grade"`
-	CopySpeed string `json:"copy_speed"`
+	ID        int64    `json:"id,string"`
+	Ctime     TaskTime `json:"ctime"`
+	Mtime     TaskTime `json:"mtime"`
+	Status    Status   `json:"status"`
+	SrcIP     string   `json:"src_ip"`
+	DstIP     string   `json:"dst_ip"`
+	FilePath  string   `json:"file_path"`
+	FileName  string   `json:"file_name"`
+	Grade     int32    `json:"grade"`
+	CopySpeed string   `json:"copy_speed"`
+	SrcAddr   string   `json:"src_addr"`
+	DstAddr   string   `json:"dst_addr"`
+}
+
+func (t TaskTime) String() string {
+	return time.Unix(int64(t), 0).Format(time.RFC3339)
 }
 
 // Tasks is slice of Task struct
 type Tasks struct {
-	mutex   *sync.RWMutex
-	TaskMap map[int64]*Task
+	mutex      *sync.RWMutex
+	TaskMap    map[int64]*Task
+	repository *Repository
 }
 
 // NewTasks is constructor of Tasks
 func NewTasks() *Tasks {
-	/*
-		for i:=0; i<size; i++ {
-
-		}
-		new(Task)
-	*/
-	tmp := make(map[int64]*Task)
-	return &Tasks{&sync.RWMutex{}, tmp}
+	return &Tasks{
+		&sync.RWMutex{},
+		make(map[int64]*Task),
+		newRepository()}
 }
 
 // GetTaskList is to get task list as Task slice
+// sort된 tasklist를 반환
 func (tasks Tasks) GetTaskList() (tl []Task) {
 	tasks.mutex.RLock()
 	defer tasks.mutex.RUnlock()
@@ -104,8 +112,11 @@ func (tasks Tasks) GetTaskList() (tl []Task) {
 	for _, v := range tasks.TaskMap {
 		tl = append(tl, *v)
 	}
+	sort.Slice(tl, func(i, j int) bool {
+		return tl[i].ID > tl[j].ID
+	})
 
-	return
+	return tl
 }
 
 // FindTaskByID is to find task with task ID
@@ -143,57 +154,79 @@ func (tasks *Tasks) UpdateStatus(id int64, s Status) error {
 	tasks.mutex.Lock()
 	defer tasks.mutex.Unlock()
 
+	task, found := tasks.TaskMap[id]
+	if !found {
+		return fmt.Errorf("not found,task(%d)", id)
+	}
+
 	switch s {
 
 	case READY:
-		return fmt.Errorf("invalid request (try to change to %d)", READY)
+		// fail : READY, WORKING, TIMEOUT, DONE -> READY
+		return fmt.Errorf("invalid request,try to change to status(%s)", READY)
 
 	case WORKING:
-		for _, task := range tasks.TaskMap {
-			if task.ID == id {
-
-				if task.Status == WORKING {
-					return fmt.Errorf("task already working, (%d), (%s)", task.ID, task.FileName)
-				}
-
-				if task.Status == DONE {
-					return fmt.Errorf("task already done, (%d), (%s)", task.ID, task.FileName)
-				}
-				task.Status = s
-				task.Mtime = time.Now().Unix()
-				return nil
-			}
+		// fail : TIMEOUT, DONE -> WORKING
+		if task.Status == DONE || task.Status == TIMEOUT {
+			return fmt.Errorf("invalid request,task already done or tiemout,task(%d),"+
+				"filename(%s)", task.ID, task.FileName)
 		}
-		return fmt.Errorf("(%d) task not found", id)
+		// success : READY, WORKING-> WORKING
+		task.Status = s
+		task.Mtime = TaskTime(time.Now().Unix())
+		tasks.repository.saveTask(task)
+		return nil
 
 	case DONE:
-		for _, task := range tasks.TaskMap {
-			if task.ID == id {
-				task.Status = s
-				task.Mtime = time.Now().Unix()
-				return nil
-			}
-		}
-		return fmt.Errorf("(%d) task not found", id)
+		// success : READY, WORKING, DONE, TIMEOUT -> DONE
+		task.Status = s
+		task.Mtime = TaskTime(time.Now().Unix())
+		tasks.repository.saveTask(task)
+		return nil
 
 	default:
-		return fmt.Errorf("invalid request's status (%d)", s)
+		return fmt.Errorf("invalid request,status(unkown)")
 	}
 
+}
+
+// LoadTasks :
+// repository 에서 task list load
+func (tasks *Tasks) LoadTasks() {
+	tasks.mutex.Lock()
+	defer tasks.mutex.Unlock()
+	tl := tasks.repository.loadTasks()
+	for _, t := range tl {
+		tasks.TaskMap[t.ID] = &Task{
+			ID:        t.ID,
+			Ctime:     t.Ctime,
+			Mtime:     t.Mtime,
+			Status:    t.Status,
+			SrcIP:     t.SrcIP,
+			DstIP:     t.DstIP,
+			FilePath:  t.FilePath,
+			FileName:  t.FileName,
+			Grade:     t.Grade,
+			CopySpeed: t.CopySpeed,
+			SrcAddr:   t.SrcAddr,
+			DstAddr:   t.DstAddr,
+		}
+	}
 }
 
 // CreateTask is to create task
 func (tasks *Tasks) CreateTask(task *Task) Task {
 
 	task.ID = time.Now().UnixNano()
-	task.Ctime = time.Now().Unix()
-	task.Mtime = time.Now().Unix()
+	task.Ctime = TaskTime(time.Now().Unix())
+	task.Mtime = TaskTime(time.Now().Unix())
 	task.Status = READY
 
 	tasks.mutex.Lock()
 	defer tasks.mutex.Unlock()
 	tasks.TaskMap[task.ID] = task
 
+	tasks.repository.saveTask(task)
 	return *task
 }
 
@@ -209,7 +242,20 @@ func (tasks *Tasks) DeleteTask(id int64) error {
 	}
 
 	delete(tasks.TaskMap, id)
-
+	tasks.repository.deleteTask(id)
 	return nil
 
+}
+
+// String : task to string
+func (task Task) String() string {
+	t := fmt.Sprintf(
+		"ID(%d), Grade(%d), FilePath(%s),"+
+			"SrcIP(%s), DstIP(%s), SrcAddr(%s), DstAddr(%s),"+
+			"Ctime(%s), Mtime(%s), Status(%s)",
+		task.ID, task.Grade, task.FilePath,
+		task.SrcIP, task.DstIP, task.SrcAddr, task.DstAddr,
+		task.Ctime, task.Mtime, task.Status,
+	)
+	return t
 }

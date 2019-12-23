@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/castisdev/cfm/common"
+	"github.com/castisdev/cfm/heartbeater"
 	"github.com/castisdev/cfm/remover"
 	"github.com/castisdev/cfm/tasker"
 	"github.com/castisdev/cilog"
@@ -18,12 +19,13 @@ import (
 )
 
 var tasks *tasker.Tasks
+var api common.MLogger
 
 // App constant
 const (
 	AppName      = "cfm"
 	AppVersion   = "1.0.0"
-	AppPreRelVer = "-qr1"
+	AppPreRelVer = "QR2"
 )
 
 func main() {
@@ -40,7 +42,7 @@ func main() {
 	}
 
 	if *printVer {
-		fmt.Println(AppName + " " + AppVersion + AppPreRelVer)
+		fmt.Println(AppName + " " + AppVersion + "." + AppPreRelVer)
 		os.Exit(0)
 	}
 
@@ -64,21 +66,52 @@ func main() {
 
 	logLevel, _ := cilog.LevelFromString(c.LogLevel)
 
-	cilog.Set(cilog.NewLogWriter(c.LogDir, AppName, 10*1024*1024), AppName, AppVersion, logLevel)
+	mLogWriter := common.MLogWriter{
+		LogWriter: cilog.NewLogWriter(c.LogDir, AppName, 10*1024*1024),
+		Dir:       c.LogDir,
+		App:       AppName,
+		MaxSize:   (10 * 1024 * 1024)}
+
+	api = common.MLogger{
+		Logger: cilog.StdLogger(),
+		Mod:    "api"}
+
+	cilog.Set(mLogWriter, AppName, AppVersion, logLevel)
 	cilog.Infof("process start")
+
+	for _, s := range c.Servers.Sources {
+		heartbeater.Add(s)
+	}
+	for _, s := range c.Servers.Destinations {
+		heartbeater.Add(s)
+	}
+	heartbeater.SetTimoutSec(c.Servers.HeartbeatTimeoutSec)
+	heartbeater.SetSleepSec(c.Servers.HeartbeatSleepSec)
+
+	// tasker가 heartbeater의 결과를 사용하기 때문에,
+	// heartbeater가 한 번 실행하고, tasker 가 실행될 수 있도록 한 번 실행시킴
+	heartbeater.Heartbeat()
+	go heartbeater.RunForever()
 
 	for _, s := range c.Servers.Destinations {
 		remover.Servers.Add(s)
 	}
-
 	for _, s := range c.SourceDirs {
 		remover.SourcePath.Add(s)
 	}
-
-	remover.SetDiskUsageLimitPercent(c.StorageUsageLimitPercent)
+	remover.SetSleepSec(c.Remover.RemoverSleepSec)
+	if err := remover.SetDiskUsageLimitPercent(
+		c.Remover.StorageUsageLimitPercent); err != nil {
+		log.Fatalf("can not configure remover.storage_usage_limit_percent"+
+			", error(%s)", err.Error())
+	}
 	remover.SetGradeInfoFile(c.GradeInfoFile)
 	remover.SetHitcountHistoryFile(c.HitcountHistoryFile)
 	remover.SetAdvPrefix(c.AdvPrefixes)
+	remover.Tail.SetWatchDir(c.WatchDir)
+	remover.Tail.SetWatchIPString(c.WatchIPString)
+	remover.Tail.SetWatchTermMin(c.WatchTermMin)
+	remover.Tail.SetWatchHitBase(c.WatchHitBase)
 
 	go remover.RunForever()
 
@@ -90,10 +123,11 @@ func main() {
 		tasker.DstServers.Add(s)
 	}
 
-	tasker.SetTaskTimeout(time.Duration(c.TaskTimeout) * time.Second)
+	tasker.SetSleepSec(c.Tasker.TaskerSleepSec)
+	tasker.SetTaskTimeout(time.Duration(c.Tasker.TaskTimeout) * time.Second)
 	tasker.SetHitcountHistoryFile(c.HitcountHistoryFile)
 	tasker.SetGradeInfoFile(c.GradeInfoFile)
-	tasker.SetTaskCopySpeed(c.TaskCopySpeedBPS)
+	tasker.SetTaskCopySpeed(c.Tasker.TaskCopySpeedBPS)
 	tasker.SetAdvPrefix(c.AdvPrefixes)
 	tasker.Tail.SetWatchDir(c.WatchDir)
 	tasker.Tail.SetWatchIPString(c.WatchIPString)
@@ -110,7 +144,7 @@ func main() {
 
 	router := NewRouter()
 	s := &http.Server{
-		Addr:         ":8080",
+		Addr:         c.ListenAddr,
 		Handler:      router,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,

@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/castisdev/cfm/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -71,13 +70,13 @@ func TestCollectRemoteFileList(t *testing.T) {
 	ts3.Start()
 	defer ts3.Close()
 
-	hosts := common.NewHosts()
-	hosts.Add("127.0.0.1:18881")
-	hosts.Add("127.0.0.1:18882")
-	hosts.Add("127.0.0.1:18883")
+	dsthosts := NewDstHosts()
+	dsthosts.Add("127.0.0.1:18881")
+	dsthosts.Add("127.0.0.1:18882")
+	dsthosts.Add("127.0.0.1:18883")
 
 	fs := make(map[string]int)
-	CollectRemoteFileList(hosts, fs)
+	CollectRemoteFileList(dsthosts, fs)
 
 	assert.Equal(t, 3, fs["A.mpg"])
 	assert.Equal(t, 3, fs["B.mpg"])

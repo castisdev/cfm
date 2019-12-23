@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/castisdev/cfm/common"
 	"github.com/castisdev/cilog"
 )
 
@@ -19,6 +20,14 @@ type Tailer struct {
 	watchTermMin  int
 	watchDir      string
 	watchHitBase  int
+}
+
+var tailer common.MLogger
+
+func init() {
+	tailer = common.MLogger{
+		Logger: cilog.StdLogger(),
+		Mod:    "tailer"}
 }
 
 // NewTailer :
@@ -34,33 +43,33 @@ func NewTailer() *Tailer {
 
 // SetWatchDir :
 func (t *Tailer) SetWatchDir(dir string) {
-	cilog.Debugf("set watch dir : (%s)", dir)
+	tailer.Debugf("set watch dir : (%s)", dir)
 	t.watchDir = dir
 }
 
 // SetWatchIPString :
 func (t *Tailer) SetWatchIPString(ip string) {
-	cilog.Debugf("set watch ip string : (%s)", ip)
+	tailer.Debugf("set watch ip string : (%s)", ip)
 	t.watchIPString = ip
 }
 
 // SetWatchTermMin :
 func (t *Tailer) SetWatchTermMin(minute int) {
 	if minute <= 0 {
-		cilog.Debugf("invalid value, set as default watch term min : (%d)", 10)
+		tailer.Debugf("invalid value, set as default watch term min : (%d)", 10)
 		t.watchTermMin = 10
 	}
-	cilog.Debugf("set watch term min : (%d)", minute)
+	tailer.Debugf("set watch term min : (%d)", minute)
 	t.watchTermMin = minute
 }
 
 // SetWatchHitBase :
 func (t *Tailer) SetWatchHitBase(baseHit int) {
 	if baseHit <= 0 {
-		cilog.Debugf("set watch hit base : (%d)", 3)
+		tailer.Debugf("set watch hit base : (%d)", 3)
 		t.watchHitBase = 3
 	}
-	cilog.Debugf("set watch hit base : (%d)", baseHit)
+	tailer.Debugf("set watch hit base : (%d)", baseHit)
 	t.watchHitBase = baseHit
 }
 
@@ -77,18 +86,22 @@ func (t *Tailer) Tail(fileMap *map[string]int) {
 
 		readOffset, err := t.parseLBEventLog(file, int64(0), from.Unix(), fileMap)
 		if err != nil {
-			cilog.Errorf("fail to parse,file(%s),error(%s)", file, err.Error())
+			tailer.Errorf("fail to parse,file(%s),error(%s)", file, err.Error())
 			continue
 		}
-		cilog.Debugf("parse file(%s) from (0) to (%d)", file, readOffset)
+		tailer.Debugf("parse file(%s) from (0) to (%d)", file, readOffset)
 	}
 
+	tailer.Debugf("hit file count(%d) in LB log", len(*fileMap))
 	// Hit 수가 기준 미달일 경우 file list 에서 제외
 	for fileName, hitCount := range *fileMap {
 		if hitCount < t.watchHitBase {
+			//tailer.Debugf("deleted in rising hit, file(%s), hit(%d)", fileName, hitCount)
 			delete(*fileMap, fileName)
 		}
+		tailer.Debugf("rising hit file(%s), hit(%d)", fileName, hitCount)
 	}
+
 	return
 }
 
@@ -132,7 +145,7 @@ func (t *Tailer) parseLBEventLog(fileName string, offset int64, baseTime int64, 
 	for scanner.Scan() {
 
 		b := scanner.Bytes()
-		offset += int64(len(b) + 1) // line 끝에 \ㅜn 가 있으므로 +1, windows 의 경우 \r\n 이므로 +2 를 해줘야 함
+		offset += int64(len(b) + 1) // line 끝에 \n 가 있으므로 +1, windows 의 경우 \r\n 이므로 +2 를 해줘야 함
 
 		line := string(b)
 
@@ -148,24 +161,24 @@ func (t *Tailer) parseLBEventLog(fileName string, offset int64, baseTime int64, 
 		})
 
 		if ss[0] != "0x40ffff" {
-			// cilog.Debugf("(%s) != 0x40ffff", ss[0])
+			// tailer.Debugf("(%s) != 0x40ffff", ss[0])
 			continue
 		}
 
 		logTime, err := strconv.ParseInt(ss[2], 10, 64)
 		if err != nil {
-			// cilog.Debugf("fail to strconv (%s)", ss[2])
+			// tailer.Debugf("fail to strconv (%s)", ss[2])
 			continue
 		}
 
 		if logTime < baseTime {
-			// cilog.Debugf("logTime(%d) < baseTime(%d)", logTime, baseTime)
+			// tailer.Debugf("logTime(%d) < baseTime(%d)", logTime, baseTime)
 			continue
 		}
 
 		matched, err := regexp.MatchString(t.watchIPString, ss[3])
 		if err != nil {
-			// cilog.Debugf("regexp match error(%s)", err.Error())
+			// tailer.Debugf("regexp match error(%s)", err.Error())
 			continue
 		}
 
@@ -174,7 +187,7 @@ func (t *Tailer) parseLBEventLog(fileName string, offset int64, baseTime int64, 
 			file := re.FindStringSubmatch(line)
 			if len(file) != 0 {
 				(*fileMap)[file[1]]++
-				// cilog.Debugf("found %s", file[1])
+				// tailer.Debugf("found %s", file[1])
 			}
 		}
 	}
