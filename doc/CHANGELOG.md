@@ -1,13 +1,16 @@
-v1.0.0.rc1 / 2019-04-01
-v1.0.0.rc2 / 2019-04-25
+v1.0.0.qr2 / 2020-01-XX
 ===================
-* https 지원
-  * config 추가 : [https][certificate-file], [https][private-key-file]
+[형상변경]
+  * 실정 변경
+    * [storage_usage_limit_percent] -> [remover]-[storage_usage_limit_percent]
+    * [task_timeout_sec] -> [taskser]]-[task_timeout_sec]
+    * [task_copy_speed_bps] -> [taskser]]-[task_copy_speed_bps]
+  * 설정 추가
+    * [remover]-[remover_sleep_sec]
+    * [tasker]-[task_timeout_sec]
+    * [servers]-[heartbeat_timeout_sec]
+    * [servers]-[heartbeat_sleep_sec]
 
-v1.0.0.rc1 / 2019-04-01
-===================
-* 로그 수정
-
-v1.0.0.rc0 / 2019-01-02
+v1.0.0.qr1 / 2019-11-12
 ===================
 * 최초 릴리즈

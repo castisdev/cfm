@@ -133,6 +133,7 @@ func init() {
 	SrcServers = NewSrcHosts()
 	DstServers = NewDstHosts()
 	SourcePath = common.NewSourceDirs()
+	Tail = tailer.NewTailer()
 
 	tasker = common.MLogger{
 		Logger: cilog.StdLogger(),
@@ -142,8 +143,6 @@ func init() {
 // RunForever is to run tasker as go routine
 func RunForever() {
 	tasks = NewTasks()
-	Tail = tailer.NewTailer()
-
 	tasks.LoadTasks()
 
 	destcount := len(*DstServers)
