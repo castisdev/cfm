@@ -27,11 +27,14 @@ func DashBoard(w http.ResponseWriter, r *http.Request) {
 func TaskIndex(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
-	w.WriteHeader(http.StatusOK)
 
 	if err := json.NewEncoder(w).Encode(tasks.TaskMap); err != nil {
-		panic(err)
+		api.Errorf("decode json fail : %s", err)
+		w.WriteHeader(http.StatusNotAcceptable)
+		return
 	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 // TaskDelete is http handler for DELETE /tasks/<taskID> route

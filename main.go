@@ -25,7 +25,7 @@ var api common.MLogger
 const (
 	AppName      = "cfm"
 	AppVersion   = "1.0.0"
-	AppPreRelVer = "QR2"
+	AppPreRelVer = "qr2"
 )
 
 func main() {
@@ -42,7 +42,7 @@ func main() {
 	}
 
 	if *printVer {
-		fmt.Println(AppName + " " + AppVersion + "." + AppPreRelVer)
+		fmt.Println(AppName + " " + AppVersion + "-" + AppPreRelVer)
 		os.Exit(0)
 	}
 
@@ -53,14 +53,14 @@ func main() {
 
 	c, err := ReadConfig(path.Join(execDir, "cfm.yml"))
 	if err != nil {
-		log.Fatalf("fail to read config,err(%s)", err)
+		log.Fatalf("fail to read config, error(%s)", err)
 	}
 
 	ValidationConfig(*c)
 
 	if c.EnableCoreDump {
 		if err := common.EnableCoreDump(); err != nil {
-			log.Fatalf("can not enable coredump,error(%s)", err.Error())
+			log.Fatalf("can not enable coredump, error(%s)", err.Error())
 		}
 	}
 
