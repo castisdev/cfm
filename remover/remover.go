@@ -22,7 +22,7 @@ type ServerDiskUsagePtrMap map[string]*common.DiskUsage
 
 type DServer struct {
 	*common.Host
-	du common.DiskUsage
+	Du common.DiskUsage
 }
 
 // Servers : 파일 삭제 대상 서버 리스트
@@ -177,8 +177,9 @@ func requestRemoveServerDuplicatedFiles(duplicatedFileMap FileMetaPtrMap,
 	}
 }
 
+// GetServerWithNotEnoughDisk
 // 서버 중에 disk 용량이 충분하지 않는 서버 구함
-func getServerWithNotEnoughDisk(serverList *common.Hosts) []DServer {
+func GetServerWithNotEnoughDisk(serverList *common.Hosts) []DServer {
 	s := make([]DServer, 0, len(*serverList))
 	for _, server := range *serverList {
 		du := new(common.DiskUsage)
@@ -254,7 +255,7 @@ func RunForever() {
 		requestRemoveServerDuplicatedFiles(duplicatedFileMap, serverFileMetaMap)
 
 		// disk 용량이 부족한 서버 구하기
-		servers := getServerWithNotEnoughDisk(Servers)
+		servers := GetServerWithNotEnoughDisk(Servers)
 
 		// disk 용량이 부족한 server 에 대해서 disk 지워야할 file 목록 만들고,
 		// 지워야 할 file 목록이 있는 경우 요청
@@ -299,7 +300,7 @@ func RunForever() {
 
 			fileListToDelete := make([]*common.FileMeta, 0, len(fileList)/10)
 			// 용량 확보될때까지 삭제할 파일에 추가
-			overUsedSize := server.du.GetOverUsedSize(diskUsageLimitPercent)
+			overUsedSize := server.Du.GetOverUsedSize(diskUsageLimitPercent)
 			deletingSize := common.Disksize(0)
 			for _, fm := range fileList {
 				if deletingSize >= overUsedSize {
@@ -336,11 +337,6 @@ func RunForever() {
 // SetDiskUsageLimitPercent is to set the limitation of disk used size
 // min is 0, max is 100
 func SetDiskUsageLimitPercent(limit uint) error {
-
-	if limit < 0 {
-		return errors.New("disk usage limit percent must be greater than 0")
-	}
-
 	if limit > 100 {
 		return errors.New("disk usage limit percent must be less than 100")
 	}
@@ -349,6 +345,11 @@ func SetDiskUsageLimitPercent(limit uint) error {
 	diskUsageLimitPercent = limit
 
 	return nil
+}
+
+// DiskUsageLimitPercent : diskUsageLimitPercent 반환
+func DiskUsageLimitPercent() uint {
+	return diskUsageLimitPercent
 }
 
 // SetAdvPrefix :

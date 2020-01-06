@@ -103,8 +103,12 @@ func NewTasks() *Tasks {
 		newRepository()}
 }
 
-// GetTaskList is to get task list as Task slice
-// sort된 tasklist를 반환
+// GetTaskList :
+// map으로 된 task 정보에서 task list를 반환
+//
+// lock 을 사용하고, 작은 taskID 순으로 sort해서 반환
+//
+// create nano time으로 id를 만들기 때문에 먼저 만들어진 task 가 먼저 나오게 됨
 func (tasks Tasks) GetTaskList() (tl []Task) {
 	tasks.mutex.RLock()
 	defer tasks.mutex.RUnlock()
@@ -113,7 +117,7 @@ func (tasks Tasks) GetTaskList() (tl []Task) {
 		tl = append(tl, *v)
 	}
 	sort.Slice(tl, func(i, j int) bool {
-		return tl[i].ID > tl[j].ID
+		return tl[i].ID < tl[j].ID
 	})
 
 	return tl

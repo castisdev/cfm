@@ -3,13 +3,18 @@
 
 source ./scripts/build.sh
 
-#${AppName}은 build.sh에서 구함
+#${AppName}, ${AppVersion}, ${AppPreRelVer} 은 build.sh에서 구함
 #${CapitalAppName}은 build.sh에서 구함
 #${GoVer}은 build.sh에서 구함
 
 BuildDir=build_${GoVer}
 PackDir=package_${GoVer}
-VERSION=$(./${BuildDir}/${AppName} -version | awk '{print $2}')
+if [ -n "$AppVersion" ]
+then
+	VERSION=$AppVersion-$AppPreRelVer
+else
+	VERSION=$(./${BuildDir}/${AppName} -version | awk '{print $2}')
+fi
 PackAppName=${AppName}-v$VERSION
 PackAppName64=${PackAppName}-x86_64-${GoVer}
 PackAppName32=${PackAppName}-i386-${GoVer}

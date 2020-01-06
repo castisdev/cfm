@@ -1,17 +1,20 @@
-package common
+package common_test
 
 import (
+	"net"
 	"os"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/castisdev/cfm/common"
 )
 
 func TestHosts_Add(t *testing.T) {
 
-	hosts := NewHosts()
+	hosts := common.NewHosts()
 
 	hosts.Add("127.0.0.1:18081")
 	hosts.Add("127.0.0.2:18081")
@@ -22,7 +25,7 @@ func TestHosts_Add(t *testing.T) {
 
 func TestSourceDirs_Add(t *testing.T) {
 
-	srcDirs := NewSourceDirs()
+	srcDirs := common.NewSourceDirs()
 
 	srcDirs.Add("/data2")
 	srcDirs.Add("/data3")
@@ -32,7 +35,7 @@ func TestSourceDirs_Add(t *testing.T) {
 
 func TestSourceDirs_IsExistOnSource(t *testing.T) {
 
-	srcDirs := NewSourceDirs()
+	srcDirs := common.NewSourceDirs()
 
 	srcDirs.Add("data2")
 	srcDirs.Add("data3")
@@ -82,16 +85,20 @@ func TestSplitHostPort(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    Host
+		want    common.Host
 		wantErr bool
 	}{
-		{"ok", args{"127.0.0.1:1000"}, Host{IP: "127.0.0.1", Port: 1000}, false},
-		{"invalid string(double colon)", args{"127.0.0.1:1000:1000"}, Host{}, true},
+		{"ok", args{"127.0.0.1:1000"},
+			common.Host{IP: "127.0.0.1", Port: 1000, Addr: "127.0.0.1:1000"}, false,
+		},
+		{"invalid string(double colon)", args{"127.0.0.1:1000:1000"},
+			common.Host{}, true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := SplitHostPort(tt.args.str)
+			got, err := common.SplitHostPort(tt.args.str)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("SplitHostPort() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -105,10 +112,17 @@ func TestSplitHostPort(t *testing.T) {
 
 // TestGetIPv4ByInterfaceName : 이 테스트는 테스트 환경마다 결과 값이 달라질 수 있다.
 func TestGetIPv4ByInterfaceName(t *testing.T) {
-	ip, err := GetIPv4ByInterfaceName("en0")
-
+	ifs, err := net.Interfaces()
 	if err != nil {
-		t.Errorf("error : (%s)", err)
+		t.Errorf("%s", err.Error())
 	}
-	assert.Equal(t, "192.168.0.28", ip)
+	for _, i := range ifs {
+		t.Logf("interface: %s", i.Name)
+		ip, err := common.GetIPv4ByInterfaceName(i.Name)
+		if err != nil {
+			t.Errorf("error : (%s)", err)
+		}
+		assert.NotEmptyf(t, ip, "ip: %s", ip)
+	}
+
 }

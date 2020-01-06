@@ -150,6 +150,8 @@ func main() {
 		WriteTimeout: 5 * time.Second,
 	}
 
-	s.ListenAndServe()
-
+	err = s.ListenAndServe()
+	if err != nil {
+		log.Fatalf("fail to start, error(%s)", err)
+	}
 }

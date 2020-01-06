@@ -15,17 +15,17 @@ import (
 type Disksize uint64
 
 //  DiskUsage :
+// |<-------------------------------TOTAL----------------------------------->|
+//
+// |<----USED------>|<----------------------FREE----------------------->|
+//
+// |<----USED------>|<----AVAIL----->|<--ReservedForRoot-->|
 //  TotalSize : 전체 용량
 //  UsedSize : 사용한 용량
 //  AvailSize : 사용할 수 있는 용량
 //  UsedPercent : 사용한 퍼센트
 //		사용한 용량 / (사용한 용량 + 사용할 수 있는 용량)	퍼센트 반올림값
 //  FreeSize : 전체 남은 용량 (사용할 수 있는 용량 + 시스템용 예약 용량)
-// |<--------------------- TOTAL ---------------------------->|
-//                 |<---------------- FREE ------------------>|
-// -----------------------------------------------------------|
-// | USED          |<------- AVAIL ------>| Reserved for root |
-// ------------------------------------------------------------
 type DiskUsage struct {
 	TotalSize   Disksize `json:"total_size,string"`
 	UsedSize    Disksize `json:"used_size,string"`
@@ -83,6 +83,7 @@ func (src *SourceDirs) Add(dir string) {
 }
 
 // IsExistOnSource is to check existance of file on source dirs
+// directory는 무시함; filename으로 directory 이름이 오는 경우
 func (src SourceDirs) IsExistOnSource(fileName string) (string, bool) {
 
 	for _, dir := range src {

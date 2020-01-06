@@ -41,7 +41,25 @@ func TestTasks_CreateTask(t *testing.T) {
 
 }
 
-func TestTasks_CreateTask_Mutex(t *testing.T) {
+func TestTasks_Create_ManyTask(t *testing.T) {
+
+	tasks := NewTasks()
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	go func() {
+		for i := 0; i < 100; i++ {
+			tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg"})
+		}
+		wg.Done()
+	}()
+
+	wg.Wait()
+	// 1개의 GoRoutine이 100개 task 생성
+	assert.Equal(t, 100, len(tasks.TaskMap))
+
+}
+
+func TestTasks_TwoCreator_Create_ManyTask(t *testing.T) {
 
 	tasks := NewTasks()
 
@@ -50,7 +68,7 @@ func TestTasks_CreateTask_Mutex(t *testing.T) {
 	wg.Add(1)
 	go func() {
 
-		for i := 1; i < 1001; i++ {
+		for i := 0; i < 1000; i++ {
 			tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg"})
 
 		}
@@ -59,14 +77,14 @@ func TestTasks_CreateTask_Mutex(t *testing.T) {
 
 	wg.Add(1)
 	go func() {
-		for i := 1; i < 1001; i++ {
+		for i := 0; i < 1000; i++ {
 			tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg"})
 		}
 		wg.Done()
 	}()
 
 	wg.Wait()
-	// 2개의 GoRoutin 이 각각 1000 개씩 task 생성
+	// 2개의 GoRoutine이 각각 1000 개씩 task 생성
 	assert.Equal(t, 2000, len(tasks.TaskMap))
 
 }
@@ -138,6 +156,7 @@ func TestTasks_GetTaskList(t *testing.T) {
 	t2 := tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/B.mpg", FileName: "B.mpg"})
 	t3 := tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/C.mpg", FileName: "C.mpg"})
 
+	// sort 된 list 를 반환함
 	tl := tasks.GetTaskList()
 
 	assert.Equal(t, t1.ID, tl[0].ID)

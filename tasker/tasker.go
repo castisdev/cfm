@@ -92,6 +92,7 @@ func (srcs *SrcHosts) Add(s string) error {
 }
 
 // Add : add destination host
+// IP, Port, Addr 값 이외 selected, status값은 초기값이 들어감
 func (dests *DstHosts) Add(s string) error {
 
 	host, err := common.SplitHostPort(s)
@@ -105,9 +106,12 @@ func (dests *DstHosts) Add(s string) error {
 }
 
 // selecteSourceServer
-// task 에 사용되지 않는 source 선택
+//
+// 아직, task 에 사용되지 않았고,
+//
 // status 가 OK 인 source 선택
-// source :srcHost, 선택 여부가 retrun 된다.
+//
+// 선택된 source: *SrcHost와 선택 여부가 retrun 된다.
 func (srcs *SrcHosts) selectSourceServer() (SrcHost, bool) {
 
 	for _, src := range *srcs {
@@ -400,11 +404,11 @@ func CollectRemoteFileList(destList *DstHosts, remoteFileSet map[string]int) {
 		fl := make([]string, 0, 10000)
 		err := common.GetRemoteFileList(&dest.Host, &fl)
 		if err != nil {
-			tasker.Errorf("[%d] fail to get remote file list, error(%s)", dest, err.Error())
+			tasker.Errorf("[%s] fail to get remote file list, error(%s)", dest, err.Error())
 			continue
 		}
 
-		tasker.Debugf("[%s] get file list", dest.Addr)
+		tasker.Debugf("[%s] get file list", dest)
 		for _, file := range fl {
 			remoteFileSet[file]++
 		}
@@ -585,6 +589,6 @@ func (dsts *DstHosts) getHostStatus(addr string) (HostStatus, bool) {
 			return dst.Status, true
 		}
 	}
-	tasker.Debugf("[%s] fail to get status, not found")
+	tasker.Debugf("[%s] fail to get status, not found", addr)
 	return OK, false
 }

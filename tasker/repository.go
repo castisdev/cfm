@@ -12,6 +12,7 @@ import (
 type Repository struct {
 	where  string
 	logger common.MLogger
+	db     *leveldb.DB
 }
 
 func newRepository() *Repository {
@@ -22,6 +23,25 @@ func newRepository() *Repository {
 			Mod:    "repository"},
 	}
 	return r
+}
+
+func (r *Repository) open() error {
+	db, err := leveldb.OpenFile(r.where, nil)
+	if err != nil {
+		r.logger.Errorf("fail to open tasks repository")
+		return err
+	}
+	r.db = db
+	return nil
+}
+
+func (r *Repository) close() error {
+	err := r.db.Close()
+	if err != nil {
+		r.logger.Errorf("fail to close tasks repository")
+		return err
+	}
+	return nil
 }
 
 func (r *Repository) saveTask(t *Task) {

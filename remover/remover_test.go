@@ -1,4 +1,4 @@
-package remover
+package remover_test
 
 import (
 	"encoding/json"
@@ -9,6 +9,8 @@ import (
 
 	"github.com/castisdev/cfm/common"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/castisdev/cfm/remover"
 )
 
 func Test_collectRemoteDiskUsage(t *testing.T) {
@@ -19,8 +21,8 @@ func Test_collectRemoteDiskUsage(t *testing.T) {
 
 	// setup dummy http server
 	d1 := common.DiskUsage{
-		TotalSize: 1000, UsedSize: 500,
-		FreeSize: 500, UsedPercent: 50,
+		TotalSize: 1000, UsedSize: 600,
+		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
 	}
 	h1 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -32,7 +34,7 @@ func Test_collectRemoteDiskUsage(t *testing.T) {
 
 	d2 := common.DiskUsage{
 		TotalSize: 2000, UsedSize: 1000,
-		FreeSize: 1000, UsedPercent: 50,
+		FreeSize: 1000, AvailSize: 1000, UsedPercent: 50,
 	}
 	h2 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -44,7 +46,7 @@ func Test_collectRemoteDiskUsage(t *testing.T) {
 
 	d3 := common.DiskUsage{
 		TotalSize: 3000, UsedSize: 1500,
-		FreeSize: 1500, UsedPercent: 50,
+		FreeSize: 1500, AvailSize: 1500, UsedPercent: 50,
 	}
 	h3 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -80,29 +82,25 @@ func Test_collectRemoteDiskUsage(t *testing.T) {
 	hosts.Add(vs2)
 	hosts.Add(vs3)
 
-	dus := make(map[string]*common.DiskUsage)
-	collectRemoteDiskUsage(hosts, dus)
+	remover.SetDiskUsageLimitPercent(55)
+	dservers := remover.GetServerWithNotEnoughDisk(hosts)
 
-	assert.Equal(t, d1.TotalSize, dus[vs1].TotalSize)
-	assert.Equal(t, d1.UsedSize, dus[vs1].UsedSize)
-	assert.Equal(t, d1.FreeSize, dus[vs1].FreeSize)
-	assert.Equal(t, d1.UsedPercent, dus[vs1].UsedPercent)
+	assert.Equal(t, 1, len(dservers))
 
-	assert.Equal(t, d2.TotalSize, dus[vs2].TotalSize)
-	assert.Equal(t, d2.UsedSize, dus[vs2].UsedSize)
-	assert.Equal(t, d2.FreeSize, dus[vs2].FreeSize)
-	assert.Equal(t, d2.UsedPercent, dus[vs2].UsedPercent)
+	if len(dservers) < 1 {
+		t.Fatal("cannot find server that run out of disk space")
+	}
+	overuseServer := dservers[0]
+	assert.Equal(t, uint(60), overuseServer.Du.UsedPercent)
 
-	assert.Equal(t, d3.TotalSize, dus[vs3].TotalSize)
-	assert.Equal(t, d3.UsedSize, dus[vs3].UsedSize)
-	assert.Equal(t, d3.FreeSize, dus[vs3].FreeSize)
-	assert.Equal(t, d3.UsedPercent, dus[vs3].UsedPercent)
+	overUsedSize := overuseServer.Du.GetOverUsedSize(remover.DiskUsageLimitPercent())
+	assert.Less(t, uint64(0), uint64(overUsedSize))
+	// 600(current used) - 550(limit used : 1000 * 55%)
+	assert.Equal(t, uint64(50), uint64(overUsedSize))
 }
 
 func TestSetDiskUsageLimitPercent(t *testing.T) {
-
-	assert.NotNil(t, SetDiskUsageLimitPercent(-1))
-	assert.NotNil(t, SetDiskUsageLimitPercent(101))
-	assert.Nil(t, SetDiskUsageLimitPercent(0))
-	assert.Nil(t, SetDiskUsageLimitPercent(50))
+	assert.NotNil(t, remover.SetDiskUsageLimitPercent(101))
+	assert.Nil(t, remover.SetDiskUsageLimitPercent(0))
+	assert.Nil(t, remover.SetDiskUsageLimitPercent(50))
 }

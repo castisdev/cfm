@@ -16,19 +16,44 @@ func TestCleanTask(t *testing.T) {
 
 	ts := NewTasks()
 
-	t1 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg", FileName: "A.mpg"})
-	t2 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/B.mpg", FileName: "B.mpg"})
-	ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/C.mpg", FileName: "C.mpg"})
-	ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/D.mpg", FileName: "D.mpg"})
-	ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/E.mpg", FileName: "E.mpg"})
+	t1 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
+		FileName: "A.mpg", SrcAddr: "127.0.0.1:8080", DstAddr: "127.0.0.1:8080"})
+	t2 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/B.mpg",
+		FileName: "B.mpg", SrcAddr: "127.0.0.1:8080", DstAddr: "127.0.0.2:8080"})
+	ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/C.mpg",
+		FileName: "C.mpg", SrcAddr: "127.0.0.1:8080", DstAddr: "127.0.0.3:8080"})
+	ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/D.mpg",
+		FileName: "D.mpg", SrcAddr: "127.0.0.1:8080", DstAddr: "127.0.0.4:8080"})
+	ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/E.mpg",
+		FileName: "E.mpg", SrcAddr: "127.0.0.1:8080", DstAddr: "127.0.0.5:8080"})
 
 	ts.TaskMap[t1.ID].Status = DONE
 	ts.TaskMap[t2.ID].Status = DONE
 
-	CleanTask(ts)
+	SrcServers.Add("127.0.0.1:8080")
+	(*SrcServers)[0].Status = OK
 
+	DstServers.Add("127.0.0.1:8080")
+	DstServers.Add("127.0.0.2:8080")
+	DstServers.Add("127.0.0.3:8080")
+	DstServers.Add("127.0.0.4:8080")
+	DstServers.Add("127.0.0.5:8080")
+
+	(*DstServers)[0].Status = OK
+	(*DstServers)[1].Status = OK
+	(*DstServers)[2].Status = OK
+	(*DstServers)[3].Status = OK
+	(*DstServers)[4].Status = OK
+
+	CleanTask(ts)
 	// 2개의 DONE task 삭제된 후 task 개수
+	// task의 SrcAddr 와 task 의 DstAddr 의 Status를 구할 수 없어도 삭제됨
 	assert.Equal(t, 3, len(ts.TaskMap))
+
+	(*DstServers)[2].Status = NOTOK
+	CleanTask(ts)
+	// dest server 127.0.0.3:8080 의 상태가 NOTOK 로 바뀌어서 삭제됨
+	assert.Equal(t, 2, len(ts.TaskMap))
 
 	SetTaskTimeout(time.Second * 1)
 	time.Sleep(time.Second * 2)
@@ -92,10 +117,27 @@ func Test_selectSourceServer(t *testing.T) {
 	srcs.Add("127.0.0.2:18001")
 	srcs.Add("127.0.0.3:18001")
 
+	// status 이 NOTOK 이므로, select 되지 않음
 	for i := 0; i < 3; i++ {
 		_, exists := srcs.selectSourceServer()
-		assert.Equal(t, true, exists)
+		assert.Equal(t, false, exists)
 	}
+
+	// (*srcs)[0] status 값이 OK 이므로,(*srcs)[0]이select 됨
+	(*srcs)[0].Status = OK
+	for i := 0; i < 3; i++ {
+		srcs.selectSourceServer()
+	}
+	assert.Equal(t, (*srcs)[0].selected, true)
+
+	// 1,2 번도 Status 값이 OK 이므로, select 됨
+	(*srcs)[1].Status = OK
+	(*srcs)[2].Status = OK
+	for i := 0; i < 3; i++ {
+		srcs.selectSourceServer()
+	}
+	assert.Equal(t, (*srcs)[1].selected, true)
+	assert.Equal(t, (*srcs)[2].selected, true)
 
 	// 이미 3개의 src 를 모두 사용했으모로 src 가 없어야 한다.
 	_, exists := srcs.selectSourceServer()
