@@ -196,10 +196,18 @@ func (tasks *Tasks) UpdateStatus(id int64, s Status) error {
 
 // LoadTasks :
 // repository 에서 task list load
+//
+// load 중에 repository 에러가 나는 경우,
+//
+// 잘못된 repository라고 repostiroy는 초기화함
 func (tasks *Tasks) LoadTasks() {
 	tasks.mutex.Lock()
 	defer tasks.mutex.Unlock()
-	tl := tasks.repository.loadTasks()
+	tl, err := tasks.repository.loadTasks()
+	if err != nil {
+		tasks.repository.remove()
+		return
+	}
 	for _, t := range tl {
 		tasks.TaskMap[t.ID] = &Task{
 			ID:        t.ID,
@@ -249,6 +257,18 @@ func (tasks *Tasks) DeleteTask(id int64) error {
 	tasks.repository.deleteTask(id)
 	return nil
 
+}
+
+// DeleteAllTask
+//
+// 내부 map, repository를 모두 지우고, 새롭게 할당
+func (tasks *Tasks) DeleteAllTask() {
+	tasks.mutex.Lock()
+	defer tasks.mutex.Unlock()
+
+	tasks.repository.remove()
+	tasks.TaskMap = make(map[int64]*Task)
+	tasks.repository = newRepository()
 }
 
 // String : task to string

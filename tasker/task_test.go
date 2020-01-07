@@ -42,8 +42,9 @@ func TestTasks_CreateTask(t *testing.T) {
 }
 
 func TestTasks_Create_ManyTask(t *testing.T) {
-
 	tasks := NewTasks()
+	defer tasks.DeleteAllTask()
+
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
 	go func() {
@@ -57,18 +58,30 @@ func TestTasks_Create_ManyTask(t *testing.T) {
 	// 1개의 GoRoutine이 100개 task 생성
 	assert.Equal(t, 100, len(tasks.TaskMap))
 
+	// repository에서 task load
+	// tasks.TaskMap 에 이미 100개가 들어있고,
+	// 같은 task들이 repository에도 100개가 들어있는 상태여서
+	// repository에서 LoadTasks 해도 여전히 100개임
+	tasks.LoadTasks()
+	assert.Equal(t, 100, len(tasks.TaskMap))
+
+	// 정보를 모두 지우면, repository에서도 지워지기 때문에,
+	//  다시 load 해도 정보는 없음
+	tasks.DeleteAllTask()
+	tasks.LoadTasks()
+	assert.Equal(t, 0, len(tasks.TaskMap))
 }
 
 func TestTasks_TwoCreator_Create_ManyTask(t *testing.T) {
-
 	tasks := NewTasks()
+	defer tasks.DeleteAllTask()
 
 	wg := new(sync.WaitGroup)
 
 	wg.Add(1)
 	go func() {
 
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < 10000; i++ {
 			tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg"})
 
 		}
@@ -77,16 +90,15 @@ func TestTasks_TwoCreator_Create_ManyTask(t *testing.T) {
 
 	wg.Add(1)
 	go func() {
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < 10000; i++ {
 			tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg"})
 		}
 		wg.Done()
 	}()
 
 	wg.Wait()
-	// 2개의 GoRoutine이 각각 1000 개씩 task 생성
-	assert.Equal(t, 2000, len(tasks.TaskMap))
-
+	// 2개의 GoRoutine이 각각 10000 개씩 task 생성
+	assert.Equal(t, 20000, len(tasks.TaskMap))
 }
 
 func TestTasks_DeleteTask(t *testing.T) {
