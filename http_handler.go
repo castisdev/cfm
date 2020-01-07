@@ -25,43 +25,41 @@ func DashBoard(w http.ResponseWriter, r *http.Request) {
 
 // TaskIndex is http handler for GET /tasks route
 func TaskIndex(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
+	t := tasks.GetTaskList()
+	if err := json.NewEncoder(w).Encode(t); err != nil {
+		api.Errorf("decode json fail : %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+// TaskDelete is http handler for DELETE /tasks/<taskID> route
+func TaskDelete(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	taskID := vars["taskId"]
 
 	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
-
-	if err := json.NewEncoder(w).Encode(tasks.TaskMap); err != nil {
-		api.Errorf("decode json fail : %s", err)
-		w.WriteHeader(http.StatusNotAcceptable)
+	if id, err := strconv.ParseInt(taskID, 10, 64); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
 		return
+	} else {
+		if err := tasks.DeleteTask(id); err != nil {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)
 }
 
-// TaskDelete is http handler for DELETE /tasks/<taskID> route
-func TaskDelete(w http.ResponseWriter, r *http.Request) {
-
-	vars := mux.Vars(r)
-	taskID := vars["taskId"]
-
-	if id, err := strconv.ParseInt(taskID, 10, 64); err != nil {
-		w.WriteHeader(404)
-	} else {
-		tasks.DeleteTask(id)
-		w.Header().Set("Content-Type", "application/json;charset=UTF-8")
-		w.WriteHeader(http.StatusOK)
-	}
-
-}
-
 // TaskUpdate is http handler for PATCH /tasks/<taskID> route
 func TaskUpdate(w http.ResponseWriter, r *http.Request) {
-
 	vars := mux.Vars(r)
 	taskID := vars["taskId"]
 
-	ID, err := strconv.ParseInt(taskID, 10, 64)
 	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
-
+	ID, err := strconv.ParseInt(taskID, 10, 64)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -72,22 +70,22 @@ func TaskUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
-		api.Errorf("decode json fail : %s", err)
-		w.WriteHeader(http.StatusNotAcceptable)
+		api.Errorf("fail to update task status, decode json fail : %s", err)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
 
 	t, exists := tasks.FindTaskByID(ID)
 	if !exists {
-		api.Warningf("receive update task status(%s) request for invalid task,ID(%d)",
+		api.Warningf("fail to update task status(%s) request for invalid task,ID(%d)",
 			s.Status, ID)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
 	if err := tasks.UpdateStatus(ID, s.Status); err != nil {
-		api.Errorf("fail to update task status(%s),task(%s),error(%s)",
+		api.Errorf("fail to update task status(%s), task(%s), error(%s)",
 			s.Status, t, err.Error())
 		w.WriteHeader(http.StatusConflict)
 		return

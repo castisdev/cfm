@@ -53,7 +53,7 @@ func main() {
 
 	c, err := ReadConfig(path.Join(execDir, "cfm.yml"))
 	if err != nil {
-		log.Fatalf("fail to read config, error(%s)", err)
+		log.Fatalf("fail to read config, error(%s)", err.Error())
 	}
 
 	ValidationConfig(*c)
@@ -138,9 +138,9 @@ func main() {
 		tasker.SourcePath.Add(s)
 	}
 
-	go tasker.RunForever()
-
+	tasker.InitTasks()
 	tasks = tasker.GetTaskListInstance()
+	go tasker.RunForever()
 
 	router := NewRouter()
 	s := &http.Server{
@@ -152,6 +152,6 @@ func main() {
 
 	err = s.ListenAndServe()
 	if err != nil {
-		log.Fatalf("fail to start, error(%s)", err)
+		log.Fatalf("fail to start, error(%s)", err.Error())
 	}
 }

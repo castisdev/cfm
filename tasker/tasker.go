@@ -144,11 +144,22 @@ func init() {
 		Mod:    "tasker"}
 }
 
-// RunForever is to run tasker as go routine
-func RunForever() {
+// InitTasks:
+//
+// 원래 init() 함수 안에 있었는데,
+//
+// cfw등 다른 모듈에서 tasker package를 사용할 때, init() 함수가 호출될 때
+//
+// 실행되게 되어 따로 분리함
+//
+// RunForever() 함수가 호출되기 전에 따로 호출해주어야 함
+func InitTasks() {
 	tasks = NewTasks()
 	tasks.LoadTasks()
+}
 
+// RunForever is to run tasker as go routine
+func RunForever() {
 	destcount := len(*DstServers)
 	if destcount == 0 {
 		tasker.Debugf("tasker endded, the number of the dest srvers is 0")

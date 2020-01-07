@@ -1,27 +1,35 @@
-[version 1.0.0.QR2]
+[version 1.0.0.qr2]
+
 컴파일 환경
-- go1.10.4 limux/amd64
+- go1.13.4 limux/amd64
+- go1.9.2 limux/amd64
 
 개발내용
 1. cfw api df 로 계산되는 used percent 계산방식으로 df 명령어의 계산식을 사용하게 수정함
-	- 이전 버전에서는 df 명령어의  값보다 used percent 값이 작게 나오고 있었음
+  - 이전 버전에서는 df 명령어의  값보다 used percent 값이 작게 나오고 있었음
 2. lb event log 에서 hit 수를 만족해서 배포되는 파일(최근 hit수가 증가한 파일)은
 	삭제 파일 리스트에 포함시키지 않음
-	- 최근 hit가 많이 발생한 파일들이 배포 후에 바로 삭제되는 것을 방지하기 위한 기능
+  - 최근 hit가 많이 발생한 파일들이 배포 후에 바로 삭제되는 것을 방지하기 위한 기능
 3. 파일 삭제 로그에 파일 정보가 파일 path//파일 이름 식으로 /가 두 번 남는 경우 수정
 4. src 서버, dst 서버가 죽었는지 파악하기 위해서 src 서버와 destination 서버에 heartbeat request 기능 추가
 5. 죽은 src 서버, dst 서버는 task 생성 시 포함하지 않는 기능 추가
 6 task에 사용 중인 destination 서버는 다른 task에 사용되지 않게 함
-	- src 서버의 갯수가 destination의 갯수보다 많은 경우, 하나의 destination 서버가 여러 task에 사용됨
+  - src 서버의 갯수가 destination의 갯수보다 많은 경우, 하나의 destination 서버가 여러 task에 사용됨
 7. hitcount history file에 두 개 이상의 서버에 위치한 파일을 조사해서
 	하나의 서버에만 위치하게 관리하는 기능 추가
-	- 하나의 서버 제외한 나머지 서버에 파일 삭제 요청함
+  - 하나의 서버 제외한 나머지 서버에 파일 삭제 요청함
 8. UpdateStaus 함수 error 조건 완화
-	- 같은 status 에서 같은 status 로 update 할 때 반환값 성공으로 변경
+  - 같은 status 에서 같은 status 로 update 할 때 반환값 성공으로 변경
 9. task 정보 파일에도 저장하는 기능 추가
 10. 일부 로그 수정
 11. 일부 설정 추가, 변경
-
+12. port 충돌로 실행 실패했을 때 화면에 error 메시지 출력하고 종료하게 변경
+  - 참고: port  충돌이 없다면 중복실행은 가능
+13. /tasks API response 형태 변경, 리턴 코드 추가
+	- map 형태 -> list 형태로 변경
+  - 500 error 리턴 코드 추가
+14. /tasks/{taskId} API 리턴 코드 추가
+  - 400, 404 error 리턴 코드 추가
 
 [version 1.0.0.QR1]
 릴리즈 날짜 : 2019-11-12

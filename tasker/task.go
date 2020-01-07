@@ -84,6 +84,24 @@ type Task struct {
 	DstAddr   string   `json:"dst_addr"`
 }
 
+// NewTaskFrom : param으로 받은 task로부터 cloning한 새로운 task반환
+func NewTaskFrom(t Task) *Task {
+	return &Task{
+		ID:        t.ID,
+		Ctime:     t.Ctime,
+		Mtime:     t.Mtime,
+		Status:    t.Status,
+		SrcIP:     t.SrcIP,
+		DstIP:     t.DstIP,
+		FilePath:  t.FilePath,
+		FileName:  t.FileName,
+		Grade:     t.Grade,
+		CopySpeed: t.CopySpeed,
+		SrcAddr:   t.SrcAddr,
+		DstAddr:   t.DstAddr,
+	}
+}
+
 func (t TaskTime) String() string {
 	return time.Unix(int64(t), 0).Format(time.RFC3339)
 }
@@ -109,10 +127,11 @@ func NewTasks() *Tasks {
 // lock 을 사용하고, 작은 taskID 순으로 sort해서 반환
 //
 // create nano time으로 id를 만들기 때문에 먼저 만들어진 task 가 먼저 나오게 됨
-func (tasks Tasks) GetTaskList() (tl []Task) {
+func (tasks Tasks) GetTaskList() []Task {
 	tasks.mutex.RLock()
 	defer tasks.mutex.RUnlock()
 
+	tl := make([]Task, 0)
 	for _, v := range tasks.TaskMap {
 		tl = append(tl, *v)
 	}
@@ -209,20 +228,7 @@ func (tasks *Tasks) LoadTasks() {
 		return
 	}
 	for _, t := range tl {
-		tasks.TaskMap[t.ID] = &Task{
-			ID:        t.ID,
-			Ctime:     t.Ctime,
-			Mtime:     t.Mtime,
-			Status:    t.Status,
-			SrcIP:     t.SrcIP,
-			DstIP:     t.DstIP,
-			FilePath:  t.FilePath,
-			FileName:  t.FileName,
-			Grade:     t.Grade,
-			CopySpeed: t.CopySpeed,
-			SrcAddr:   t.SrcAddr,
-			DstAddr:   t.DstAddr,
-		}
+		tasks.TaskMap[t.ID] = NewTaskFrom(t)
 	}
 }
 
