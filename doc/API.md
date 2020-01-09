@@ -88,7 +88,7 @@
 
 - curl 사용 예:
 ```bash
-    $ curl 127.0.0.1:7888/tasks -v
+    $ curl 127.0.0.1:7888/tasks
 ```
 - httpie 사용 예:
 ```bash
@@ -104,7 +104,7 @@
 
 - curl 사용 예:
 ```bash
-  $ curl -X DELETE 127.0.0.1:7888/tasks/1578383370370052104 -v
+  $ curl -X DELETE 127.0.0.1:7888/tasks/1578383370370052104
 ```
 - httpie 사용 예:
 ```bash
@@ -127,7 +127,7 @@
 $ curl --header "Content-Type: application/json" \
   --request PATCH \
   --data '{"status":"done"}' \
-  http://127.0.0.1:7888/tasks/1578383370370052104 -v
+  http://127.0.0.1:7888/tasks/1578383370370052104
 ```
 - httpie 사용 예:
 ```bash
