@@ -27,13 +27,13 @@
         <thead>
             <tr>
             <th>ID</th>
-            <th>Grade</th>
             <th>FilePath</th>
             <th>Status</th>
-            <th>Ctime</th>
-            <th>Mtime</th>
             <th>SrcAddr</th>
             <th>DstAddr</th>
+            <th>Grade</th>
+            <th>Ctime</th>
+            <th>Mtime</th>
             </tr>
         </thead>
         <tbody>
@@ -50,13 +50,13 @@
                     <tr class>
                 {{ end }}
                     <th scope="row">{{.ID}}</th>
-                    <td>{{.Grade}}</td>
                     <td>{{.FilePath}}</td>
                     <td>{{.Status}}</td>
-                    <td>{{.Ctime}}</td>
-                    <td>{{.Mtime}}</td>
                     <td>{{.SrcAddr}}</td>
                     <td>{{.DstAddr}}</td>
+                    <td>{{.Grade}}</td>
+                    <td>{{.Ctime}}</td>
+                    <td>{{.Mtime}}</td>
                     </tr>
             {{end}}
         </tbody>

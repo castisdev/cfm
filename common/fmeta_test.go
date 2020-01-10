@@ -138,3 +138,16 @@ func TestIsADFile(t *testing.T) {
 	assert.Equal(t, false, common.IsADFile("AMN10001.mpg", prefixes))
 
 }
+
+func TestIsPrefix(t *testing.T) {
+
+	prefixes := []string{"M64", "MN1"}
+
+	assert.Equal(t, true, common.IsPrefix("M640001.mpg", prefixes))
+	assert.Equal(t, true, common.IsPrefix("MN10001.mpg", prefixes))
+	assert.Equal(t, false, common.IsPrefix("M650001.mpg", prefixes))
+	assert.Equal(t, false, common.IsPrefix("MN20001.mpg", prefixes))
+	assert.Equal(t, false, common.IsPrefix("AM64001.mpg", prefixes))
+	assert.Equal(t, false, common.IsPrefix("AMN10001.mpg", prefixes))
+
+}

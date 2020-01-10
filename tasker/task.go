@@ -66,9 +66,31 @@ func (s Status) String() string {
 
 type TaskTime int64
 
-// Task is struct for copy task
-// CTime : created time
-// MTime : modified time
+// Task is struct for 배포 task
+//
+// ID : unique key값
+//
+// CTime : created time, 사용하는 곳 없음
+//
+// MTime : modified time, 배포 task Timeout 삭제 조건으로 사용
+//
+// Status : 배포 상태
+//
+// SrcIP : source 서버 IP
+//
+// DstIP : dest 서버 IP, 사용하는 곳 없음(DstAddr과 중복됨)
+//
+// FilePath : 배포 파일 path, source 서버 상의 파일 위치
+//
+// FileName : 배포 파일 이름
+//
+// Grade : 파일 등급, 사용하는 곳 없음
+//
+// CopySpeed : 배포 속도(bps)
+//
+// SrcAddr : Source 서버 IP, Port
+//
+// DstAddr : Destination 서버 IP, Port
 type Task struct {
 	ID        int64    `json:"id,string"`
 	Ctime     TaskTime `json:"ctime"`
@@ -186,12 +208,12 @@ func (tasks *Tasks) UpdateStatus(id int64, s Status) error {
 
 	case READY:
 		// fail : READY, WORKING, TIMEOUT, DONE -> READY
-		return fmt.Errorf("invalid request,try to change to status(%s)", READY)
+		return fmt.Errorf("invalid request, try to change to status(%s)", READY)
 
 	case WORKING:
 		// fail : TIMEOUT, DONE -> WORKING
 		if task.Status == DONE || task.Status == TIMEOUT {
-			return fmt.Errorf("invalid request,task already done or tiemout,task(%d),"+
+			return fmt.Errorf("invalid request, task already done or tiemout,task(%d),"+
 				"filename(%s)", task.ID, task.FileName)
 		}
 		// success : READY, WORKING-> WORKING
@@ -256,7 +278,7 @@ func (tasks *Tasks) DeleteTask(id int64) error {
 
 	_, exists := tasks.TaskMap[id]
 	if !exists {
-		return fmt.Errorf("could not find Task with id(%d) to delete", id)
+		return fmt.Errorf("not found, task(%d) to delete", id)
 	}
 
 	delete(tasks.TaskMap, id)
@@ -280,12 +302,12 @@ func (tasks *Tasks) DeleteAllTask() {
 // String : task to string
 func (task Task) String() string {
 	t := fmt.Sprintf(
-		"ID(%d), Grade(%d), FilePath(%s),"+
-			"SrcIP(%s), DstIP(%s), SrcAddr(%s), DstAddr(%s),"+
-			"Ctime(%s), Mtime(%s), Status(%s)",
+		"id(%d), grade(%d), filePath(%s),"+
+			"srcIP(%s), dstIP(%s), srcAddr(%s), dstAddr(%s),"+
+			"ctime(%s), mtime(%s), status(%s), copySpeed(%s)bps",
 		task.ID, task.Grade, task.FilePath,
 		task.SrcIP, task.DstIP, task.SrcAddr, task.DstAddr,
-		task.Ctime, task.Mtime, task.Status,
+		task.Ctime, task.Mtime, task.Status, task.CopySpeed,
 	)
 	return t
 }

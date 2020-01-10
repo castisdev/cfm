@@ -62,6 +62,7 @@ var advPrefixes []string
 var hitcountHistoryFile string
 var gradeInfoFile string
 var taskCopySpeed string
+var ignorePrefixes []string
 
 // GetTaskListInstance is to get global task list structure's addr
 func GetTaskListInstance() *Tasks {
@@ -239,6 +240,12 @@ func RunForever() {
 
 		for _, v := range fileMetaMap {
 
+			// 서버 파일 중 제외 파일 처리
+			if common.IsPrefix(v.Name, ignorePrefixes) {
+				tasker.Debugf("remove file meta by ignoring prefix, file(%s)", v.Name)
+				continue
+			}
+
 			// 6. 광고 파일은 제외
 			if common.IsADFile(v.Name, advPrefixes) {
 				tasker.Debugf("remove adfile from file metas, file(%s)", v.Name)
@@ -262,6 +269,11 @@ func RunForever() {
 
 		sortByHit := make([]*common.FileMeta, 0, len(hitMapFromLBLog))
 		for fileName, hitCount := range hitMapFromLBLog {
+
+			if common.IsPrefix(fileName, ignorePrefixes) {
+				tasker.Debugf("remove file meta by ignoring prefix, file(%s)", fileName)
+				continue
+			}
 
 			// 9.1. 광고 파일은 제외
 			if common.IsADFile(fileName, advPrefixes) {
@@ -602,4 +614,10 @@ func (dsts *DstHosts) getHostStatus(addr string) (HostStatus, bool) {
 	}
 	tasker.Debugf("[%s] fail to get status, not found", addr)
 	return OK, false
+}
+
+// SetIgnorePrefixes
+func SetIgnorePrefixes(p []string) {
+	tasker.Debugf("set ignore prefixes(%v)", p)
+	ignorePrefixes = p
 }

@@ -37,6 +37,8 @@ var hitcountHistoryFile string
 var gradeInfoFile string
 var sleepSec uint
 
+var ignorePrefixes []string
+
 // Tail :: LB EventLog 를 tailing 하며 SAN 에서 Hit 되는 파일 목록 추출
 var Tail *tailer.Tailer
 
@@ -272,6 +274,12 @@ func RunForever() {
 			for filename, fm := range sfmm {
 				//remover.Debugf("[%s] file(%s) in the server", server, filename)
 
+				// 서버 파일 중 제외 파일 처리
+				if common.IsPrefix(filename, ignorePrefixes) {
+					remover.Debugf("[%s] skip file by ignoring prefix, file(%s)", server, filename)
+					continue
+				}
+
 				// 서버 파일 중 광고 파일은 제외
 				if common.IsADFile(filename, advPrefixes) {
 					remover.Debugf("[%s] skip adfile, file(%s)", server, filename)
@@ -354,6 +362,7 @@ func DiskUsageLimitPercent() uint {
 
 // SetAdvPrefix :
 func SetAdvPrefix(p []string) {
+	remover.Debugf("set adv prefixes(%v)", p)
 	advPrefixes = p
 }
 
@@ -365,4 +374,10 @@ func SetHitcountHistoryFile(f string) {
 // SetGradeInfoFile :
 func SetGradeInfoFile(f string) {
 	gradeInfoFile = f
+}
+
+// SetIgnorePrefixes
+func SetIgnorePrefixes(p []string) {
+	remover.Debugf("set ignore prefixes(%v)", p)
+	ignorePrefixes = p
 }

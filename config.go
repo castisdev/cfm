@@ -28,6 +28,10 @@ type Tasker struct {
 	TaskCopySpeedBPS string `mapstructure:"task_copy_speed_bps"`
 }
 
+type Ignore struct {
+	Prefixes []string `mapstructure:"prefixes"`
+}
+
 // Config :
 type Config struct {
 	AdvPrefixes         []string `mapstructure:"adv_prefixes"`
@@ -49,7 +53,8 @@ type Config struct {
 
 // ReadConfig :
 func ReadConfig(configFile string) (*Config, error) {
-
+	viper.SetDefault("log_dir", "log")
+	viper.SetDefault("log_level", "info")
 	viper.SetDefault("enable_coredump", true)
 	viper.SetDefault("tasker.task_timeout_sec", 3600)
 	viper.SetDefault("tasker.task_copy_speed_bps", 10000000)

@@ -13,6 +13,7 @@ v1.0.0.qr2 / 2020-01-08
     - [tasker]-[task_timeout_sec]
     - [servers]-[heartbeat_timeout_sec]
     - [servers]-[heartbeat_sleep_sec]
+    - [ignore]-[prefixes]
   * /tasks API response 변경
     - lock 처리 추가
 	  - map 형태 -> list 형태로 변경
@@ -47,6 +48,7 @@ v1.0.0.qr2 / 2020-01-08
   * task 정보를 파일에도 저장하는 기능 추가
     - leveldb 사용
   * 일부 로그 수정
+  * 최신 로그 파일에 대한 symbol link 파일 생성
 
 v1.0.0.qr1 / 2019-11-12
 ===================

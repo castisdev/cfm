@@ -84,7 +84,8 @@ def make_html(html_path, md_html_body):
 
 
 def main(md_path, pdf_path):
-        home = expanduser("~") + '/'
+        #home = expanduser("~") + '/'
+        home = os.path.dirname(md_path) + '/'
         html_path = home + os.path.splitext(os.path.basename(md_path))[0]
         html_path += '.html'
         md_text = get_contents(md_path)

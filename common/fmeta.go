@@ -131,6 +131,16 @@ func ParseGradeFileAndNewFileMetas(fileName string, fmm map[string]*FileMeta) er
 	return nil
 }
 
+// IsPrefix : prefix 검사
+func IsPrefix(f string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(f, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 // IsADFile :
 func IsADFile(f string, adPrefixes []string) bool {
 
