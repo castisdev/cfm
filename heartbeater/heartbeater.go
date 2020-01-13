@@ -172,7 +172,7 @@ func Heartbeat() {
 		if rc {
 			h.Status = OK
 			h.Mtime = HBTime(time.Now().Unix())
-			hber.Debugf("[%s] success heartbeat, host(%s)", h.Host, h)
+			hber.Debugf("[%s] heartbeat, host(%s)", h.Host, h)
 		} else {
 			h.Status = NOTOK
 			h.Mtime = HBTime(time.Now().Unix())

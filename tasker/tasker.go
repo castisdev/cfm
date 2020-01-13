@@ -233,7 +233,7 @@ func RunForever() {
 			time.Sleep(time.Second * 5)
 			continue
 		}
-		tasker.Debugf("success making file metas, time(%s)", time.Since(est))
+		tasker.Debugf("make file metas, time(%s)", time.Since(est))
 
 		// 5. 높은 등급 순서로 정렬하기 위해 빈 Slice 생성 (map->slice)
 		sortedFileList := make([]*common.FileMeta, 0, len(fileMetaMap))
@@ -488,7 +488,7 @@ func (srcs *SrcHosts) setHostStatus() {
 		if ok {
 			if h.Status == heartbeater.OK {
 				src.Status = OK
-				tasker.Debugf("[%s] success heartbeat", src)
+				tasker.Debugf("[%s] heartbeat", src)
 			} else {
 				src.Status = NOTOK
 				tasker.Debugf("[%s] fail to heartbeat", src)
@@ -575,7 +575,7 @@ func (dsts *DstHosts) setHostStatus() {
 		if ok {
 			if h.Status == heartbeater.OK {
 				dst.Status = OK
-				tasker.Debugf("[%s] success heartbeat", dst)
+				tasker.Debugf("[%s] heartbeat", dst)
 			} else {
 				dst.Status = NOTOK
 				tasker.Debugf("[%s] fail to heartbeat", dst)

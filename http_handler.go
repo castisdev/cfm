@@ -91,7 +91,7 @@ func TaskUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.Infof("success updating task status(%s),task(%s)",
+	api.Infof("update task status(%s),task(%s)",
 		s.Status, t)
 	w.WriteHeader(http.StatusOK)
 }

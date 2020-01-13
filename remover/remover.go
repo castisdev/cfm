@@ -105,8 +105,8 @@ func selectFileMetas(server *common.Host,
 }
 
 // getServerFileMetas :
-// 전체 파일 목록 중에
-// 서버 별로 있는 파일 목록을 구해서 반환
+// 전체 파일 meta map 중에
+// 서버 별로 있는 파일에 대한 meta map을 구해서 반환
 // 서버 파일 목록을 구하다 에러가 난 경우, 해당 서버의 목록은 비어있게 됨
 func getServerFileMetas(allfmm FileMetaPtrMap) ServerFileMetaPtrMap {
 	sfmm := make(ServerFileMetaPtrMap)
@@ -121,34 +121,30 @@ func getServerFileMetas(allfmm FileMetaPtrMap) ServerFileMetaPtrMap {
 	return sfmm
 }
 
-// 현재 서버와 통신이 안되서, 또는
-// 현재 서버에는 없지만, 아직 전체 파일 목록에 반영이 안되서
-// 중복 파일의 서버 list에 현재 서버 정보가 있는 경우
-// file meta 정보에서 현재 서버 정보 삭제
-func updateAllFileMetasForDuplicatedFiles(fileMetaMap FileMetaPtrMap,
-	duplicatedFileMap FileMetaPtrMap, ssfms ServerFileMetaPtrMap) {
+// 실제 서버의 파일 유무가 반영된 서버별 file meta 정보를 이용하여,
+// 전체 서버 file meta 를 이용해서 만들어진
+// 중복 서버 file(여러 서버에 있는) meta 정보의 서버 목록 정보 update
+func updateFileMetasForDuplicatedFiles(duplicatedFileMap FileMetaPtrMap,
+	ssfmm ServerFileMetaPtrMap) {
 	for _, server := range *Servers {
-		sfms := ssfms[server.Addr]
 		for dfn, _ := range duplicatedFileMap {
-			_, ok := sfms[dfn]
-			if !ok {
-				// 중복 파일의 서버 list에 현재 서버 정보가 있는 경우,
-				// file meta 정보에서 현재 서버 정보 삭제
-				_, e := fileMetaMap[dfn].ServerIPs[server.IP]
-				if e {
-					// remover.Debugf("[%s] delete in the serverlist, not found in the server, file(%s)",
-					// 	server, dfn)
-					fileMetaMap[dfn].ServerCount--
-					fileMetaMap[dfn].ServerIPs[server.IP]--
-				}
-				continue
+			// 중복 파일로 등록되어있는 파일에 대해서
+			// 해당 서버의 파일 목록에서 찾을 수 없지만,
+			// 해당 파일의 서버 리스트에는 해당 서버가 있는 경우
+			_, insfm := ssfmm[server.Addr][dfn]
+			_, indfm := duplicatedFileMap[dfn].ServerIPs[server.IP]
+			if !insfm && indfm {
+				// 서버 리스트에서 해당 서버의 duplicate 정보 삭제
+				// count만 줄여준다.
+				duplicatedFileMap[dfn].ServerCount--
+				duplicatedFileMap[dfn].ServerIPs[server.IP]--
 			}
 		}
 	}
 }
 
 // 서버 파일 중에 중복 서버 list에 있는 파일 목록 구해서 delete 요청 하기
-func requestRemoveServerDuplicatedFiles(duplicatedFileMap FileMetaPtrMap,
+func requestRemoveDuplicatedFiles(duplicatedFileMap FileMetaPtrMap,
 	ssfms ServerFileMetaPtrMap) {
 	// 서버 파일 중에 중복 서버 list에 있는 파일 목록 구해서 delete 요청 하기
 	for _, server := range *Servers {
@@ -166,11 +162,11 @@ func requestRemoveServerDuplicatedFiles(duplicatedFileMap FileMetaPtrMap,
 				continue
 			}
 			if err := common.DeleteFileOnRemote(server, fm.Name); err != nil {
-				remover.Errorf("[%s] fail to request delete duplicated, file(%s), error(%s)",
+				remover.Errorf("[%s] fail to request to delete duplicated, file(%s), error(%s)",
 					server, fm, err.Error())
 				continue
 			}
-			remover.Infof("[%s] success requesting delete duplicated, file(%s)", server, fm)
+			remover.Infof("[%s] request to delete duplicated, file(%s)", server, fm)
 			// 현재 server에 delete 요청 성공한 파일에 대해서
 			// file meta 정보에서 현재 서버 정보 삭제
 			fm.ServerCount--
@@ -179,9 +175,9 @@ func requestRemoveServerDuplicatedFiles(duplicatedFileMap FileMetaPtrMap,
 	}
 }
 
-// GetServerWithNotEnoughDisk
+// FindServersOutOfDiskSpace
 // 서버 중에 disk 용량이 충분하지 않는 서버 구함
-func GetServerWithNotEnoughDisk(serverList *common.Hosts) []DServer {
+func FindServersOutOfDiskSpace(serverList *common.Hosts) []DServer {
 	s := make([]DServer, 0, len(*serverList))
 	for _, server := range *serverList {
 		du := new(common.DiskUsage)
@@ -208,6 +204,62 @@ func GetServerWithNotEnoughDisk(serverList *common.Hosts) []DServer {
 	}
 
 	return s
+}
+
+// getFileListToFreeDiskSpace
+// 서버의 파일 목록 중 지워야할 목록 구하기
+func getFileListToFreeDiskSpace(server DServer, ssfmm ServerFileMetaPtrMap,
+	rhitfmm map[string]int) []*common.FileMeta {
+	sfmm, ok := ssfmm[server.Addr]
+	fileList := make([]*common.FileMeta, 0, len(sfmm))
+	if !ok {
+		remover.Debugf("[%s] no file to delete", server)
+		return fileList
+	}
+	for filename, fm := range sfmm {
+		remover.Debugf("[%s] file(%s) in the server", server, filename)
+		// 서버 파일 중 제외 파일 처리
+		if common.IsPrefix(filename, ignorePrefixes) {
+			remover.Debugf("[%s] skip file by ignoring prefix, file(%s)", server, filename)
+			continue
+		}
+		// SAN 에 없는 파일이면 삭제 대상에서 제외
+		if _, exists := SourcePath.IsExistOnSource(filename); exists != true {
+			remover.Debugf("[%s] skip file, not found in source paths, file(%s)", server, filename)
+			continue
+		}
+		// 급 hit 상승 파일 목록에 속하는 파일이면 삭제 대상에 제외
+		if _, exists := rhitfmm[filename]; exists {
+			remover.Debugf("[%s] skip file, found in rising hit files, file(%s)", server, filename)
+			continue
+		}
+		fileList = append(fileList, fm)
+	}
+	if len(fileList) == 0 {
+		remover.Debugf("[%s] skip removing files, no file to delete", server)
+		return fileList
+	}
+
+	// 낮은 등급순(999999->1 순으로) 정렬
+	sort.Slice(fileList, func(i, j int) bool {
+		return fileList[i].Grade > fileList[j].Grade
+	})
+
+	fileListToDelete := make([]*common.FileMeta, 0, len(fileList)/10)
+	// 용량 확보될때까지 삭제할 파일에 추가
+	overUsedSize := server.Du.GetOverUsedSize(diskUsageLimitPercent)
+	deletingSize := common.Disksize(0)
+	for _, fm := range fileList {
+		if deletingSize >= overUsedSize {
+			break
+		}
+		deletingSize += common.Disksize(fm.Size)
+		remover.Debugf("[%s] deleting size(%d/%d), added to delete list"+
+			", file(%s)", server, deletingSize, overUsedSize, fm)
+		fileListToDelete = append(fileListToDelete, fm)
+	}
+
+	return fileListToDelete
 }
 
 // RunForever :
@@ -239,25 +291,26 @@ func RunForever() {
 			time.Sleep(time.Second * time.Duration(sleepSec))
 			continue
 		}
-		remover.Debugf("success making file metas, time(%s)", time.Since(est))
+		remover.Debugf("make file metas, time(%s)", time.Since(est))
 
 		// 급 hit 상승 파일 목록 구하기
 		// LB EventLog 에서 특정 IP 에 할당된 파일 목록 추출
 		Tail.Tail(&risingHitFileMap)
 
-		// 현재 destination 서버에 있는 파일 목록에
-		// meta 정보 연결된 서버별 파일 목록 생성
+		// 전체 파일 meta 정보에서
+		// 현재 서버(destination)에 있는 파일들의 meta만 골라내서
+		// 서버별 파일 meta 정보로 만들기
 		serverFileMetaMap := getServerFileMetas(fileMetaMap)
 
-		// 전체 파일목록의 중복 파일 정보에
-		// 현재 destination 서버에 없는 파일 정보 제거
-		updateAllFileMetasForDuplicatedFiles(fileMetaMap, duplicatedFileMap, serverFileMetaMap)
+		// 서버별 파일 meta 정보를 가지고
+		// 파일 meta 정보의 서버 정보 update
+		updateFileMetasForDuplicatedFiles(duplicatedFileMap, serverFileMetaMap)
 
 		// destination 서버에 중복 파일 삭제 요청
-		requestRemoveServerDuplicatedFiles(duplicatedFileMap, serverFileMetaMap)
+		requestRemoveDuplicatedFiles(duplicatedFileMap, serverFileMetaMap)
 
 		// disk 용량이 부족한 서버 구하기
-		servers := GetServerWithNotEnoughDisk(Servers)
+		servers := FindServersOutOfDiskSpace(Servers)
 
 		// disk 용량이 부족한 server 에 대해서 disk 지워야할 file 목록 만들고,
 		// 지워야 할 file 목록이 있는 경우 요청
@@ -327,15 +380,15 @@ func RunForever() {
 			for _, fm := range fileListToDelete {
 				deletingSize := common.Disksize(0)
 				if err := common.DeleteFileOnRemote(server.Host, fm.Name); err != nil {
-					remover.Errorf("[%s] fail to request delete, file(%s), error(%s)",
+					remover.Errorf("[%s] fail to request to delete, file(%s), error(%s)",
 						server, fm, err.Error())
 				} else {
-					remover.Infof("[%s] success requesting delete, file(%s)", server, fm)
+					remover.Infof("[%s] request to delete, file(%s)", server, fm)
 					deletingSize = deletingSize + common.Disksize(fm.Size)
 				}
 			}
 			if deletingSize > 0 {
-				remover.Infof("[%s] deleting diskSize(%s)", server, deletingSize)
+				remover.Infof("[%s] request to free diskSize(%s)", server, deletingSize)
 			}
 		}
 		time.Sleep(time.Second * time.Duration(sleepSec))

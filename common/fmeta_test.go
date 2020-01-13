@@ -32,6 +32,7 @@ func Test_ParseHitcountFile(t *testing.T) {
 	fmt.Fprintln(f, "STRANGESERVER.mpg,1500856569,10,1234,127.0.0.1 127.0.0.2,2,0,0,0=0 0")
 	f.Close()
 
+	// fmm: graceinfo 파일 파싱 후에 만들어진 filemeta map이라고 가정하고 만듬
 	fmm := make(map[string]*common.FileMeta)
 	fmm["AAAAAAAAAAAAAAAAAA.mpg"] = common.NewFileMetaWith("AAAAAAAAAAAAAAAAAA.mpg", 1)
 	fmm["BBBBBBBBBBBBBBBBBB_K20180501000000.mpg"] = common.NewFileMetaWith("BBBBBBBBBBBBBBBBBB_K20180501000000.mpg", 2)
