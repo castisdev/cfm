@@ -80,6 +80,9 @@ func NewDstHosts() *DstHosts {
 }
 
 // Add is to add host to source servers
+// IP, Port, Addr 값 이외 selected, status값은 초기값이 들어감
+//
+// 서버 순서를 일정하게 유지할 수 있도록 Addr 큰 순서로 sort 함
 func (srcs *SrcHosts) Add(s string) error {
 
 	host, err := common.SplitHostPort(s)
@@ -89,11 +92,18 @@ func (srcs *SrcHosts) Add(s string) error {
 
 	src := SrcHost{host, false, NOTOK}
 	*srcs = append(*srcs, &src)
+
+	sort.Slice(*srcs, func(i, j int) bool {
+		return (*srcs)[i].Addr > (*srcs)[j].Addr
+	})
+
 	return nil
 }
 
 // Add : add destination host
 // IP, Port, Addr 값 이외 selected, status값은 초기값이 들어감
+//
+// 서버 순서를 일정하게 유지할 수 있도록 Addr 큰 순서로 sort 함
 func (dests *DstHosts) Add(s string) error {
 
 	host, err := common.SplitHostPort(s)
@@ -103,6 +113,11 @@ func (dests *DstHosts) Add(s string) error {
 
 	dest := DstHost{host, false, NOTOK}
 	*dests = append(*dests, &dest)
+
+	sort.Slice(*dests, func(i, j int) bool {
+		return (*dests)[i].Addr > (*dests)[j].Addr
+	})
+
 	return nil
 }
 
@@ -170,10 +185,6 @@ func RunForever() {
 	for _, dst := range *DstServers {
 		dstIPMap[dst.IP]++
 	}
-	// 서버 순서를 일정하게 유지할 수 있도록 sort 해서 사용함
-	sort.Slice(*DstServers, func(i, j int) bool {
-		return (*DstServers)[i].Addr > (*DstServers)[j].Addr
-	})
 
 	// elapsed time : 소요 시간
 	var est time.Time
@@ -265,7 +276,7 @@ func RunForever() {
 
 		// 9. LB EventLog 에서 특정 IP 에 할당된 파일 목록 추출
 		hitMapFromLBLog := make(map[string]int)
-		Tail.Tail(&hitMapFromLBLog)
+		Tail.Tail(time.Now(), &hitMapFromLBLog)
 
 		sortByHit := make([]*common.FileMeta, 0, len(hitMapFromLBLog))
 		for fileName, hitCount := range hitMapFromLBLog {

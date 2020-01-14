@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"syscall"
 )
@@ -24,8 +25,9 @@ type Disksize uint64
 //  UsedSize : 사용한 용량
 //  AvailSize : 사용할 수 있는 용량
 //  UsedPercent : 사용한 퍼센트
-//		사용한 용량 / (사용한 용량 + 사용할 수 있는 용량)	퍼센트 반올림값
+//		UsedSize / (UsedSize + AvailSize)	퍼센트 반올림값
 //  FreeSize : 전체 남은 용량 (사용할 수 있는 용량 + 시스템용 예약 용량)
+// 		TotalSize - UserdSize
 type DiskUsage struct {
 	TotalSize   Disksize `json:"total_size,string"`
 	UsedSize    Disksize `json:"used_size,string"`
@@ -55,6 +57,8 @@ func NewHosts() *Hosts {
 }
 
 // Add is to add host to remover's host pool
+//
+// 서버 순서를 일정하게 유지할 수 있도록 Addr 큰 순서로 sort 함
 func (hs *Hosts) Add(s string) error {
 
 	host, err := SplitHostPort(s)
@@ -64,6 +68,11 @@ func (hs *Hosts) Add(s string) error {
 	}
 
 	*hs = append(*hs, &host)
+
+	sort.Slice(*hs, func(i, j int) bool {
+		return (*hs)[i].Addr > (*hs)[j].Addr
+	})
+
 	return nil
 }
 
@@ -259,11 +268,23 @@ func FormatByte(b uint64) string {
 }
 
 // GetDiskUsage :
-// |<--------------------- f_blocks ---------------------------->|
-//                 |<---------------- f_bfree ------------------>|
-// ---------------------------------------------------------------
-// | USED          |<--f_bavail ------------>| Reserved for root |
-// ---------------------------------------------------------------
+//
+// |<-------------------------------f_blocks---------------------------------->|
+//
+// |<----USED------>|<----------------------f_bfree--------------------->|
+//
+// |<----USED------>|<----f_bavail---->|<--ReservedForRoot-->|
+//
+// total size = f_blocks * block_size
+//
+// free size = f_bfree * block_size
+//
+// avail size = f_bavail * block_size
+//
+// used size = total size - free size
+//
+// used percent = ( used size ) / ( used size + avail size)
+//
 // reserved space is for system partitions
 func GetDiskUsage(path string) (DiskUsage, error) {
 	du := DiskUsage{}

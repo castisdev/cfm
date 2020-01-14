@@ -34,7 +34,6 @@ type Ignore struct {
 
 // Config :
 type Config struct {
-	AdvPrefixes         []string `mapstructure:"adv_prefixes"`
 	SourceDirs          []string `mapstructure:"source_dirs"`
 	HitcountHistoryFile string   `mapstructure:"hitcount_history_file"`
 	GradeInfoFile       string   `mapstructure:"grade_info_file"`
@@ -49,6 +48,7 @@ type Config struct {
 	ListenAddr          string   `mapstructure:"listen_addr"`
 	Remover             Remover  `mapstructure:"remover"`
 	Tasker              Tasker   `mapstructure:"tasker"`
+	Ignore              Ignore   `mapstructure:"ignore"`
 }
 
 // ReadConfig :

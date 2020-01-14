@@ -16,20 +16,14 @@ ignore:
 # prefix
 # 기본값 : 없음, 설정해주어야 함, 대소문자 구분
 # 예:
+# KT에서는 광고 파일은 배포/삭제 대상에서 제외해야 한다.
+# KT 에서 사용하는 광고 파일은 이름에 특별한 규칙이 있다. (M64 또는 MN1 으로 시작함)
+# 이를 이용하여 광고 파일 여부를 결정한다.
+# ignore.prefix 를 설정해주어야 한다.
 #   prefixes:
 #   - M64
 #   - MN1
   prefixes:
-
-# deprecated : 삭제 예정
-# 광고 파일은 배포/삭제 대상에서 제외해야 한다.
-# KT 에서 사용하는 광고 파일은 이름에 특별한 규칙이 있다. (M64 또는 MN1 으로 시작함)
-# 이를 이용하여 광고 파일 여부를 결정한다.
-# 예:
-# adv_prefixes:
-#   - M64
-#   - MN1
-adv_prefixes:
 
 # 파일 우선순위,크기를 구하기 위해 이용하는 파일들의 경로
 hitcount_history_file: /data2/FailOver/.hitcount.history

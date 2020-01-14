@@ -14,6 +14,10 @@ v1.0.0.qr2 / 2020-01-08
     - [servers]-[heartbeat_timeout_sec]
     - [servers]-[heartbeat_sleep_sec]
     - [ignore]-[prefixes]
+  * 설정 삭제
+    - [adv_prefixes]
+      [adv_prefixes] 대신 [ignore]-[prefixes] 를 사용할 수 있음
+
   * /tasks API response 변경
     - lock 처리 추가
 	  - map 형태 -> list 형태로 변경

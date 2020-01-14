@@ -107,7 +107,7 @@ func main() {
 	}
 	remover.SetGradeInfoFile(c.GradeInfoFile)
 	remover.SetHitcountHistoryFile(c.HitcountHistoryFile)
-	remover.SetAdvPrefix(c.AdvPrefixes)
+	remover.SetIgnorePrefixes(c.Ignore.Prefixes)
 	remover.Tail.SetWatchDir(c.WatchDir)
 	remover.Tail.SetWatchIPString(c.WatchIPString)
 	remover.Tail.SetWatchTermMin(c.WatchTermMin)
@@ -128,7 +128,7 @@ func main() {
 	tasker.SetHitcountHistoryFile(c.HitcountHistoryFile)
 	tasker.SetGradeInfoFile(c.GradeInfoFile)
 	tasker.SetTaskCopySpeed(c.Tasker.TaskCopySpeedBPS)
-	tasker.SetAdvPrefix(c.AdvPrefixes)
+	tasker.SetIgnorePrefixes(c.Ignore.Prefixes)
 	tasker.Tail.SetWatchDir(c.WatchDir)
 	tasker.Tail.SetWatchIPString(c.WatchIPString)
 	tasker.Tail.SetWatchTermMin(c.WatchTermMin)

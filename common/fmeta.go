@@ -160,9 +160,8 @@ func (fm FileMeta) String() string {
 		sl = sl + fmt.Sprintf("@%s(%d)", serverIP, n)
 	}
 	s := fmt.Sprintf(
-		"Name(%s), Grade(%d), Size(%d), RisingHit(%d), SeverCount(%d), ServerIPs(%s)",
+		"Name(%s), Grade(%d), Size(%d), RisingHit(%d), ServerCount(%d), ServerIPs(%s)",
 		fm.Name, fm.Grade, fm.Size, fm.RisingHit, fm.ServerCount, sl)
-
 	return s
 }
 
