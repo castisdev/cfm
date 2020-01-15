@@ -47,6 +47,8 @@ v1.0.0.qr2 / 2020-01-08
 	  - src 서버의 갯수가 destination의 갯수보다 많은 경우, 하나의 destination 서버가 여러 task에 사용됨
   * hitcount history file에 두 개 이상의 서버에 위치한 파일을 조사해서 하나의 서버에만 위치하게 관리하는 기능 추가
 	  - 하나의 서버 제외한 나머지 서버에 파일 삭제 요청함
+    - ignore.prefix로 시작하는 파일 삭제 제외 (광고 파일 제외)
+    - source_dirs 에 없는 파일 삭제 제외 (SAN에 없는 파일 제외)
   * UpdateStaus 함수 error 조건 완화
 	  - 같은 status 에서 같은 status 로 update 할 때 반환값 성공으로 변경
   * task 정보를 파일에도 저장하는 기능 추가

@@ -19,6 +19,57 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func cfw(cfwaddr string, du common.DiskUsage, filenames []string) *httptest.Server {
+	router := mux.NewRouter().StrictSlash(true)
+	router.Methods("GET").Path("/df").HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			bd, err := json.Marshal(du)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.Write(bd)
+		})
+	router.Methods("GET").Path("/files").HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			for _, fn := range filenames {
+				fmt.Fprintln(w, fn)
+			}
+		})
+	router.Methods("DELETE").Path("/files/{fileName}").HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			vars := mux.Vars(r)
+			fileName, exists := vars["fileName"]
+			if !exists {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			for _, fn := range filenames {
+				if fileName == fn {
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+			}
+			w.WriteHeader(http.StatusNotFound)
+		})
+
+	s := &http.Server{
+		Addr:         cfwaddr,
+		Handler:      router,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+	}
+	cfw := httptest.NewUnstartedServer(router)
+	l, _ := net.Listen("tcp", cfwaddr)
+	cfw.Listener.Close()
+	cfw.Listener = l
+	cfw.Config = s
+
+	return cfw
+}
+
 func makeGradeInfoFile(dir string, filename string) {
 	fp := filepath.Join(dir, filename)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -66,16 +117,17 @@ func makeHitcourntHistoryFile(dir string, filename string) {
 	f.Close()
 }
 
-// 기준 시간 : 1527951611
-// 기준 ip : 125.159.40.3
-// rising file : F.mpg
-// now := time.Now()
-func makeRisingHitFile(dir string, filename string, now time.Time, watchTermMin int) {
-	// 현재 시각값을 이용하여 N분 전 시각을 구하기 위해선 음수 값이 필요하다.
-	from := now.Add(time.Minute * time.Duration(watchTermMin*-1))
-	logFileNames := tailer.GetLogFileName(dir, watchTermMin)
+// basetime : ex) 1527951611
+// watchip : ex) 125.159.40.3
+// risingfile : ex) F.mpg
+func makeRisingHitFile(dir string, watchip string, risingfile string,
+	basetm time.Time, watchmin int) {
 
-	baseTime := from.Unix()
+	// 현재 시각값을 이용하여 N분 전 시각을 구하기 위해선 음수 값이 필요하다.
+	from := basetm.Add(time.Minute * time.Duration(watchmin*-1))
+	logFileNames := tailer.GetLogFileName(basetm, dir, watchmin)
+
+	baselogTime := from.Unix()
 	logFileName := (*logFileNames)[0]
 	fp := filepath.Clean(logFileName)
 
@@ -90,62 +142,62 @@ func makeRisingHitFile(dir string, filename string, now time.Time, watchTermMin 
 		log.Fatal(err)
 	}
 	// ------------------------------------------------- 테스트 기준 시각 - 4
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.159.40.3 Selected for Client StreamID : 3f004a6e-82af-4dce-85ba-9bbf9c7cb8cb, ClientID : 0, GLB IP : 125.144.96.6's file(MCLE901VSGL1500001_K20140915224744.mpg) Request", baseTime-4)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : 3f004a6e-82af-4dce-85ba-9bbf9c7cb8cb, ClientID : 0, GLB IP : 125.144.96.6's file(MCLE901VSGL1500001_K20140915224744.mpg) Request", baselogTime-4, watchip)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,4,%d,File Not Found, UUID : fffb233a-376a-4c2f-842e-553fb68af9cf, GLB IP : 125.144.161.6, MV6F9001SGL1500001_K20150909214818.mpg", baseTime-4)
+	fmt.Fprintf(f, "0x40ffff,4,%d,File Not Found, UUID : fffb233a-376a-4c2f-842e-553fb68af9cf, GLB IP : 125.144.161.6, MV6F9001SGL1500001_K20150909214818.mpg", baselogTime-4)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.91.87 Selected for Client StreamID : 360527d4-44b3-4b8f-aef7-dbf8fd230d54, ClientID : 0, GLB IP : 125.144.169.6's file(M33E80DTSGL1500001_K20141022144006.mpg) Request", baseTime-4)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.91.87 Selected for Client StreamID : 360527d4-44b3-4b8f-aef7-dbf8fd230d54, ClientID : 0, GLB IP : 125.144.169.6's file(M33E80DTSGL1500001_K20141022144006.mpg) Request", baselogTime-4)
 	fmt.Fprintln(f)
 	// ------------------------------------------------- 테스트 기준 시각 - 2
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.159.40.3 Selected for Client StreamID : c93a7db2-ccaf-4765-af8d-7ddc2d33a812, ClientID : 0, GLB IP : 125.159.40.5's file(F.mpg) Request", baseTime-2)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : c93a7db2-ccaf-4765-af8d-7ddc2d33a812, ClientID : 0, GLB IP : 125.159.40.5's file(%s) Request", baselogTime-2, watchip, risingfile)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,4,%d,File Not Found, UUID : f1add5cf-75ac-41ab-a6ff-85d9e0927762, GLB IP : 125.144.169.6, MK4E7BK2SGL0800014_K20120725124707.mpg", baseTime-2)
+	fmt.Fprintf(f, "0x40ffff,4,%d,File Not Found, UUID : f1add5cf-75ac-41ab-a6ff-85d9e0927762, GLB IP : 125.144.169.6, MK4E7BK2SGL0800014_K20120725124707.mpg", baselogTime-2)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.97.67 Selected for Client StreamID : 06fb572e-7602-4231-8670-cb6526603fb0, ClientID : 0, GLB IP : 125.146.8.6's file(M33H90E2SGL1500001_K20171008222635.mpg) Request", baseTime-2)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.97.67 Selected for Client StreamID : 06fb572e-7602-4231-8670-cb6526603fb0, ClientID : 0, GLB IP : 125.146.8.6's file(M33H90E2SGL1500001_K20171008222635.mpg) Request", baselogTime-2)
 	fmt.Fprintln(f)
 	// ------------------------------------------------- 테스트 기준 시각 - 1
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.159.40.3 Selected for Client StreamID : 3c61af91-cd6a-4dd6-bc04-5ec6bc78b94f, ClientID : 0, GLB IP : 125.159.40.5's file(MWGI5006SGL1500001_K20180524203234.mpg) Request", baseTime-1)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : 3c61af91-cd6a-4dd6-bc04-5ec6bc78b94f, ClientID : 0, GLB IP : 125.159.40.5's file(MWGI5006SGL1500001_K20180524203234.mpg) Request", baselogTime-1, watchip)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,4,%d,File Not Found, UUID : c585905f-9980-49b1-89bc-97c7140eaa83, GLB IP : 125.159.40.5, M34G80A3SGL1500001_K20160827230242.mpg", baseTime-1)
+	fmt.Fprintf(f, "0x40ffff,4,%d,File Not Found, UUID : c585905f-9980-49b1-89bc-97c7140eaa83, GLB IP : 125.159.40.5, M34G80A3SGL1500001_K20160827230242.mpg", baselogTime-1)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.97.74 Selected for Client StreamID : 7cf6b886-edd2-471b-9cfd-12763a160b0b, GLB IP : 125.159.40.5's file(M34F60QHSGL1500001_K20150701232550.mpg) Request", baseTime-1)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.97.74 Selected for Client StreamID : 7cf6b886-edd2-471b-9cfd-12763a160b0b, GLB IP : 125.159.40.5's file(M34F60QHSGL1500001_K20150701232550.mpg) Request", baselogTime-1)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.97.77 Selected for Client StreamID : 23dd1489-543b-4051-b07a-e877f8b2e052, GLB IP : 125.147.192.6's file(MW0E6JE3SGL0800014_K20120601193450.mpg) Request", baseTime-1)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.97.77 Selected for Client StreamID : 23dd1489-543b-4051-b07a-e877f8b2e052, GLB IP : 125.147.192.6's file(MW0E6JE3SGL0800014_K20120601193450.mpg) Request", baselogTime-1)
 	fmt.Fprintln(f)
 	// ------------------------------------------------- 테스트 기준 시각
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.159.40.3 Selected for Client StreamID : 97096b41-afe1-44d8-b57c-e758a70883d9, GLB IP : 125.159.40.5's file(M33F3MA3SGL0800038_K20130326135640.mpg) Request", baseTime)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : 97096b41-afe1-44d8-b57c-e758a70883d9, GLB IP : 125.159.40.5's file(M33F3MA3SGL0800038_K20130326135640.mpg) Request", baselogTime, watchip)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.91.83 Selected for Client StreamID : aa7de9a1-7d0d-40d5-9586-31dc275a0634, ClientID : 0, GLB IP : 125.147.36.6's file(MADI4008SGL1500001_K20180506231943.mpg) Request", baseTime)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.91.83 Selected for Client StreamID : aa7de9a1-7d0d-40d5-9586-31dc275a0634, ClientID : 0, GLB IP : 125.147.36.6's file(MADI4008SGL1500001_K20180506231943.mpg) Request", baselogTime)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.91.84 Selected for Client StreamID : 1926c2ba-c313-48fb-977a-b7f3fd27ea98, ClientID : 0, GLB IP : 125.148.160.6's file(MEQI405ISGL1500001_K20180509034746.mpg) Request", baseTime)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.91.84 Selected for Client StreamID : 1926c2ba-c313-48fb-977a-b7f3fd27ea98, ClientID : 0, GLB IP : 125.148.160.6's file(MEQI405ISGL1500001_K20180509034746.mpg) Request", baselogTime)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.97.73 Selected for Client StreamID : f179c61a-d5e0-45b9-b046-a3cd4e3dbbfc, ClientID : 0, GLB IP : 125.147.192.6's file(MIAF51OLSGL1500001_K20150511175323.mpg) Request", baseTime)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.97.73 Selected for Client StreamID : f179c61a-d5e0-45b9-b046-a3cd4e3dbbfc, ClientID : 0, GLB IP : 125.147.192.6's file(MIAF51OLSGL1500001_K20150511175323.mpg) Request", baselogTime)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.159.40.3 Selected for Client StreamID : 3894d674-d74b-4eca-a2ea-fafbfa1113a8, ClientID : 0, GLB IP : 125.159.40.5's file(F.mpg) Request", baseTime)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : 3894d674-d74b-4eca-a2ea-fafbfa1113a8, ClientID : 0, GLB IP : 125.159.40.5's file(%s) Request", baselogTime, watchip, risingfile)
 	fmt.Fprintln(f)
 	// ------------------------------------------------- 테스트 기준 시각 + 1
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.159.40.3 Selected for Client StreamID : 8b2e7e4a-270d-4586-85a1-e4284551176d, ClientID : 0, GLB IP : 125.159.40.5's file(F.mpg) Request", baseTime+1)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : 8b2e7e4a-270d-4586-85a1-e4284551176d, ClientID : 0, GLB IP : 125.159.40.5's file(%s) Request", baselogTime+1, watchip, risingfile)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.159.40.3 Selected for Client StreamID : f1893245-802b-45b1-b0fa-377bc1415b35, ClientID : 0, GLB IP : 125.159.40.5's file(F.mpg) Request", baseTime+1)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : f1893245-802b-45b1-b0fa-377bc1415b35, ClientID : 0, GLB IP : 125.159.40.5's file(%s) Request", baselogTime+1, watchip, risingfile)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.93.100 Selected for Client StreamID : 3c68d2a5-354e-4a4b-b181-c724d16cf406, GLB IP : 125.147.36.6's file(MVHF201MSGL1500001_K20150216200556.mpg) Request", baseTime+1)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.93.100 Selected for Client StreamID : 3c68d2a5-354e-4a4b-b181-c724d16cf406, GLB IP : 125.147.36.6's file(MVHF201MSGL1500001_K20150216200556.mpg) Request", baselogTime+1)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.159.40.3 Selected for Client StreamID : d41dc03a-91b7-4c14-bb3a-a73823f333e0, ClientID : 0, GLB IP : 125.159.40.5's file(F.mpg) Request", baseTime+1)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : d41dc03a-91b7-4c14-bb3a-a73823f333e0, ClientID : 0, GLB IP : 125.159.40.5's file(%s) Request", baselogTime+1, watchip, risingfile)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,4,%d,File Not Found, UUID : d9672fe8-1b39-491f-a8a4-23bf7a6f096c, GLB IP : 125.144.96.6, M0200000SGL1065016_K20100826000000.MPG", baseTime+1)
+	fmt.Fprintf(f, "0x40ffff,4,%d,File Not Found, UUID : d9672fe8-1b39-491f-a8a4-23bf7a6f096c, GLB IP : 125.144.96.6, M0200000SGL1065016_K20100826000000.MPG", baselogTime+1)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.159.40.3 Selected for Client StreamID : f8a21815-a75b-4fe4-8f6a-dba984ee7c6e, ClientID : 0, GLB IP : 125.159.40.5's file(F.mpg) Request", baseTime+1)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : f8a21815-a75b-4fe4-8f6a-dba984ee7c6e, ClientID : 0, GLB IP : 125.159.40.5's file(%s) Request", baselogTime+1, watchip, risingfile)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.159.40.3 Selected for Client StreamID : 7148fadd-edab-4a48-8d27-4bf8c8b74cbd, ClientID : 0, GLB IP : 125.159.40.5's file(F.mpg) Request", baseTime+1)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : 7148fadd-edab-4a48-8d27-4bf8c8b74cbd, ClientID : 0, GLB IP : 125.159.40.5's file(%s) Request", baselogTime+1, watchip, risingfile)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.159.40.3 Selected for Client StreamID : b121ae29-954c-4990-8e58-e102959d0239, ClientID : 0, GLB IP : 125.159.40.5's file(F.mpg) Request", baseTime+1)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : b121ae29-954c-4990-8e58-e102959d0239, ClientID : 0, GLB IP : 125.159.40.5's file(%s) Request", baselogTime+1, watchip, risingfile)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.93.97 Selected for Client StreamID : 86fd80d3-2691-4274-9172-315d50e90801, ClientID : 0, GLB IP : 125.159.40.5's file(M34I502CSGL1500001_K20180512022857.mpg) Request", baseTime+1)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.93.97 Selected for Client StreamID : 86fd80d3-2691-4274-9172-315d50e90801, ClientID : 0, GLB IP : 125.159.40.5's file(M34I502CSGL1500001_K20180512022857.mpg) Request", baselogTime+1)
 	fmt.Fprintln(f)
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.159.40.3 Selected for Client StreamID : 598131b3-8fb2-4415-b0f8-472d52ef054c, ClientID : 0, GLB IP : 125.159.40.5's file(F.mpg) Request", baseTime+1)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : 598131b3-8fb2-4415-b0f8-472d52ef054c, ClientID : 0, GLB IP : 125.159.40.5's file(%s) Request", baselogTime+1, watchip, risingfile)
 	fmt.Fprintln(f)
 	// ------------------------------------------------- 테스트 기준 시각 + 2
-	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.159.40.3 Selected for Client StreamID : 0590710c-bd2e-4863-941e-041877328d78, ClientID : 0, GLB IP : 125.159.40.5's file(F.mpg) Request", baseTime+2)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : 0590710c-bd2e-4863-941e-041877328d78, ClientID : 0, GLB IP : 125.159.40.5's file(%s) Request", baselogTime+2, watchip, risingfile)
 	fmt.Fprintln(f)
 
 	f.Close()
@@ -240,58 +292,7 @@ func deletefile(dir string, filename string) {
 	}
 }
 
-func cfw(cfwaddr string, du common.DiskUsage, filenames []string) *httptest.Server {
-	router := mux.NewRouter().StrictSlash(true)
-	router.Methods("GET").Path("/df").HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			bd, err := json.Marshal(du)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.Write(bd)
-		})
-	router.Methods("GET").Path("/files").HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			for _, fn := range filenames {
-				fmt.Fprintln(w, fn)
-			}
-		})
-	router.Methods("DELETE").Path("/files/{fileName}").HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			vars := mux.Vars(r)
-			fileName, exists := vars["fileName"]
-			if !exists {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			for _, fn := range filenames {
-				if fileName == fn {
-					w.WriteHeader(http.StatusOK)
-					return
-				}
-			}
-			w.WriteHeader(http.StatusNotFound)
-		})
-
-	s := &http.Server{
-		Addr:         cfwaddr,
-		Handler:      router,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
-	}
-	cfw := httptest.NewUnstartedServer(router)
-	l, _ := net.Listen("tcp", cfwaddr)
-	cfw.Listener.Close()
-	cfw.Listener = l
-	cfw.Config = s
-
-	return cfw
-}
-
-func Test_FindServersOutOfDiskSpace(t *testing.T) {
+func Test_findServersOutOfDiskSpace(t *testing.T) {
 	vs1 := "127.0.0.1:18881"
 	vs2 := "127.0.0.1:18882"
 	vs3 := "127.0.0.1:18883"
@@ -331,7 +332,7 @@ func Test_FindServersOutOfDiskSpace(t *testing.T) {
 	hosts.Add(vs3)
 
 	SetDiskUsageLimitPercent(55)
-	dservers := FindServersOutOfDiskSpace(hosts)
+	dservers := findServersOutOfDiskSpace(hosts)
 
 	assert.Equal(t, 1, len(dservers))
 
@@ -791,6 +792,19 @@ func Test_requestRemoveDuplicatedFiles(t *testing.T) {
 	cfw2.Start()
 	defer cfw2.Close()
 
+	base := "testsourcefolder"
+	SourcePath.Add(base)
+
+	for _, f1 := range files1 {
+		createfile(base, f1)
+	}
+	for _, f2 := range files2 {
+		createfile(base, f2)
+	}
+	deletefile(base, "C.mpg")
+
+	defer deletefile(base, "")
+
 	allfmm, dupfmm := makeFileMetaMap()
 
 	ssfmm := getServerFileMetas(allfmm)
@@ -841,7 +855,8 @@ func Test_requestRemoveDuplicatedFiles(t *testing.T) {
 	assert.Equal(t, 1, allfmm["D.mpg"].ServerCount)
 	assert.Equal(t, 1, allfmm["E.mpg"].ServerCount)
 
-	// Serve1 또는 Server1에 C.mpg 삭제 요청을 날린다.
+	// Server2에 C.mpg 삭제 요청을 날려야 하지만
+	// C.mpg 는 src directory 에 없으므로, 삭제되지 않음
 	requestRemoveDuplicatedFiles(dupfmm, ssfmm)
 
 	// B.mpg의 server count 정보가 0이므로, B.mpg에 대해서는 요청을 하지 않는다.
@@ -849,8 +864,9 @@ func Test_requestRemoveDuplicatedFiles(t *testing.T) {
 	assert.Equal(t, 0, dupfmm["B.mpg"].ServerCount)
 
 	// 요청이 성공하면,
-	// C.mpg의 serverCount 값은 1로 바뀐다.
-	assert.Equal(t, 1, dupfmm["C.mpg"].ServerCount)
+	// C.mpg 는 src directory 에 없으므로, 삭제되지 않음
+	// C.mpg의 serverCount 값은 2로 그대로 있음
+	assert.Equal(t, 2, dupfmm["C.mpg"].ServerCount)
 
 	t.Logf("duplicated metas:%s", dupfmm)
 
@@ -861,6 +877,7 @@ func Test_requestRemoveDuplicatedFiles(t *testing.T) {
 }
 
 func Test_getFileListToDeleteForFreeDiskSpace(t *testing.T) {
+	Servers = common.NewHosts()
 	s1 := "127.0.0.1:18881"
 	files1 := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg"}
 	d1 := common.DiskUsage{
@@ -889,7 +906,7 @@ func Test_getFileListToDeleteForFreeDiskSpace(t *testing.T) {
 	updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
 
 	SetDiskUsageLimitPercent(55)
-	servers := FindServersOutOfDiskSpace(Servers)
+	servers := findServersOutOfDiskSpace(Servers)
 
 	base := "testsourcefolder"
 	SourcePath.Add(base)
@@ -954,6 +971,7 @@ func Test_getFileListToDeleteForFreeDiskSpace(t *testing.T) {
 }
 
 func Test_requestRemoveFilesForFreeDiskSpace(t *testing.T) {
+	Servers = common.NewHosts()
 	s1 := "127.0.0.1:18881"
 	files1 := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg"}
 	d1 := common.DiskUsage{
@@ -982,7 +1000,7 @@ func Test_requestRemoveFilesForFreeDiskSpace(t *testing.T) {
 	updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
 
 	SetDiskUsageLimitPercent(55)
-	servers := FindServersOutOfDiskSpace(Servers)
+	servers := findServersOutOfDiskSpace(Servers)
 
 	base := "testsourcefolder"
 	SourcePath.Add(base)
@@ -1025,6 +1043,7 @@ func Test_requestRemoveFilesForFreeDiskSpace(t *testing.T) {
 
 // duplicate 되어서 삭제요청한 파일이 다시 disk 용량으로 삭제대상이 될 순 없는 것이 아닌지 test
 func Test_requestRemoveDuplicatedFilesAndgetFileListToDeleteForFreeDiskSpace(t *testing.T) {
+	Servers = common.NewHosts()
 	s1 := "127.0.0.1:18881"
 	files1 := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg"}
 	d1 := common.DiskUsage{
@@ -1064,19 +1083,21 @@ func Test_requestRemoveDuplicatedFilesAndgetFileListToDeleteForFreeDiskSpace(t *
 	ssfmm := getServerFileMetas(allfmm)
 	updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
 
+	// B.mpg,  C.mpg가 s1, s2에 두 copy 존재함
 	// sort 순서에 따라서, s2에 B.mpg 삭제 요청을 날린다.
 	// sort 순서에 따라서, s2에 C.mpg 삭제 요청을 날린다.
+	// 그러나 C.mpg는 source path 에 없으므로 삭제 요청을 날리지 않는다.
 	requestRemoveDuplicatedFiles(dupfmm, ssfmm)
 	// 요청이 성공하면, B.mpg의 serverCount 값은 1로 바뀐다.
 	assert.Equal(t, 1, allfmm["B.mpg"].ServerCount)
 	assert.Equal(t, 1, dupfmm["B.mpg"].ServerCount)
 
-	// 요청이 성공하면, C.mpg의 serverCount 값은 1로 바뀐다.
-	assert.Equal(t, 1, allfmm["C.mpg"].ServerCount)
-	assert.Equal(t, 1, dupfmm["C.mpg"].ServerCount)
+	// 요청이 성공하면, C.mpg의 serverCount 값은 2로 그대로 있음
+	assert.Equal(t, 2, allfmm["C.mpg"].ServerCount)
+	assert.Equal(t, 2, dupfmm["C.mpg"].ServerCount)
 
 	SetDiskUsageLimitPercent(55)
-	servers := FindServersOutOfDiskSpace(Servers)
+	servers := findServersOutOfDiskSpace(Servers)
 
 	ignores := []string{"E"}
 	SetIgnorePrefixes(ignores)
@@ -1131,7 +1152,8 @@ func Test_requestRemoveDuplicatedFilesAndgetFileListToDeleteForFreeDiskSpace(t *
 	}
 }
 
-func Test_RunWithInfo(t *testing.T) {
+func Test_runWithInfo(t *testing.T) {
+	Servers = common.NewHosts()
 	s1 := "127.0.0.1:18881"
 	files1 := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg"}
 	d1 := common.DiskUsage{
@@ -1174,11 +1196,11 @@ func Test_RunWithInfo(t *testing.T) {
 	rhitfmm := makeRisingHitFileMap(rhfiles)
 	allfmm, dupfmm := makeFileMetaMap()
 
-	remover.Debugf("call 1st RunWithInfo ---------------------------------------")
+	remover.Debugf("call 1st runWithInfo ---------------------------------------")
 
-	RunWithInfo(allfmm, dupfmm, rhitfmm)
+	runWithInfo(allfmm, dupfmm, rhitfmm)
 
-	remover.Debugf("after 1st call RunWithInfo ---------------------------------")
+	remover.Debugf("after 1st call runWithInfo ---------------------------------")
 	remover.Debugf("B: %s", allfmm["A.mpg"])
 	remover.Debugf("B: %s", allfmm["B.mpg"])
 	remover.Debugf("C: %s", allfmm["C.mpg"])
@@ -1196,10 +1218,12 @@ func Test_RunWithInfo(t *testing.T) {
 	assert.Equal(t, 0, allfmm["B.mpg"].ServerIPs["127.0.0.1"])
 	assert.Equal(t, 0, allfmm["B.mpg"].ServerIPs["127.0.0.2"])
 
-	//C.mpg 는 S1, S2 중복이었기 때문에, S1에는 그대로 있고, S2에서 삭제
-	// San에 없는 파일이어서, S1이 disk 부족이지만, 지워지지 않음
+	//C.mpg 는 S1, S2 중복이었기 때문에, S1에는 그대로 있고, S2에서 삭제되어야 하지만
+	// San에 없는 파일이어서 지워지지 않음
+	//S1이 disk 부족이지만, San에 없는 파일이어서,  지워지지 않음
+	//S1, S2에 그대로 있음
 	assert.Equal(t, 1, allfmm["C.mpg"].ServerIPs["127.0.0.1"])
-	assert.Equal(t, 0, allfmm["C.mpg"].ServerIPs["127.0.0.2"])
+	assert.Equal(t, 1, allfmm["C.mpg"].ServerIPs["127.0.0.2"])
 
 	//D.mpg 는 S1 disk 용량 부족으로 S1에서 삭제
 	// S2에는 원래 없었음
@@ -1216,13 +1240,13 @@ func Test_RunWithInfo(t *testing.T) {
 	assert.Equal(t, 0, allfmm["E.mpg"].ServerIPs["127.0.0.1"])
 	assert.Equal(t, 1, allfmm["F.mpg"].ServerIPs["127.0.0.2"])
 
-	remover.Debugf("call 2nd RunWithInfo ---------------------------------------")
+	remover.Debugf("call 2nd runWithInfo ---------------------------------------")
 
 	//dupfmm 정보는 잘못되어있지만, meta 정보는 update 되어있는 상태,
 	//만일 한 번 더 실행한다면,
-	RunWithInfo(allfmm, dupfmm, rhitfmm)
+	runWithInfo(allfmm, dupfmm, rhitfmm)
 
-	remover.Debugf("after 2nd call RunWithInfo ---------------------------------")
+	remover.Debugf("after 2nd call runWithInfo ---------------------------------")
 	remover.Debugf("B: %s", allfmm["A.mpg"])
 	remover.Debugf("B: %s", allfmm["B.mpg"])
 	remover.Debugf("C: %s", allfmm["C.mpg"])
@@ -1240,10 +1264,12 @@ func Test_RunWithInfo(t *testing.T) {
 	assert.Equal(t, 0, allfmm["B.mpg"].ServerIPs["127.0.0.1"])
 	assert.Equal(t, 0, allfmm["B.mpg"].ServerIPs["127.0.0.2"])
 
-	//C.mpg 는 San에 없는 파일이어서, S1이 disk 부족이지만, 지워지지 않음
-	// S2 에서는 이미 지워짐
+	//C.mpg 는 S1, S2 중복이었기 때문에, S1에는 그대로 있고, S2에서 삭제되어야 하지만
+	// San에 없는 파일이어서 지워지지 않음
+	//S1이 disk 부족이지만, San에 없는 파일이어서,  지워지지 않음
+	//S1, S2에 그대로 있음
 	assert.Equal(t, 1, allfmm["C.mpg"].ServerIPs["127.0.0.1"])
-	assert.Equal(t, 0, allfmm["C.mpg"].ServerIPs["127.0.0.2"])
+	assert.Equal(t, 1, allfmm["C.mpg"].ServerIPs["127.0.0.2"])
 
 	//D.mpg 는 이미 S1에서 지워짐
 	// S2에는 원래 없었음
@@ -1264,11 +1290,11 @@ func Test_RunWithInfo(t *testing.T) {
 	//만일 한 번 더 실행한다면,
 	// 더 이상 지워질 파일이 없음
 	// 2nd call 결과와 같음
-	remover.Debugf("call 3rd RunWithInfo ---------------------------------------")
+	remover.Debugf("call 3rd runWithInfo ---------------------------------------")
 
-	RunWithInfo(allfmm, dupfmm, rhitfmm)
+	runWithInfo(allfmm, dupfmm, rhitfmm)
 
-	remover.Debugf("after 3rd call RunWithInfo ---------------------------------")
+	remover.Debugf("after 3rd call runWithInfo ---------------------------------")
 	remover.Debugf("B: %s", allfmm["A.mpg"])
 	remover.Debugf("B: %s", allfmm["B.mpg"])
 	remover.Debugf("C: %s", allfmm["C.mpg"])
@@ -1283,10 +1309,12 @@ func Test_RunWithInfo(t *testing.T) {
 	assert.Equal(t, 0, allfmm["B.mpg"].ServerIPs["127.0.0.1"])
 	assert.Equal(t, 0, allfmm["B.mpg"].ServerIPs["127.0.0.2"])
 
-	//C.mpg 는 San에 없는 파일이어서, S1이 disk 부족이지만, 지워지지 않음
-	// S2 에서는 이미 지워짐
+	//C.mpg 는 S1, S2 중복이었기 때문에, S1에는 그대로 있고, S2에서 삭제되어야 하지만
+	// San에 없는 파일이어서 지워지지 않음
+	//S1이 disk 부족이지만, San에 없는 파일이어서,  지워지지 않음
+	//S1, S2에 그대로 있음
 	assert.Equal(t, 1, allfmm["C.mpg"].ServerIPs["127.0.0.1"])
-	assert.Equal(t, 0, allfmm["C.mpg"].ServerIPs["127.0.0.2"])
+	assert.Equal(t, 1, allfmm["C.mpg"].ServerIPs["127.0.0.2"])
 
 	//D.mpg 는 이미 S1에서 지워짐
 	// S2에는 원래 없었음
@@ -1303,4 +1331,74 @@ func Test_RunWithInfo(t *testing.T) {
 	assert.Equal(t, 0, allfmm["E.mpg"].ServerIPs["127.0.0.1"])
 	assert.Equal(t, 1, allfmm["F.mpg"].ServerIPs["127.0.0.2"])
 
+}
+
+func Test_run(t *testing.T) {
+	Servers = common.NewHosts()
+	s1 := "127.0.0.1:18881"
+	files1 := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg"}
+	d1 := common.DiskUsage{
+		TotalSize: 1000, UsedSize: 750,
+		FreeSize: 250, AvailSize: 250, UsedPercent: 75,
+	}
+	s2 := "127.0.0.2:18882"
+	files2 := []string{"B.mpg", "C.mpg", "E.mpg", "F.mpg"}
+	d2 := common.DiskUsage{
+		TotalSize: 1000, UsedSize: 600,
+		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
+	}
+	Servers.Add(s1)
+	Servers.Add(s2)
+
+	cfw1 := cfw(s1, d1, files1)
+	cfw1.Start()
+	defer cfw1.Close()
+	cfw2 := cfw(s2, d2, files2)
+	cfw2.Start()
+	defer cfw2.Close()
+
+	base := "testsourcefolder"
+	SourcePath.Add(base)
+	for _, f1 := range files1 {
+		createfile(base, f1)
+	}
+	for _, f2 := range files2 {
+		createfile(base, f2)
+	}
+	deletefile(base, "C.mpg")
+	defer deletefile(base, "")
+
+	SetDiskUsageLimitPercent(55)
+
+	ignores := []string{"E"}
+	SetIgnorePrefixes(ignores)
+
+	gradedir := "gradeinfofolder"
+	gradefile := ".grade.info"
+	makeGradeInfoFile(gradedir, gradefile)
+	defer deletefile(gradedir, "")
+
+	SetGradeInfoFile(filepath.Join(gradedir, gradefile))
+
+	hcdir := "hitcounthistoryinfofolder"
+	hcfile := ".hitcount.history"
+	makeHitcourntHistoryFile(hcdir, hcfile)
+	defer deletefile(hcdir, "")
+
+	SetHitcountHistoryFile(filepath.Join(hcdir, hcfile))
+
+	taildir := "taildir"
+	tailip := "255.255.255.255"
+	watchmin := 10
+	hitbase := 5
+
+	Tail.SetWatchDir(taildir)
+	Tail.SetWatchIPString(tailip)
+	Tail.SetWatchTermMin(watchmin)
+	Tail.SetWatchHitBase(hitbase)
+	basetm := time.Now()
+	makeRisingHitFile(taildir, tailip, "F.mpg", basetm, watchmin)
+	defer deletefile(taildir, "")
+
+	run(basetm)
 }

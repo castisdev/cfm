@@ -73,7 +73,10 @@ func SetSleepSec(s uint) {
 }
 
 // Add :
+//
 // host 정보 추가
+//
+// 이미 Add했던 host 를 add 하면 error 리턴
 func Add(s string) error {
 	rwlock.Lock()
 	defer rwlock.Unlock()

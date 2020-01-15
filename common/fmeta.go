@@ -35,6 +35,18 @@ func NewFileMetaWith(filename string, grade int32) *FileMeta {
 		ServerCount: 0, ServerIPs: map[string]int{}}
 }
 
+// String : FileMeta to string
+func (fm FileMeta) String() string {
+	var sl string
+	for serverIP, n := range fm.ServerIPs {
+		sl = sl + fmt.Sprintf("@%s(%d)", serverIP, n)
+	}
+	s := fmt.Sprintf(
+		"name(%s), grade(%d), size(%d), risingHit(%d), serverCount(%d), serverIPs(%s)",
+		fm.Name, fm.Grade, fm.Size, fm.RisingHit, fm.ServerCount, sl)
+	return s
+}
+
 // ParseHitcountFileAndUpdateFileMetas
 // hitcount.history file을 parsing 해서
 //
@@ -139,30 +151,6 @@ func IsPrefix(f string, prefixes []string) bool {
 		}
 	}
 	return false
-}
-
-// IsADFile :
-func IsADFile(f string, adPrefixes []string) bool {
-
-	for _, prefix := range adPrefixes {
-		if strings.HasPrefix(f, prefix) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// String : FileMeta to string
-func (fm FileMeta) String() string {
-	var sl string
-	for serverIP, n := range fm.ServerIPs {
-		sl = sl + fmt.Sprintf("@%s(%d)", serverIP, n)
-	}
-	s := fmt.Sprintf(
-		"Name(%s), Grade(%d), Size(%d), RisingHit(%d), ServerCount(%d), ServerIPs(%s)",
-		fm.Name, fm.Grade, fm.Size, fm.RisingHit, fm.ServerCount, sl)
-	return s
 }
 
 // GetAllFileMetas :

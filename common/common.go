@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"syscall"
+	"time"
 )
 
 type Disksize uint64
@@ -323,4 +324,12 @@ func (du DiskUsage) GetOverUsedSize(limitPercent uint) Disksize {
 		return du.UsedSize - limitUsed
 	}
 	return 0
+}
+
+func Start() time.Time {
+	return time.Now()
+}
+
+func Elapsed(start time.Time) time.Duration {
+	return time.Since(start)
 }

@@ -30,6 +30,30 @@ func init() {
 		Mod:    "tailer"}
 }
 
+// getLogFileName : 파싱해야할 로그 파일명을 현재 시각 기준으로 생성
+// 로그 파일명 : EventLog[YYYYmmdd].log
+// YYYYmmdd 를 구하기 위해 현재 시각 이용
+func GetLogFileName(basetm time.Time, watchDir string, watchTermMin int) *[]string {
+
+	logFileNames := make([]string, 0, 2)
+
+	// base time값을 이용하여 N분 전 시각을 구하기 위해선 음수 값이 필요하다.
+	from := basetm.Add(time.Minute * time.Duration(watchTermMin*-1))
+
+	f1 := fmt.Sprintf("%s/EventLog[%s].log", watchDir, from.Format("20060102"))
+	f2 := fmt.Sprintf("%s/EventLog[%s].log", watchDir, basetm.Format("20060102"))
+
+	// 시간 순서대로 정렬해야 parsing 로직에서 lastOffset 계산이 정상적으로 된다.
+	// 오래된 파일이 제일 앞에 추가되어야 한다.
+	logFileNames = append(logFileNames, f1)
+
+	if f2 != f1 {
+		logFileNames = append(logFileNames, f2)
+	}
+
+	return &logFileNames
+}
+
 // NewTailer :
 func NewTailer() *Tailer {
 	// from - 값이 아닌 경우 -10 으로 설정
@@ -76,83 +100,59 @@ func (t *Tailer) SetWatchHitBase(baseHit int) {
 // Tail : working on Linux only
 //
 // 입력받은 시각값의 watchTermMin 전부터의 로그를 tail 한다.
-func (t *Tailer) Tail(now time.Time, fileMap *map[string]int) {
-	// 입력받은 시각값을 이용하여 N분 전 시각을 구하기 위해선 음수 값이 필요하다.
-	from := now.Add(time.Minute * time.Duration(t.watchTermMin*-1))
+func (t *Tailer) Tail(basetm time.Time, fileMap *map[string]int) {
+	tailer.Infof("start tailer process")
+	defer logElapased("end tailer process", common.Start())
 
-	logFileNames := t.getLogFileName()
+	// 입력받은 시각값을 이용하여 N분 전 시각을 구하기 위해선 음수 값이 필요하다.
+	from := basetm.Add(time.Minute * time.Duration(t.watchTermMin*-1))
+
+	logFileNames := t.getLogFileName(basetm)
 
 	for _, file := range *logFileNames {
-
-		readOffset, err := t.parseLBEventLog(file, int64(0), from.Unix(), fileMap)
+		startOffset := int64(0)
+		readOffset, err := t.parseLBEventLog(file, startOffset, from.Unix(), fileMap)
 		if err != nil {
 			tailer.Errorf("fail to parse,file(%s),error(%s)", file, err.Error())
 			continue
 		}
-		tailer.Debugf("parse file(%s) from (0) to (%d)", file, readOffset)
+		tailer.Infof("parse file(%s) from (%d) to (%d)", file, startOffset, readOffset)
 	}
 
-	tailer.Debugf("hit file count(%d) in LB log", len(*fileMap))
+	tailer.Debugf("hit files(%d)", len(*fileMap))
 	// Hit 수가 기준 미달일 경우 file list 에서 제외
 	for fileName, hitCount := range *fileMap {
+		tailer.Debugf("rising hit file(%s), hit(%d)", fileName, hitCount)
 		if hitCount < t.watchHitBase {
-			//tailer.Debugf("deleted in rising hit, file(%s), hit(%d)", fileName, hitCount)
 			delete(*fileMap, fileName)
 		}
-		tailer.Debugf("rising hit file(%s), hit(%d)", fileName, hitCount)
 	}
+	tailer.Debugf("rising hit files(%d), hits > basehit(%d) ", len(*fileMap), t.watchHitBase)
 
 	return
-}
-
-func GetLogFileName(watchDir string, watchTermMin int) *[]string {
-
-	logFileNames := make([]string, 0, 2)
-
-	now := time.Now()
-	// 현재 시각값을 이용하여 N분 전 시각을 구하기 위해선 음수 값이 필요하다.
-	from := now.Add(time.Minute * time.Duration(watchTermMin*-1))
-
-	f1 := fmt.Sprintf("%s/EventLog[%s].log", watchDir, from.Format("20060102"))
-	f2 := fmt.Sprintf("%s/EventLog[%s].log", watchDir, now.Format("20060102"))
-
-	// 시간 순서대로 정렬해야 parsing 로직에서 lastOffset 계산이 정상적으로 된다.
-	// 오래된 파일이 제일 앞에 추가되어야 한다.
-	logFileNames = append(logFileNames, f1)
-
-	if f2 != f1 {
-		logFileNames = append(logFileNames, f2)
-	}
-
-	return &logFileNames
 }
 
 // getLogFileName : 파싱해야할 로그 파일명을 현재 시각 기준으로 생성
 // 로그 파일명 : EventLog[YYYYmmdd].log
 // YYYYmmdd 를 구하기 위해 현재 시각 이용
-func (t *Tailer) getLogFileName() *[]string {
-
-	logFileNames := make([]string, 0, 2)
-
-	now := time.Now()
-	// 현재 시각값을 이용하여 N분 전 시각을 구하기 위해선 음수 값이 필요하다.
-	from := now.Add(time.Minute * time.Duration(t.watchTermMin*-1))
-
-	f1 := fmt.Sprintf("%s/EventLog[%s].log", t.watchDir, from.Format("20060102"))
-	f2 := fmt.Sprintf("%s/EventLog[%s].log", t.watchDir, now.Format("20060102"))
-
-	// 시간 순서대로 정렬해야 parsing 로직에서 lastOffset 계산이 정상적으로 된다.
-	// 오래된 파일이 제일 앞에 추가되어야 한다.
-	logFileNames = append(logFileNames, f1)
-
-	if f2 != f1 {
-		logFileNames = append(logFileNames, f2)
-	}
-
-	return &logFileNames
+func (t *Tailer) getLogFileName(basetm time.Time) *[]string {
+	return GetLogFileName(basetm, t.watchDir, t.watchTermMin)
 }
 
-// hit 로그 시간이 기준 시간과 같거나 큰 경우, 해당 file들의 hit count를 잧아냄
+// 다음과 같은 log를 찾기위해서
+//
+// 0x40ffff,1,1527951607,Server 125.159.40.3 Selected for Client StreamID : 609d8714-096a-475e-994c-135deea7177f, ClientID : 0, GLB IP : 125.159.40.5's file(MZ3I5008SGL1500001_K20180602222428.mpg) Request
+//
+// 첫번째 필드는 0x40ffff 로 시작하고,
+//
+// 세번째 필드인 로그 시간이 기준 시간과 같거나 크고,
+//
+// 네번째 필드에 watchIPString이 있고, file(파일이름)로 되어있는 문자열이
+// 있는 경우에
+//
+// 이와 같은 log line의 count 를 세어서 파일이름의 hitcount 를 구한다.
+//
+// 파일이름은 숫자와 영문문자와 .과 -와 _로 이루어진 문자열로 구성된다.
 func (t *Tailer) parseLBEventLog(fileName string, offset int64, baseTime int64, fileMap *map[string]int) (int64, error) {
 
 	f, err := os.Open(fileName)
@@ -216,4 +216,8 @@ func (t *Tailer) parseLBEventLog(fileName string, offset int64, baseTime int64, 
 	}
 
 	return offset, nil
+}
+
+func logElapased(message string, start time.Time) {
+	tailer.Infof("%s, time(%s)", message, common.Elapsed(start))
 }

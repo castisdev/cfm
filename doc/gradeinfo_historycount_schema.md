@@ -33,3 +33,16 @@
 | virtualVODcount   | virtualVOD 존재여부  |
 | contentType       | 타입번호= (0=,1=,2=,3=,4=,5=) |
 | hitcountlist   | hitcount 리스트(공백 구분) |
+
+## RISING HITCOUNT 구하기
+Event log(lb 또는 glb의 log 로 추정)의 로그 중에
+아래 형식의 로그를 찾아
+특정 시간대, 특정 IP로 요청이 온 파일 이름별 count 를 구한다.
+
+**0x40ffff**,1,**1527951607**,Server **125.159.40.3** Selected for Client StreamID : 609d8714-096a-475e-994c-135deea7177f, ClientID : 0, GLB IP : 125.159.40.5's **file(MZ3I5008SGL1500001_K20180602222428.mpg)** Request
+
+- 첫번째 필드는 0x40ffff 로 시작하고,
+- 세번째 필드인 로그 시간이 기준 시간과 같거나 크고,
+- 네번째 필드에 특정 IP가 있고, file(파일이름)로 되어있는 문자열이 있는 경우를 구한다.
+- 필드 구분자는 ,이고
+- 파일이름은 숫자와 영문문자와 .과 -와 _로 이루어진 문자열로 구성된다.

@@ -128,7 +128,27 @@ func (t TaskTime) String() string {
 	return time.Unix(int64(t), 0).Format(time.RFC3339)
 }
 
+// String : task to string
+func (task Task) String() string {
+	t := fmt.Sprintf(
+		"id(%d), grade(%d), filePath(%s)"+
+			", srcIP(%s), dstIP(%s), srcAddr(%s), dstAddr(%s)"+
+			", ctime(%s), mtime(%s), status(%s), copySpeed(%s)bps",
+		task.ID, task.Grade, task.FilePath,
+		task.SrcIP, task.DstIP, task.SrcAddr, task.DstAddr,
+		task.Ctime, task.Mtime, task.Status, task.CopySpeed,
+	)
+	return t
+}
+
 // Tasks is slice of Task struct
+//
+// map은 read만 있을 때는 thread-safe 하지만,
+// update가 있을 때는 그렇지 않음
+//
+// https://golang.org/doc/faq#atomic_maps
+//
+// https://blog.golang.org/go-maps-in-action
 type Tasks struct {
 	mutex      *sync.RWMutex
 	TaskMap    map[int64]*Task
@@ -297,17 +317,4 @@ func (tasks *Tasks) DeleteAllTask() {
 	tasks.repository.remove()
 	tasks.TaskMap = make(map[int64]*Task)
 	tasks.repository = newRepository()
-}
-
-// String : task to string
-func (task Task) String() string {
-	t := fmt.Sprintf(
-		"id(%d), grade(%d), filePath(%s),"+
-			"srcIP(%s), dstIP(%s), srcAddr(%s), dstAddr(%s),"+
-			"ctime(%s), mtime(%s), status(%s), copySpeed(%s)bps",
-		task.ID, task.Grade, task.FilePath,
-		task.SrcIP, task.DstIP, task.SrcAddr, task.DstAddr,
-		task.Ctime, task.Mtime, task.Status, task.CopySpeed,
-	)
-	return t
 }

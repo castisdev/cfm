@@ -24,6 +24,14 @@ const (
 	OK
 )
 
+func (s HostStatus) String() string {
+	m := map[HostStatus]string{
+		NOTOK: "notok",
+		OK:    "ok",
+	}
+	return m[s]
+}
+
 // SrcHost : Source Host
 // selected : task에서 src 선택되었는지 여부
 // Status : host 상태
@@ -58,7 +66,6 @@ var SrcServers *SrcHosts
 var Tail *tailer.Tailer
 
 var tasks *Tasks
-var advPrefixes []string
 var hitcountHistoryFile string
 var gradeInfoFile string
 var taskCopySpeed string
@@ -121,26 +128,6 @@ func (dests *DstHosts) Add(s string) error {
 	return nil
 }
 
-// selecteSourceServer
-//
-// 아직, task 에 사용되지 않았고,
-//
-// status 가 OK 인 source 선택
-//
-// 선택된 source: *SrcHost와 선택 여부가 retrun 된다.
-func (srcs *SrcHosts) selectSourceServer() (SrcHost, bool) {
-
-	for _, src := range *srcs {
-
-		if src.selected != true && src.Status == OK {
-			src.selected = true
-			return *src, true
-		}
-
-	}
-	return SrcHost{}, false
-}
-
 // SourcePath : 배포할 파일이 존재하는 경로
 var SourcePath *common.SourceDirs
 
@@ -158,6 +145,48 @@ func init() {
 	tasker = common.MLogger{
 		Logger: cilog.StdLogger(),
 		Mod:    "tasker"}
+}
+
+// SetTaskTimeout is to set timeout for task
+func SetTaskTimeout(t time.Duration) error {
+
+	if t < 0 {
+		return errors.New("can not use negative value")
+	}
+
+	taskTimeout = t
+	tasker.Infof("set task timeout(%s)", taskTimeout)
+	return nil
+}
+
+// SetHitcountHistoryFile :
+func SetHitcountHistoryFile(f string) {
+	tasker.Debugf("set hitcountHistory file path(%s)", f)
+	hitcountHistoryFile = f
+}
+
+// SetGradeInfoFile :
+func SetGradeInfoFile(f string) {
+	tasker.Debugf("set gradeInfo file path(%s)", f)
+	gradeInfoFile = f
+}
+
+// SetTaskCopySpeed :
+func SetTaskCopySpeed(speed string) {
+	tasker.Debugf("set task copy speed(%s)", speed)
+	taskCopySpeed = speed
+}
+
+// SetSleepSec :
+func SetSleepSec(s uint) {
+	tasker.Infof("set sleepSec(%d)", s)
+	sleepSec = s
+}
+
+// SetIgnorePrefixes
+func SetIgnorePrefixes(p []string) {
+	tasker.Debugf("set ignore prefixes(%v)", p)
+	ignorePrefixes = p
 }
 
 // InitTasks:
@@ -186,22 +215,21 @@ func RunForever() {
 		dstIPMap[dst.IP]++
 	}
 
-	// elapsed time : 소요 시간
-	var est time.Time
 	for {
 
-		// 0.5 Src heartbeat 검사
-		SrcServers.setHostStatus()
-		// 0.5.1 Dest heartbeat 검사
-		DstServers.setHostStatus()
+		// Src heartbeat 검사를 가져옴
+		SrcServers.getAllHostStatus()
+		// Dest heartbeat 검사를 가져옴
+		DstServers.getAllHostStatus()
 
-		CleanTask(tasks)
+		cleanTask(tasks)
 
-		// 1. unset selected flag (true->false)
-		// 2. task queue 에 있는 src를 할당된 상태로 변경
-		SrcServers.setSelected()
-		// 2.5 task queue 에 있는 dest를 할당된 상태로 변경
-		DstServers.setSelected()
+		// unset selected flag (true->false)
+		// task queue 에 있는 src를 할당된 상태로 변경
+		curtasks := tasks.GetTaskList()
+		SrcServers.setSelected(curtasks)
+		// task queue 에 있는 dest를 할당된 상태로 변경
+		DstServers.setSelected(curtasks)
 
 		// status가 OK이고, 아직 배포 task 에 할당안된 source가 없으면
 		// task를 더이상 만들지 않음
@@ -233,9 +261,9 @@ func RunForever() {
 		fileMetaMap := make(map[string]*common.FileMeta)
 		duplicatedFileMap := make(map[string]*common.FileMeta)
 
-		est = time.Now()
 		// 4. 파일 등급 list 생성
 		// gradeinfoFile 과 hitcountHistoryFile로 file meta list 생성
+		est := common.Start()
 		err := common.MakeAllFileMetas(gradeInfoFile, hitcountHistoryFile,
 			fileMetaMap, dstIPMap, duplicatedFileMap)
 
@@ -244,24 +272,19 @@ func RunForever() {
 			time.Sleep(time.Second * 5)
 			continue
 		}
-		tasker.Debugf("make file metas, time(%s)", time.Since(est))
+		tasker.Infof("make file metas(name, grade, size, servers), time(%s)", common.Elapsed(est))
 
 		// 5. 높은 등급 순서로 정렬하기 위해 빈 Slice 생성 (map->slice)
 		sortedFileList := make([]*common.FileMeta, 0, len(fileMetaMap))
 
 		for _, v := range fileMetaMap {
 
-			// 서버 파일 중 제외 파일 처리
+			// 6. 광고 파일은 제외 : 제외 파일 처리
 			if common.IsPrefix(v.Name, ignorePrefixes) {
 				tasker.Debugf("remove file meta by ignoring prefix, file(%s)", v.Name)
 				continue
 			}
 
-			// 6. 광고 파일은 제외
-			if common.IsADFile(v.Name, advPrefixes) {
-				tasker.Debugf("remove adfile from file metas, file(%s)", v.Name)
-				continue
-			}
 			sortedFileList = append(sortedFileList, v)
 		}
 
@@ -281,14 +304,9 @@ func RunForever() {
 		sortByHit := make([]*common.FileMeta, 0, len(hitMapFromLBLog))
 		for fileName, hitCount := range hitMapFromLBLog {
 
+			// 9.1. 광고 파일은 제외 : 제외 파일 처리
 			if common.IsPrefix(fileName, ignorePrefixes) {
 				tasker.Debugf("remove file meta by ignoring prefix, file(%s)", fileName)
-				continue
-			}
-
-			// 9.1. 광고 파일은 제외
-			if common.IsADFile(fileName, advPrefixes) {
-				tasker.Debugf("remove adfile from rising hit files, file(%s)", fileName)
 				continue
 			}
 
@@ -382,14 +400,14 @@ func RunForever() {
 	}
 }
 
-// CleanTask :
+// cleanTask :
 // lock 없이 직접 TaskMap traversal 하던 코드
-// 	-> copy해서 사용하도록 수정(copy 할 때 RLock 사용)
+// 	-> GetTaskList()해서 사용하도록 수정(GetTaskList()에서 RLock 사용)
 // status가 done인 task 삭제
-// timeout인 task 삭제
+// timeout인 task 삭제 : duration(현재 time - task.Mtime)이 taskTimeout보다 큰 경우
 // src의 status가 OK가 아닌 task 삭제
 // dest의 status가 OK가 아닌 task 삭제
-func CleanTask(tasks *Tasks) {
+func cleanTask(tasks *Tasks) {
 
 	tl := make([]Task, 0, 10)
 	curtasks := tasks.GetTaskList()
@@ -407,21 +425,21 @@ func CleanTask(tasks *Tasks) {
 		if diff > taskTimeout {
 			task.Status = TIMEOUT
 			tl = append(tl, task)
-			tasker.Infof("[%d] delete timeout task(%s)", task.ID, task)
+			tasker.Infof("[%d] with timeout, delete task(%s)", task.ID, task)
 			continue
 		}
 
 		srcstatus, srcfound := SrcServers.getHostStatus(task.SrcAddr)
 		if !srcfound || srcstatus != OK {
 			tl = append(tl, task)
-			tasker.Infof("[%d] with srcHost's status NOT OK, delete task(%s)", task.ID, task)
+			tasker.Infof("[%d] with srcHost's status NOTOK, delete task(%s)", task.ID, task)
 			continue
 		}
 
 		dststatus, dstfound := DstServers.getHostStatus(task.DstAddr)
 		if !dstfound || dststatus != OK {
 			tl = append(tl, task)
-			tasker.Infof("[%d] with dstHost's status NOT OK, delete task(%s)", task.ID, task)
+			tasker.Infof("[%d] with dstHost's status NOTOK, delete task(%s)", task.ID, task)
 			continue
 		}
 	}
@@ -431,108 +449,88 @@ func CleanTask(tasks *Tasks) {
 	}
 }
 
-// CollectRemoteFileList is to get file list on remote servers
-func CollectRemoteFileList(destList *DstHosts, remoteFileSet map[string]int) {
+// task list 를 검사해서
+//
+// src server의 selected 상태 update 하고
+//
+// task에서 사용하지 않고, status가 ok인
+//
+// src server 개수 return
+func getAvailableSrcServerCount(curtasks []Task) int {
+	SrcServers.setSelected(curtasks)
+	return SrcServers.getSelectableCount()
+}
 
-	for _, dest := range *destList {
-		fl := make([]string, 0, 10000)
-		err := common.GetRemoteFileList(&dest.Host, &fl)
-		if err != nil {
-			tasker.Errorf("[%s] fail to get remote file list, error(%s)", dest, err.Error())
-			continue
-		}
+// task list 를 검사해서
+//
+// dst server의 selected 상태 update 하고
+//
+// task에서 사용하지 않고, status가 ok인
+//
+// sort된 dst server list 를 Ring 으로 만들어서 return
+//
+// dst server가 없는 경우, nil return 됨
+func getAvailableDstServerRing(curtasks []Task) *ring.Ring {
+	dstlist := getAvailableDstServerList(curtasks)
 
-		tasker.Debugf("[%s] get file list", dest)
-		for _, file := range fl {
-			remoteFileSet[file]++
-		}
+	dstRing := ring.New(len(dstlist))
+	for _, d := range dstlist {
+		dstRing.Value = d
+		dstRing = dstRing.Next()
+		tasker.Debugf("[%s] added to available destination servers", d.Addr)
 	}
+	return dstRing
 }
 
-// SetSleepSec :
-func SetSleepSec(s uint) {
-	tasker.Infof("set sleepSec(%d)", s)
-	sleepSec = s
+// task list 를 검사해서
+//
+// dst server의 selected 상태 update 하고
+//
+// task에서 사용하지 않고, status가 ok인
+//
+// sort된 dst server list return
+func getAvailableDstServerList(curtasks []Task) []DstHost {
+	DstServers.setSelected(curtasks)
+	return DstServers.getSelectableList()
 }
 
-// SetTaskTimeout is to set timeout for task
-func SetTaskTimeout(t time.Duration) error {
-
-	if t < 0 {
-		return errors.New("can not use negative value")
-	}
-
-	taskTimeout = t
-	tasker.Infof("set task timeout(%s)", taskTimeout)
-	return nil
-}
-
-// SetAdvPrefix :
-func SetAdvPrefix(p []string) {
-	tasker.Debugf("set adv prefixes(%v)", p)
-	advPrefixes = p
-}
-
-// SetHitcountHistoryFile :
-func SetHitcountHistoryFile(f string) {
-	tasker.Debugf("set hitcountHistory file path(%s)", f)
-	hitcountHistoryFile = f
-}
-
-// SetGradeInfoFile :
-func SetGradeInfoFile(f string) {
-	tasker.Debugf("set gradeInfo file path(%s)", f)
-	gradeInfoFile = f
-}
-
-// SetTaskCopySpeed :
-func SetTaskCopySpeed(speed string) {
-	tasker.Debugf("set task copy speed(%s)", speed)
-	taskCopySpeed = speed
-}
-
-// setHostStatus :
+// getAllHostStatus :
 // 각 src host의 heartbeat 결과가 Status에 저장됨
-func (srcs *SrcHosts) setHostStatus() {
+func (srcs *SrcHosts) getAllHostStatus() {
 	for _, src := range *srcs {
 		h, ok := heartbeater.Get(src.Addr)
 		if ok {
 			if h.Status == heartbeater.OK {
 				src.Status = OK
-				tasker.Debugf("[%s] heartbeat", src)
+				tasker.Debugf("[%s] src, heartbeat ok", src)
 			} else {
 				src.Status = NOTOK
-				tasker.Debugf("[%s] fail to heartbeat", src)
+				tasker.Debugf("[%s] src, fail to heartbeat", src)
 			}
 		} else {
 			src.Status = NOTOK
-			tasker.Debugf("[%s] fail to heartbeat", src)
+			tasker.Debugf("[%s] src, fail to heartbeat, fail to get heartbeat result", src)
 		}
 	}
 }
 
 // setSelected :
-// tasks에서 사용 중이지 않은 src 의 selected 상태를 false로 변경
-// tasks에서 사용 중인 src 의 selected 상태를 true 변경
-// lock 없이 직접 TaskMap traversal 하던 코드
-// 	-> copy해서 사용하도록 수정(copy 할 때 RLock 사용)
-// 1. unset selected flag (true->false)
-// 2. task queue 에 있는 src ip는 할당된 상태로 변경
-func (srcs *SrcHosts) setSelected() int {
+// src 의 selected 상태를 false로 reset하고,
+//
+// task list 를 검사해서
+// task에서 사용 중인 src 의 selected 상태를 true 변경
+//
+func (srcs *SrcHosts) setSelected(curtasks []Task) {
 	for _, src := range *srcs {
 		src.selected = false
 	}
-	selectedCount := 0
-	curtasks := tasks.GetTaskList()
 	for _, task := range curtasks {
 		for _, src := range *srcs {
 			if src.Addr == task.SrcAddr {
 				src.selected = true
-				selectedCount++
 			}
 		}
 	}
-	return selectedCount
 }
 
 // source 목록에 파라미터로 받은 addr 값의 source가 있는 경우 status 값 반환
@@ -540,14 +538,15 @@ func (srcs *SrcHosts) setSelected() int {
 func (srcs *SrcHosts) getHostStatus(addr string) (HostStatus, bool) {
 	for _, src := range *srcs {
 		if src.Addr == addr {
-			tasker.Debugf("[%s] get src status(%d)", src, src.Status)
+			tasker.Debugf("[%s] get src status(%s)", src, src.Status)
 			return src.Status, true
 		}
 	}
 	tasker.Debugf("[%s] fail to get status, not found", addr)
-	return OK, false
+	return NOTOK, false
 }
 
+// 상태가 OK 이고, selected가 false 인 src 서버 개수 반환
 func (srcs *SrcHosts) getSelectableCount() int {
 	cnt := 0
 	for _, src := range *srcs {
@@ -558,42 +557,61 @@ func (srcs *SrcHosts) getSelectableCount() int {
 	return cnt
 }
 
-// setSelected :
-// tasks에서 사용 중이지 않은 dest 의 selected 상태를 false로 변경
-// tasks에서 사용 중인 dest 의 selected 상태를 true 변경
-func (dsts *DstHosts) setSelected() int {
-	for _, dst := range *dsts {
-		dst.selected = false
-	}
-	selectedCount := 0
-	curtasks := tasks.GetTaskList()
-	for _, task := range curtasks {
-		for _, dst := range *dsts {
-			if dst.Addr == task.DstAddr {
-				dst.selected = true
-				selectedCount++
-			}
+// selectSourceServer
+//
+// 아직, task 에 사용되지 않았고,
+//
+// status 가 OK 인 source 선택
+//
+// 선택된 source: *SrcHost와 선택 여부가 retrun 된다.
+func (srcs *SrcHosts) selectSourceServer() (SrcHost, bool) {
+
+	for _, src := range *srcs {
+
+		if src.selected != true && src.Status == OK {
+			src.selected = true
+			return *src, true
 		}
+
 	}
-	return selectedCount
+	return SrcHost{}, false
 }
 
-// setHostStatus :
+// getAllHostStatus :
 // 각 dest host의 heartbeat 결과가 Status에 저장됨
-func (dsts *DstHosts) setHostStatus() {
+func (dsts *DstHosts) getAllHostStatus() {
 	for _, dst := range *dsts {
 		h, ok := heartbeater.Get(dst.Addr)
 		if ok {
 			if h.Status == heartbeater.OK {
 				dst.Status = OK
-				tasker.Debugf("[%s] heartbeat", dst)
+				tasker.Debugf("[%s] dst, heartbeat ok", dst)
 			} else {
 				dst.Status = NOTOK
-				tasker.Debugf("[%s] fail to heartbeat", dst)
+				tasker.Debugf("[%s] dst, fail to heartbeat", dst)
 			}
 		} else {
 			dst.Status = NOTOK
-			tasker.Debugf("[%s] fail to heartbeat", dst)
+			tasker.Debugf("[%s] dst, fail to heartbeat, fail to get heartbeat result", dst)
+		}
+	}
+}
+
+// setSelected :
+// dest 의 selected 상태를 false로 reset하고,
+//
+// task list 를 검사해서
+// task에서 사용 중인 dest 의 selected 상태를 true 변경
+//
+func (dsts *DstHosts) setSelected(curtasks []Task) {
+	for _, dst := range *dsts {
+		dst.selected = false
+	}
+	for _, task := range curtasks {
+		for _, dst := range *dsts {
+			if dst.Addr == task.DstAddr {
+				dst.selected = true
+			}
 		}
 	}
 }
@@ -619,16 +637,28 @@ func (dsts *DstHosts) getSelectableList() (rl []DstHost) {
 func (dsts *DstHosts) getHostStatus(addr string) (HostStatus, bool) {
 	for _, dst := range *dsts {
 		if dst.Addr == addr {
-			tasker.Debugf("[%s] get dst status(%d)", dst, dst.Status)
+			tasker.Debugf("[%s] get dst status(%s)", dst, dst.Status)
 			return dst.Status, true
 		}
 	}
 	tasker.Debugf("[%s] fail to get status, not found", addr)
-	return OK, false
+	return NOTOK, false
 }
 
-// SetIgnorePrefixes
-func SetIgnorePrefixes(p []string) {
-	tasker.Debugf("set ignore prefixes(%v)", p)
-	ignorePrefixes = p
+// CollectRemoteFileList is to get file list on remote servers
+func CollectRemoteFileList(destList *DstHosts, remoteFileSet map[string]int) {
+
+	for _, dest := range *destList {
+		fl := make([]string, 0, 10000)
+		err := common.GetRemoteFileList(&dest.Host, &fl)
+		if err != nil {
+			tasker.Errorf("[%s] fail to get remote file list, error(%s)", dest, err.Error())
+			continue
+		}
+
+		tasker.Debugf("[%s] get file list", dest)
+		for _, file := range fl {
+			remoteFileSet[file]++
+		}
+	}
 }
