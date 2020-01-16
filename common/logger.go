@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/castisdev/cilog"
@@ -48,18 +49,36 @@ func (l *MLogger) Log(calldepth int, lvl cilog.Level, msg string, t time.Time) {
 	var ok bool
 	var pc uintptr
 	var pkg string
+	var fn string
+
 	pc, file, line, ok = runtime.Caller(calldepth)
 	if !ok {
 		file = "???"
 		line = 0
 		pkg = "???"
+		fn = ""
 	} else {
 		file = filepath.Base(file)
 		pkg = cilog.PackageBase(runtime.FuncForPC(pc).Name())
+		fn = filepath.Base(runtime.FuncForPC(pc).Name())
+		fn = fn[strings.Index(fn, ".")+1:]
+	}
+	var pcc uintptr
+	var okc bool
+	var linec int
+	var fnc string
+	pcc, _, linec, okc = runtime.Caller(calldepth + 1)
+	if !okc {
+		fnc = ""
+	} else {
+		fnc = filepath.Base(runtime.FuncForPC(pcc).Name())
+		fnc = fnc[strings.Index(fnc, ".")+1:]
+		fn = fnc + ":" + strconv.Itoa(linec) + "|" + fn
 	}
 
 	m := l.GetModule() + "," + l.GetModuleVer() + "," + timeStr + "," +
-		lvl.Output() + "," + pkg + "::" + file + ":" + strconv.Itoa(line) + "," +
+		lvl.Output() + "," + pkg + "::" + file + "::" + fn + ":" +
+		strconv.Itoa(line) + "," +
 		l.Mod + "," + msg
 	if len(msg) == 0 || msg[len(msg)-1] != '\n' {
 		m += "\n"

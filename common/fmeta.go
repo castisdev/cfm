@@ -9,6 +9,9 @@ import (
 	"strings"
 )
 
+type Freq uint64
+type Hits uint64
+
 // FileMeta is struct to save file meta info
 type FileMeta struct {
 	Name        string

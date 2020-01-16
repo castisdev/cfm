@@ -127,7 +127,7 @@ func (t *Tailer) Tail(basetm time.Time, fileMap *map[string]int) {
 			delete(*fileMap, fileName)
 		}
 	}
-	tailer.Debugf("rising hit files(%d), hits > basehit(%d) ", len(*fileMap), t.watchHitBase)
+	tailer.Debugf("rising hit files(%d), hits > base hits(%d) ", len(*fileMap), t.watchHitBase)
 
 	return
 }

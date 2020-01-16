@@ -769,7 +769,10 @@ func Test_updateFileMetasForDuplicatedFilesServerNull(t *testing.T) {
 	assert.Equal(t, 1, allfmm["E.mpg"].ServerCount)
 }
 
-func Test_requestRemoveDuplicatedFiles(t *testing.T) {
+// 두 개의 duplicated file 중
+// 하나는 cfm의 src directory 에 없고,
+// 하나는 서버에 존재하지 않는 경우
+func Test_requestRemoveDuplicatedFilesNotInTheSourceDir(t *testing.T) {
 	Servers = common.NewHosts()
 	vs1 := "127.0.0.1:18881"
 	files1 := []string{"A.mpg", "C.mpg", "D.mpg"}
@@ -832,6 +835,11 @@ func Test_requestRemoveDuplicatedFiles(t *testing.T) {
 	assert.Equal(t, 2, dupfmm["B.mpg"].ServerCount)
 	assert.Equal(t, 2, dupfmm["C.mpg"].ServerCount)
 
+	// F.mpg 는 server2 에 있지는 않지만,
+	// 전체 meta 정보에는 그대로 server2 에 있다고 기록되어있다.
+	assert.Equal(t, 1, allfmm["F.mpg"].ServerCount)
+	assert.Equal(t, 1, allfmm["F.mpg"].ServerIPs["127.0.0.2"])
+
 	// updateAllFileMetasForDuplicatedFiles 호출하고 나면,
 	updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
 
@@ -855,8 +863,10 @@ func Test_requestRemoveDuplicatedFiles(t *testing.T) {
 	assert.Equal(t, 1, allfmm["D.mpg"].ServerCount)
 	assert.Equal(t, 1, allfmm["E.mpg"].ServerCount)
 
-	// Server2에 C.mpg 삭제 요청을 날려야 하지만
+	// Server2, Server1에 C.mpg 삭제 요청을 날려야 하지만
 	// C.mpg 는 src directory 에 없으므로, 삭제되지 않음
+	// Server2, Server1에 B.mpg 삭제 요청을 날려야 하지만
+	// B.mpg 는 server2에 없으므로, 요청을 날리지 않음
 	requestRemoveDuplicatedFiles(dupfmm, ssfmm)
 
 	// B.mpg의 server count 정보가 0이므로, B.mpg에 대해서는 요청을 하지 않는다.
@@ -866,6 +876,137 @@ func Test_requestRemoveDuplicatedFiles(t *testing.T) {
 	// 요청이 성공하면,
 	// C.mpg 는 src directory 에 없으므로, 삭제되지 않음
 	// C.mpg의 serverCount 값은 2로 그대로 있음
+	assert.Equal(t, 2, dupfmm["C.mpg"].ServerCount)
+
+	t.Logf("duplicated metas:%s", dupfmm)
+
+	// 중복된 파일이 아닌 파일의 정보는 바뀌지 않는다.
+	assert.Equal(t, 1, allfmm["A.mpg"].ServerCount)
+	assert.Equal(t, 1, allfmm["D.mpg"].ServerCount)
+	assert.Equal(t, 1, allfmm["E.mpg"].ServerCount)
+}
+
+// 두 개의 duplicated file 중
+// 하나는 cfm의 src directory 에 없고,
+// 하나는 ignore prefix 로 시작하는 경우(광고 파일)
+// 파일이 하나도 없는 s3 서버도 test에 추가
+func Test_requestRemoveDuplicatedFilesIgnorePrefix(t *testing.T) {
+	Servers = common.NewHosts()
+	s1 := "127.0.0.1:18881"
+	files1 := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg"}
+	d1 := common.DiskUsage{
+		TotalSize: 1000, UsedSize: 600,
+		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
+	}
+	s2 := "127.0.0.2:18882"
+	files2 := []string{"B.mpg", "C.mpg", "E.mpg"}
+	d2 := common.DiskUsage{
+		TotalSize: 1000, UsedSize: 600,
+		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
+	}
+	s3 := "127.0.0.3:18883"
+	files3 := []string{}
+	d3 := common.DiskUsage{
+		TotalSize: 1000, UsedSize: 600,
+		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
+	}
+
+	Servers.Add(s1)
+	Servers.Add(s2)
+	Servers.Add(s3)
+	cfw1 := cfw(s1, d1, files1)
+	cfw1.Start()
+	defer cfw1.Close()
+	cfw2 := cfw(s2, d2, files2)
+	cfw2.Start()
+	defer cfw2.Close()
+	cfw3 := cfw(s3, d3, files3)
+	cfw3.Start()
+	defer cfw3.Close()
+
+	base := "testsourcefolder"
+	SourcePath.Add(base)
+
+	for _, f1 := range files1 {
+		createfile(base, f1)
+	}
+	for _, f2 := range files2 {
+		createfile(base, f2)
+	}
+	deletefile(base, "C.mpg")
+
+	defer deletefile(base, "")
+
+	allfmm, dupfmm := makeFileMetaMap()
+
+	ssfmm := getServerFileMetas(allfmm)
+	for s, sfmm := range ssfmm {
+		t.Logf("server metas:%s -> %s", s, sfmm)
+	}
+
+	// 전체 server는 3개
+	assert.Equal(t, 3, len(ssfmm))
+
+	s1fmm := ssfmm[s1]
+	// 서버1 에 A, B, C, D가 모두 있음
+	assert.Equal(t, 4, len(s1fmm))
+	assert.Contains(t, s1fmm, "A.mpg")
+	assert.Contains(t, s1fmm, "B.mpg")
+	assert.Contains(t, s1fmm, "C.mpg")
+	assert.Contains(t, s1fmm, "D.mpg")
+
+	// 서버2 에 B, C, E가 있음
+	s2fmm := ssfmm[s2]
+	assert.Equal(t, 3, len(s2fmm))
+	assert.Contains(t, s1fmm, "B.mpg")
+	assert.Contains(t, s1fmm, "C.mpg")
+	assert.Contains(t, s2fmm, "E.mpg")
+
+	// 서버3, empty
+	s3fmm := ssfmm[s3]
+	assert.Equal(t, 0, len(s3fmm))
+
+	// 전체 파일 정보에서는 B.mpg 가 Server1, Serve2 에 있다고 되어있지만
+	// 전체 파일 정보에서는 C.mpg 가 Server1, Serve2 에 있다고 되어있지만
+	assert.Equal(t, 2, dupfmm["B.mpg"].ServerCount)
+	assert.Equal(t, 2, dupfmm["C.mpg"].ServerCount)
+
+	// F.mpg 는 server2 에 없지만,
+	// 전체 meta 정보에는 그대로 server2 에 있다고 기록되어있다.
+	assert.Equal(t, 1, allfmm["F.mpg"].ServerCount)
+	assert.Equal(t, 1, allfmm["F.mpg"].ServerIPs["127.0.0.2"])
+
+	// updateAllFileMetasForDuplicatedFiles 호출하고 나면,
+	updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
+
+	// Server1, Server2 의 파일 meta 정보가 반영되지만
+	// B, C.mpg의 serverCount 값은 그대로 2이다.
+	assert.Equal(t, 2, dupfmm["B.mpg"].ServerCount)
+	assert.Equal(t, 2, allfmm["B.mpg"].ServerCount)
+
+	assert.Equal(t, 2, dupfmm["C.mpg"].ServerCount)
+	assert.Equal(t, 2, allfmm["C.mpg"].ServerCount)
+
+	for s, sfmm := range ssfmm {
+		t.Logf("server metas:%s -> %s", s, sfmm)
+	}
+	t.Logf("duplicated metas:%s", dupfmm)
+	// 중복된 파일이 아닌 파일의 정보는 바뀌지 않는다.
+	assert.Equal(t, 1, allfmm["A.mpg"].ServerCount)
+	assert.Equal(t, 1, allfmm["D.mpg"].ServerCount)
+	assert.Equal(t, 1, allfmm["E.mpg"].ServerCount)
+
+	// Server2, Server1에 C.mpg 삭제 요청을 날려야 하지만
+	// C.mpg 는 src directory 에 없으므로, 삭제되지 않음
+	// Server2, Server1에 B.mpg 삭제 요청을 날려야 하지만
+	// B.mpg 는 ingnore.prefix 로 시작하므로, 삭제되지 않음
+	ignores := []string{"B"}
+	SetIgnorePrefixes(ignores)
+
+	requestRemoveDuplicatedFiles(dupfmm, ssfmm)
+
+	// 값도 변함이 없다.
+	assert.Equal(t, 2, dupfmm["B.mpg"].ServerCount)
 	assert.Equal(t, 2, dupfmm["C.mpg"].ServerCount)
 
 	t.Logf("duplicated metas:%s", dupfmm)

@@ -12,6 +12,20 @@ import (
 	"github.com/castisdev/cilog"
 )
 
+type FileMetaPtr *common.FileMeta
+
+// map: file name -> *common.FileMeta
+type FileMetaPtrMap map[string]*common.FileMeta
+
+// map: common.Host.addr -> (map : filename -> *common.FileMeta)
+type ServerFileMetaPtrMap map[string]FileMetaPtrMap
+
+// map : file name -> Hits
+type FileHitsMap map[string]common.Hits
+
+// map : file name -> Hits
+type FileFreqMap map[string]common.Freq
+
 var sleepSec uint
 var taskTimeout time.Duration
 
@@ -222,11 +236,12 @@ func RunForever() {
 		// Dest heartbeat 검사를 가져옴
 		DstServers.getAllHostStatus()
 
-		cleanTask(tasks)
+		curtasks := tasks.GetTaskList()
+
+		cleanTask(curtasks)
 
 		// unset selected flag (true->false)
 		// task queue 에 있는 src를 할당된 상태로 변경
-		curtasks := tasks.GetTaskList()
 		SrcServers.setSelected(curtasks)
 		// task queue 에 있는 dest를 할당된 상태로 변경
 		DstServers.setSelected(curtasks)
@@ -281,7 +296,7 @@ func RunForever() {
 
 			// 6. 광고 파일은 제외 : 제외 파일 처리
 			if common.IsPrefix(v.Name, ignorePrefixes) {
-				tasker.Debugf("remove file meta by ignoring prefix, file(%s)", v.Name)
+				tasker.Debugf("skip file by ignore.prefix, file(%s)", v.Name)
 				continue
 			}
 
@@ -294,8 +309,8 @@ func RunForever() {
 		})
 
 		// 8. 모든 서버의 파일 리스트 수집
-		remoteFileSet := make(map[string]int)
-		CollectRemoteFileList(DstServers, remoteFileSet)
+		remoteFileSet := make(FileFreqMap)
+		collectRemoteFileList(DstServers, remoteFileSet)
 
 		// 9. LB EventLog 에서 특정 IP 에 할당된 파일 목록 추출
 		hitMapFromLBLog := make(map[string]int)
@@ -306,7 +321,7 @@ func RunForever() {
 
 			// 9.1. 광고 파일은 제외 : 제외 파일 처리
 			if common.IsPrefix(fileName, ignorePrefixes) {
-				tasker.Debugf("remove file meta by ignoring prefix, file(%s)", fileName)
+				tasker.Debugf("skip file meta by ignore.prefix, file(%s)", fileName)
 				continue
 			}
 
@@ -401,16 +416,20 @@ func RunForever() {
 }
 
 // cleanTask :
-// lock 없이 직접 TaskMap traversal 하던 코드
-// 	-> GetTaskList()해서 사용하도록 수정(GetTaskList()에서 RLock 사용)
+//
+// 특정 조건의 task를 tasks(전역변수)에서 삭제
+//
 // status가 done인 task 삭제
+//
 // timeout인 task 삭제 : duration(현재 time - task.Mtime)이 taskTimeout보다 큰 경우
+//
 // src의 status가 OK가 아닌 task 삭제
+//
 // dest의 status가 OK가 아닌 task 삭제
-func cleanTask(tasks *Tasks) {
+//
+func cleanTask(curtasks []Task) {
 
-	tl := make([]Task, 0, 10)
-	curtasks := tasks.GetTaskList()
+	tl := make([]Task, 0, len(curtasks))
 
 	tasker.Debugf("clean task, current task count(%d)", len(curtasks))
 	for _, task := range curtasks {
@@ -423,7 +442,6 @@ func cleanTask(tasks *Tasks) {
 
 		diff := time.Since(time.Unix(int64(task.Mtime), 0))
 		if diff > taskTimeout {
-			task.Status = TIMEOUT
 			tl = append(tl, task)
 			tasker.Infof("[%d] with timeout, delete task(%s)", task.ID, task)
 			continue
@@ -547,6 +565,7 @@ func (srcs *SrcHosts) getHostStatus(addr string) (HostStatus, bool) {
 }
 
 // 상태가 OK 이고, selected가 false 인 src 서버 개수 반환
+// FIXME: disk 상태도 고려하면 좋을 듯
 func (srcs *SrcHosts) getSelectableCount() int {
 	cnt := 0
 	for _, src := range *srcs {
@@ -559,11 +578,12 @@ func (srcs *SrcHosts) getSelectableCount() int {
 
 // selectSourceServer
 //
-// 아직, task 에 사용되지 않았고,
+// selected 가 false 이고
 //
-// status 가 OK 인 source 선택
+// status 가 OK 인 source 선택되고, selected가 true로 update
 //
 // 선택된 source: *SrcHost와 선택 여부가 retrun 된다.
+// FIXME: disk 상태도 고려하면 좋을 듯
 func (srcs *SrcHosts) selectSourceServer() (SrcHost, bool) {
 
 	for _, src := range *srcs {
@@ -645,8 +665,8 @@ func (dsts *DstHosts) getHostStatus(addr string) (HostStatus, bool) {
 	return NOTOK, false
 }
 
-// CollectRemoteFileList is to get file list on remote servers
-func CollectRemoteFileList(destList *DstHosts, remoteFileSet map[string]int) {
+// collectRemoteFileList is to get file list on remote servers
+func collectRemoteFileList(destList *DstHosts, remoteFiles FileFreqMap) {
 
 	for _, dest := range *destList {
 		fl := make([]string, 0, 10000)
@@ -658,7 +678,120 @@ func CollectRemoteFileList(destList *DstHosts, remoteFileSet map[string]int) {
 
 		tasker.Debugf("[%s] get file list", dest)
 		for _, file := range fl {
-			remoteFileSet[file]++
+			remoteFiles[file]++
 		}
 	}
+}
+
+// getFileMetaListForTask:
+//
+// 배포 대상이 되는 파일 리스트 retrun
+//
+// - 이미 배포 대상이 되는 파일은 제외
+//
+// - 서버에 이미 있는 파일은 제외
+//
+// - ignore.prefix로 시작하는 파일(광고 파일)은 제외
+//
+// - source path 에 없는 파일은 제외
+//
+// rising hits 파일은 제일 앞에
+//
+// grade 값이 작은(등급이 높은) 파일이 그 다음 순에
+//
+// sort 된 list return
+func getFileMetaListForTask(allfmm FileMetaPtrMap,
+	risinghits map[string]int, curtasks []Task,
+	serverfiles FileFreqMap) []FileMetaPtr {
+
+	usedtaskfiles := getFilesInTasks(curtasks)
+	updateFileMetasForRisingHitsFiles(allfmm, risinghits)
+
+	taskfilelist := make([]FileMetaPtr, 0, len(allfmm))
+	for _, fmm := range allfmm {
+		if !checkForTask(fmm, usedtaskfiles, serverfiles) {
+			continue
+		}
+		taskfilelist = append(taskfilelist, fmm)
+	}
+	// Risinghit 값이 다르면 Risinghit값이 높은 순으로
+	// Risinghit 값이 같으면
+	// 	Grade 값이 작은(높은 등급) 순으로 정렬 순서로 정렬
+	sort.Slice(taskfilelist, func(i, j int) bool {
+		if taskfilelist[i].RisingHit != taskfilelist[j].RisingHit {
+			return taskfilelist[i].RisingHit > taskfilelist[j].RisingHit
+		} else {
+			return taskfilelist[i].Grade < taskfilelist[j].Grade
+		}
+	})
+
+	return taskfilelist
+}
+
+func getFilesInTasks(curtasks []Task) FileFreqMap {
+	filenames := make(FileFreqMap)
+	for _, task := range curtasks {
+		filenames[task.FileName]++
+	}
+	return filenames
+}
+
+// updateFileMetasForRisingHitsFiles :
+//
+// - risinghits map의 file들의 file meta찾아서
+// 해당 file meta의 rising hit 값을 update 함
+//
+// - 일반 file meta의 rising hit 값은 0임
+//
+// - file meta가 없는 rising hit file은 결과에서 제외됨
+func updateFileMetasForRisingHitsFiles(allfmm FileMetaPtrMap,
+	risinghits map[string]int) {
+
+	for rhfn, hits := range risinghits {
+		fmm, ok := allfmm[rhfn]
+		if ok {
+			fmm.RisingHit = hits
+		} else {
+			// 전체 file meta 에 없다면 제외
+			tasker.Debugf("skip file by not.found.in.the.all.file.metas, file(%s)", rhfn)
+		}
+	}
+}
+
+// - 이미 배포 대상이 되는 파일은 제외
+//
+// - 서버에 이미 있는 파일은 제외
+//
+// - ignore.prefix로 시작하는 파일(광고 파일)은 제외
+//
+// - source path 에 없는 파일은 제외
+func checkForTask(fmm *common.FileMeta,
+	taskfiles FileFreqMap,
+	serverfiles FileFreqMap) bool {
+
+	fn := fmm.Name
+	// 이미 배포 task에 사용되는 파일 제외
+	if n, using := taskfiles[fn]; using && n > 0 {
+		tasker.Debugf("skip file, found in the tasks, file(%s)", fmm)
+		return false
+	}
+
+	// - 서버에 이미 있는 파일은 제외
+	if n, using := serverfiles[fn]; using && n > 0 {
+		tasker.Debugf("skip file, found in the servers, file(%s)", fmm)
+		return false
+	}
+
+	// ignore.prefix 로 시작하는 파일 제외(광고 파일)
+	if common.IsPrefix(fn, ignorePrefixes) {
+		tasker.Debugf("skip file by ignore.prefix, file(%s)", fmm)
+		return false
+	}
+
+	// 소스 directory 에 없는 파일 제외(SAN 에 없는 파일 제외)
+	if _, exists := SourcePath.IsExistOnSource(fn); !exists {
+		tasker.Debugf("skip file by not.found.in.the.source.paths, file(%s)", fmm)
+		return false
+	}
+	return true
 }
