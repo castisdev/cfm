@@ -131,12 +131,12 @@ func (t TaskTime) String() string {
 // String : task to string
 func (task Task) String() string {
 	t := fmt.Sprintf(
-		"id(%d), grade(%d), filePath(%s)"+
-			", srcIP(%s), dstIP(%s), srcAddr(%s), dstAddr(%s)"+
-			", ctime(%s), mtime(%s), status(%s), copySpeed(%s)bps",
-		task.ID, task.Grade, task.FilePath,
-		task.SrcIP, task.DstIP, task.SrcAddr, task.DstAddr,
-		task.Ctime, task.Mtime, task.Status, task.CopySpeed,
+		"id(%d), status(%s), grade(%d), filePath(%s), fileName(%s)"+
+			", srcAddr(%s), dstAddr(%s)"+
+			", mtime(%s), copySpeed(%s)bps, srcIP(%s), ctime(%s), dstIP(%s)",
+		task.ID, task.Status, task.Grade, task.FilePath, task.FileName,
+		task.SrcAddr, task.DstAddr, task.Mtime, task.CopySpeed, task.SrcIP,
+		task.Ctime, task.DstIP,
 	)
 	return t
 }
@@ -243,7 +243,16 @@ func (tasks *Tasks) UpdateStatus(id int64, s Status) error {
 		return nil
 
 	case DONE:
+		// TIMEOUT -> DONE 도 ok
 		// success : READY, WORKING, DONE, TIMEOUT -> DONE
+		task.Status = s
+		task.Mtime = TaskTime(time.Now().Unix())
+		tasks.repository.saveTask(task)
+		return nil
+
+	case TIMEOUT:
+		// DONE -> TIMEOUT 도 ok
+		// success : READY, WORKING, DONE, TIMEOUT -> TIMEOUT
 		task.Status = s
 		task.Mtime = TaskTime(time.Now().Unix())
 		tasks.repository.saveTask(task)
@@ -304,7 +313,25 @@ func (tasks *Tasks) DeleteTask(id int64) error {
 	delete(tasks.TaskMap, id)
 	tasks.repository.deleteTask(id)
 	return nil
+}
 
+// DeleteTasks is to delete tasks
+// id 가 없으면 그냥 다음 id로 넘어감
+// 성공한 개수가 넘어감
+func (tasks *Tasks) DeleteTasks(ids []int64) int {
+	tasks.mutex.Lock()
+	defer tasks.mutex.Unlock()
+
+	var cnt int = 0
+	for _, id := range ids {
+		_, exists := tasks.TaskMap[id]
+		if exists {
+			delete(tasks.TaskMap, id)
+			tasks.repository.deleteTask(id)
+			cnt++
+		}
+	}
+	return cnt
 }
 
 // DeleteAllTask
@@ -317,4 +344,13 @@ func (tasks *Tasks) DeleteAllTask() {
 	tasks.repository.remove()
 	tasks.TaskMap = make(map[int64]*Task)
 	tasks.repository = newRepository()
+}
+
+// Release
+// 내부 map, repository를 모두 지우기
+func (tasks *Tasks) Release() {
+	tasks.mutex.Lock()
+	defer tasks.mutex.Unlock()
+	tasks.repository.remove()
+	tasks.TaskMap = make(map[int64]*Task)
 }

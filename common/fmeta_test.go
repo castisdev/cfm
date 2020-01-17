@@ -127,19 +127,6 @@ func Test_ParseGradeFile(t *testing.T) {
 
 }
 
-func TestIsADFile(t *testing.T) {
-
-	prefixes := []string{"M64", "MN1"}
-
-	assert.Equal(t, true, common.IsADFile("M640001.mpg", prefixes))
-	assert.Equal(t, true, common.IsADFile("MN10001.mpg", prefixes))
-	assert.Equal(t, false, common.IsADFile("M650001.mpg", prefixes))
-	assert.Equal(t, false, common.IsADFile("MN20001.mpg", prefixes))
-	assert.Equal(t, false, common.IsADFile("AM64001.mpg", prefixes))
-	assert.Equal(t, false, common.IsADFile("AMN10001.mpg", prefixes))
-
-}
-
 func TestIsPrefix(t *testing.T) {
 
 	prefixes := []string{"M64", "MN1"}

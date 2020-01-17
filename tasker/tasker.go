@@ -219,199 +219,314 @@ func InitTasks() {
 
 // RunForever is to run tasker as go routine
 func RunForever() {
+	for {
+		run(time.Now())
+		time.Sleep(time.Second * time.Duration(sleepSec))
+	}
+}
+
+// run :
+func run(basetm time.Time) error {
+	tasker.Infof("start tasker process")
+	defer logElapased("end tasker process", common.Start())
+
 	destcount := len(*DstServers)
 	if destcount == 0 {
-		tasker.Debugf("tasker endded, the number of the dest srvers is 0")
-		return
+		tasker.Errorf("tasker endded, the number of the dest srvers is 0")
+		return errors.New("tasker endded, the number of the dest srvers is 0")
 	}
 	dstIPMap := make(map[string]int)
 	for _, dst := range *DstServers {
 		dstIPMap[dst.IP]++
 	}
+	fileMetaMap := make(map[string]*common.FileMeta)
+	duplicatedFileMap := make(map[string]*common.FileMeta)
+	risingHitFileMap := make(map[string]int)
 
-	for {
+	// 4. 파일 등급 list 생성
+	// gradeinfoFile 과 hitcountHistoryFile로 file meta list 생성
+	est := common.Start()
+	err := common.MakeAllFileMetas(gradeInfoFile, hitcountHistoryFile,
+		fileMetaMap, dstIPMap, duplicatedFileMap)
 
-		// Src heartbeat 검사를 가져옴
-		SrcServers.getAllHostStatus()
-		// Dest heartbeat 검사를 가져옴
-		DstServers.getAllHostStatus()
+	if err != nil {
+		tasker.Errorf("fail to make file metas, error(%s)", err.Error())
+		//time.Sleep(time.Second * 5)
+		return err
+	}
+	tasker.Infof("make file metas(name, grade, size, servers), time(%s)", common.Elapsed(est))
 
-		curtasks := tasks.GetTaskList()
+	// 급 hit 상승 파일 목록 구하기
+	// LB EventLog 에서 특정 IP 에 할당된 파일 목록 추출
+	Tail.Tail(basetm, &risingHitFileMap)
 
-		cleanTask(curtasks)
+	runWithInfo(fileMetaMap, risingHitFileMap)
 
-		// unset selected flag (true->false)
-		// task queue 에 있는 src를 할당된 상태로 변경
-		SrcServers.setSelected(curtasks)
-		// task queue 에 있는 dest를 할당된 상태로 변경
-		DstServers.setSelected(curtasks)
+	return nil
+}
 
-		// status가 OK이고, 아직 배포 task 에 할당안된 source가 없으면
-		// task를 더이상 만들지 않음
-		srccnt := SrcServers.getSelectableCount()
-		if srccnt == 0 {
-			tasker.Debugf("no src is available")
-			time.Sleep(time.Second * 5)
-			continue
+// runWithInfo :
+// FIXME: refactoring 중
+func runWithInfo(
+	fileMetaMap FileMetaPtrMap,
+	risingHitFileMap map[string]int) {
+
+	tasker.Infof("start tasker inner process")
+	defer logElapased("end tasker inner process", common.Start())
+
+	// Src heartbeat 검사를 가져옴
+	SrcServers.getAllHostStatus()
+	// Dest heartbeat 검사를 가져옴
+	DstServers.getAllHostStatus()
+
+	curtasks := tasks.GetTaskList()
+
+	// task 정리 후 새로운 task 를다시 구한다.
+	curtasks = cleanTask(curtasks)
+
+	// unset selected flag (true->false)
+	// task queue 에 있는 src를 할당된 상태로 변경
+	// status가 OK이고, 아직 배포 task 에 할당안된 source가 없으면
+	// task를 더이상 만들지 않음
+	srccnt := getAvailableSrcServerCount(curtasks)
+	if srccnt == 0 {
+		tasker.Debugf("no src is available")
+		return
+		//time.Sleep(time.Second * 5)
+		//continue
+	}
+
+	// task queue 에 있는 dest를 할당된 상태로 변경
+	// destination ip 를 round robin 으로 선택하기 위한 ring 생성
+	// status가 OK이고,
+	// 아직 배포 task 에 할당안된 dest가 없으면
+	// task를 더이상 만들지 않음
+	dstRing := getAvailableDstServerRing(curtasks)
+	if dstRing == nil {
+		tasker.Debugf("no dst is available")
+		return
+		// time.Sleep(time.Second * 5)
+		// continue
+	}
+
+	// 모든 서버의 파일 리스트 수집
+	remoteFileSet := make(FileFreqMap)
+	collectRemoteFileList(DstServers, remoteFileSet)
+
+	// 높은 등급 순서로 정렬하기 위해 빈 Slice 생성 하고 배포 대상이 되는파일 return
+	// ignore.prefix로 시작하는 파일 배포 제외 : 광고 파일 배포 제외
+	// .grade.info, .hitcount.history 에서 file meta를 구할 수 없는 파일은 배포에서 제외
+	// task 에 이미 있는 파일 제외
+	// source path에 없는 파일 제외 :SAN 에 없는 파일 배포에서 제외
+	//   source path에 있는 파일이면, source path를 file meta에 update
+	// 급 상승 Hit 수가 많은 순서대로 정렬
+	// 높은 등급 순서로 정렬 (가장 높은 등급:1)
+	sortedFileList := getFileMetaListForTask(fileMetaMap, risingHitFileMap,
+		curtasks, remoteFileSet)
+
+	for _, file := range sortedFileList {
+
+		// src ip 선택, 없으면 loop 종료
+		src, exists := SrcServers.selectSourceServer()
+		if exists != true {
+			tasker.Debugf("stop making task, no src is available")
+			break
 		}
 
-		// destination ip 를 round robin 으로 선택하기 위한 ring 생성
-		// status가 OK이고,
-		// 아직 배포 task 에 할당안된 dest가 없으면
-		// task를 더이상 만들지 않음
-		okdests := DstServers.getSelectableList()
-		if len(okdests) == 0 {
-			tasker.Debugf("no dst is available")
-			time.Sleep(time.Second * 5)
-			continue
-		}
-
-		dstRing := ring.New(len(okdests))
-		for _, d := range okdests {
-			dstRing.Value = d
-			dstRing = dstRing.Next()
-			tasker.Debugf("[%s] added to available destination servers", d.Addr)
-		}
-
-		fileMetaMap := make(map[string]*common.FileMeta)
-		duplicatedFileMap := make(map[string]*common.FileMeta)
-
-		// 4. 파일 등급 list 생성
-		// gradeinfoFile 과 hitcountHistoryFile로 file meta list 생성
-		est := common.Start()
-		err := common.MakeAllFileMetas(gradeInfoFile, hitcountHistoryFile,
-			fileMetaMap, dstIPMap, duplicatedFileMap)
-
-		if err != nil {
-			tasker.Errorf("fail to make file metas, error(%s)", err.Error())
-			time.Sleep(time.Second * 5)
-			continue
-		}
-		tasker.Infof("make file metas(name, grade, size, servers), time(%s)", common.Elapsed(est))
-
-		// 5. 높은 등급 순서로 정렬하기 위해 빈 Slice 생성 (map->slice)
-		sortedFileList := make([]*common.FileMeta, 0, len(fileMetaMap))
-
-		for _, v := range fileMetaMap {
-
-			// 6. 광고 파일은 제외 : 제외 파일 처리
-			if common.IsPrefix(v.Name, ignorePrefixes) {
-				tasker.Debugf("skip file by ignore.prefix, file(%s)", v.Name)
-				continue
-			}
-
-			sortedFileList = append(sortedFileList, v)
-		}
-
-		// 7. 높은 등급 순서로 정렬 (가장 높은 등급:1)
-		sort.Slice(sortedFileList, func(i, j int) bool {
-			return sortedFileList[i].Grade < sortedFileList[j].Grade
+		// task 생성
+		dst := DstHost(dstRing.Value.(DstHost))
+		t := tasks.CreateTask(&Task{
+			FilePath:  file.SrcFilePath,
+			FileName:  file.Name,
+			SrcIP:     src.IP,
+			DstIP:     dst.IP,
+			Grade:     file.Grade,
+			CopySpeed: taskCopySpeed,
+			SrcAddr:   src.Addr,
+			DstAddr:   dst.Addr,
 		})
+		dstRing = dstRing.Next()
 
-		// 8. 모든 서버의 파일 리스트 수집
-		remoteFileSet := make(FileFreqMap)
-		collectRemoteFileList(DstServers, remoteFileSet)
+		if file.RisingHit > 0 {
+			tasker.Infof("[%d] create task(%s) for risingHit(%d), file(%s)",
+				t.ID, t, file.RisingHit, *file)
+		} else {
+			tasker.Infof("[%d] create task(%s) for grade(%d), file(%s)",
+				t.ID, t, file.Grade, *file)
+		}
+	}
+}
 
-		// 9. LB EventLog 에서 특정 IP 에 할당된 파일 목록 추출
-		hitMapFromLBLog := make(map[string]int)
-		Tail.Tail(time.Now(), &hitMapFromLBLog)
+// runWithInfo :
+// Deprecated : 지울 예정
+func runWithInfo_drepreacted(
+	fileMetaMap FileMetaPtrMap,
+	risingHitFileMap map[string]int) {
 
-		sortByHit := make([]*common.FileMeta, 0, len(hitMapFromLBLog))
-		for fileName, hitCount := range hitMapFromLBLog {
+	tasker.Infof("start tasker inner process")
+	defer logElapased("end tasker inner process", common.Start())
 
-			// 9.1. 광고 파일은 제외 : 제외 파일 처리
-			if common.IsPrefix(fileName, ignorePrefixes) {
-				tasker.Debugf("skip file meta by ignore.prefix, file(%s)", fileName)
-				continue
-			}
+	// Src heartbeat 검사를 가져옴
+	SrcServers.getAllHostStatus()
+	// Dest heartbeat 검사를 가져옴
+	DstServers.getAllHostStatus()
 
-			// file size 셋팅 (.hitcount.history 에서 파싱한 정보)
-			// .hitcount.history 에 없을 수도 있음(파일 갱신 주기 때문에)
-			// 그럴 경우 Size = -1
-			fileSize := int64(-1)
-			if fm, exists := fileMetaMap[fileName]; exists {
-				fileSize = fm.Size
-			}
+	curtasks := tasks.GetTaskList()
 
-			// file grade 셋팅 (.grade.info 에서 파싱한 정보)
-			// .grade.info 에 없을 수도 있음(파일 갱신 주기 때문에)
-			// 그럴 경우 Grade = -1
-			fileGrade := int32(-1)
-			if fm, exists := fileMetaMap[fileName]; exists {
-				fileGrade = fm.Grade
-			}
+	// task 정리 후 새로운 task 를다시 구한다.
+	curtasks = cleanTask(curtasks)
 
-			fileMeta := common.FileMeta{
-				Name:      fileName,
-				Grade:     fileGrade,
-				Size:      fileSize,
-				RisingHit: hitCount,
-			}
-			sortByHit = append(sortByHit, &fileMeta)
+	// unset selected flag (true->false)
+	// task queue 에 있는 src를 할당된 상태로 변경
+	SrcServers.setSelected(curtasks)
+	// status가 OK이고, 아직 배포 task 에 할당안된 source가 없으면
+	// task를 더이상 만들지 않음
+	srccnt := SrcServers.getSelectableCount()
+	if srccnt == 0 {
+		tasker.Debugf("no src is available")
+		return
+		//time.Sleep(time.Second * 5)
+		//continue
+	}
+
+	// task queue 에 있는 dest를 할당된 상태로 변경
+	DstServers.setSelected(curtasks)
+
+	// destination ip 를 round robin 으로 선택하기 위한 ring 생성
+	// status가 OK이고,
+	// 아직 배포 task 에 할당안된 dest가 없으면
+	// task를 더이상 만들지 않음
+	okdests := DstServers.getSelectableList()
+	if len(okdests) == 0 {
+		tasker.Debugf("no dst is available")
+		return
+		// time.Sleep(time.Second * 5)
+		// continue
+	}
+
+	dstRing := ring.New(len(okdests))
+	for _, d := range okdests {
+		dstRing.Value = d
+		dstRing = dstRing.Next()
+		tasker.Debugf("[%s] added to available destination servers", d.Addr)
+	}
+
+	// 모든 서버의 파일 리스트 수집
+	remoteFileSet := make(FileFreqMap)
+	collectRemoteFileList(DstServers, remoteFileSet)
+
+	// 높은 등급 순서로 정렬하기 위해 빈 Slice 생성 (map->slice)
+	sortedFileList := make([]*common.FileMeta, 0, len(fileMetaMap))
+
+	for _, v := range fileMetaMap {
+
+		// 광고 파일은 제외 : 제외 파일 처리
+		if common.IsPrefix(v.Name, ignorePrefixes) {
+			tasker.Debugf("skip file by ignore.prefix, file(%s)", v.Name)
+			continue
 		}
 
-		// 10. Hit 수가 많은 순서대로 정렬
-		sort.Slice(sortByHit, func(i, j int) bool {
-			return hitMapFromLBLog[sortByHit[i].Name] > hitMapFromLBLog[sortByHit[j].Name]
+		sortedFileList = append(sortedFileList, v)
+	}
+
+	// 높은 등급 순서로 정렬 (가장 높은 등급:1)
+	sort.Slice(sortedFileList, func(i, j int) bool {
+		return sortedFileList[i].Grade < sortedFileList[j].Grade
+	})
+
+	sortByHit := make([]*common.FileMeta, 0, len(risingHitFileMap))
+	for fileName, hitCount := range risingHitFileMap {
+
+		// 9.1. 광고 파일은 제외 : 제외 파일 처리
+		if common.IsPrefix(fileName, ignorePrefixes) {
+			tasker.Debugf("skip file meta by ignore.prefix, file(%s)", fileName)
+			continue
+		}
+
+		// file size 셋팅 (.hitcount.history 에서 파싱한 정보)
+		// .hitcount.history 에 없을 수도 있음(파일 갱신 주기 때문에)
+		// 그럴 경우 Size = -1
+		fileSize := int64(-1)
+		if fm, exists := fileMetaMap[fileName]; exists {
+			fileSize = fm.Size
+		}
+
+		// file grade 셋팅 (.grade.info 에서 파싱한 정보)
+		// .grade.info 에 없을 수도 있음(파일 갱신 주기 때문에)
+		// 그럴 경우 Grade = -1
+		fileGrade := int32(-1)
+		if fm, exists := fileMetaMap[fileName]; exists {
+			fileGrade = fm.Grade
+		}
+
+		fileMeta := common.FileMeta{
+			Name:      fileName,
+			Grade:     fileGrade,
+			Size:      fileSize,
+			RisingHit: hitCount,
+		}
+		sortByHit = append(sortByHit, &fileMeta)
+	}
+
+	// 10. Hit 수가 많은 순서대로 정렬
+	sort.Slice(sortByHit, func(i, j int) bool {
+		return risingHitFileMap[sortByHit[i].Name] > risingHitFileMap[sortByHit[j].Name]
+	})
+
+	// 11. LB EventLog 에서 찾은 파일을 먼저 배포하고, 그 후에 .grade.info 등급 순으로 배포하기 위한 file list 정렬
+	// sortedFileList가 sortByHist를 포함하는 관계라서, 중복이 있으나,
+	// task 만들 때, 중복되는 경우 skip 됨
+	sortedFileList = append(sortByHit, sortedFileList...)
+
+	for _, file := range sortedFileList {
+
+		// 12. 이미 task queue 에 있는 파일이면 skip
+		if _, exists := tasks.FindTaskByFileName(file.Name); exists {
+			tasker.Debugf("skip making task, already in task, file(%s)", file.Name)
+			continue
+		}
+
+		// 13. 이미 remote file list 에 있는 파일이면 skip
+		if _, exists := remoteFileSet[file.Name]; exists {
+			tasker.Debugf("skip making task, already in remote file list, file(%s)", file.Name)
+			continue
+		}
+
+		// 14. SAN 에 없는 파일이면 제외
+		filePath, exists := SourcePath.IsExistOnSource(file.Name)
+		if exists != true {
+			tasker.Debugf("skip making task, not found in source paths, file(%s)", file.Name)
+			continue
+		}
+
+		// 15. src ip 선택, 없으면 loop 종료
+		src, exists := SrcServers.selectSourceServer()
+		if exists != true {
+			tasker.Debugf("stop making task, no src is available")
+			break
+		}
+
+		// 16. task 생성
+		dst := DstHost(dstRing.Value.(DstHost))
+		t := tasks.CreateTask(&Task{
+			FilePath:  filePath,
+			FileName:  file.Name,
+			SrcIP:     src.IP,
+			DstIP:     dst.IP,
+			Grade:     file.Grade,
+			CopySpeed: taskCopySpeed,
+			SrcAddr:   src.Addr,
+			DstAddr:   dst.Addr,
 		})
+		dstRing = dstRing.Next()
 
-		// 11. LB EventLog 에서 찾은 파일을 먼저 배포하고, 그 후에 .grade.info 등급 순으로 배포하기 위한 file list 정렬
-		// sortedFileList가 sortByHist를 포함하는 관계라서, 중복이 있으나,
-		// task 만들 때, 중복되는 경우 skip 됨
-		sortedFileList = append(sortByHit, sortedFileList...)
-
-		for _, file := range sortedFileList {
-
-			// 12. 이미 task queue 에 있는 파일이면 skip
-			if _, exists := tasks.FindTaskByFileName(file.Name); exists {
-				tasker.Debugf("skip making task, already in task, file(%s)", file.Name)
-				continue
-			}
-
-			// 13. 이미 remote file list 에 있는 파일이면 skip
-			if _, exists := remoteFileSet[file.Name]; exists {
-				tasker.Debugf("skip making task, already in remote file list, file(%s)", file.Name)
-				continue
-			}
-
-			// 14. SAN 에 없는 파일이면 제외
-			filePath, exists := SourcePath.IsExistOnSource(file.Name)
-			if exists != true {
-				tasker.Debugf("skip making task, not found in source paths, file(%s)", file.Name)
-				continue
-			}
-
-			// 15. src ip 선택, 없으면 loop 종료
-			src, exists := SrcServers.selectSourceServer()
-			if exists != true {
-				tasker.Debugf("stop making task, no src is available")
-				break
-			}
-
-			// 16. task 생성
-			dst := DstHost(dstRing.Value.(DstHost))
-			t := tasks.CreateTask(&Task{
-				FilePath:  filePath,
-				FileName:  file.Name,
-				SrcIP:     src.IP,
-				DstIP:     dst.IP,
-				Grade:     file.Grade,
-				CopySpeed: taskCopySpeed,
-				SrcAddr:   src.Addr,
-				DstAddr:   dst.Addr,
-			})
-			dstRing = dstRing.Next()
-
-			if file.RisingHit > 0 {
-				tasker.Infof("[%d] create task(%s) for risingHit(%d), filePath(%s), file(%s)",
-					t.ID, t, file.RisingHit, filePath, file.Name)
-			} else {
-				tasker.Infof("[%d] create task(%s) for grade(%d), filePath(%s), file(%s)",
-					t.ID, t, file.Grade, filePath, file.Name)
-			}
+		if file.RisingHit > 0 {
+			tasker.Infof("[%d] create task(%s) for risingHit(%d), filePath(%s), file(%s)",
+				t.ID, t, file.RisingHit, filePath, file.Name)
+		} else {
+			tasker.Infof("[%d] create task(%s) for grade(%d), filePath(%s), file(%s)",
+				t.ID, t, file.Grade, filePath, file.Name)
 		}
-
-		time.Sleep(time.Second * time.Duration(sleepSec))
 	}
 }
 
@@ -427,44 +542,54 @@ func RunForever() {
 //
 // dest의 status가 OK가 아닌 task 삭제
 //
-func cleanTask(curtasks []Task) {
+// 작업 후의 task list를 retrun
+func cleanTask(curtasks []Task) []Task {
 
-	tl := make([]Task, 0, len(curtasks))
+	tl := make([]int64, 0, len(curtasks))
 
-	tasker.Debugf("clean task, current task count(%d)", len(curtasks))
 	for _, task := range curtasks {
 
 		if task.Status == DONE {
-			tl = append(tl, task)
+			tl = append(tl, task.ID)
 			tasker.Infof("[%d] with stauts done, delete task(%s) ", task.ID, task)
 			continue
 		}
 
 		diff := time.Since(time.Unix(int64(task.Mtime), 0))
 		if diff > taskTimeout {
-			tl = append(tl, task)
+			tl = append(tl, task.ID)
 			tasker.Infof("[%d] with timeout, delete task(%s)", task.ID, task)
 			continue
 		}
 
 		srcstatus, srcfound := SrcServers.getHostStatus(task.SrcAddr)
+		if srcfound {
+			tasker.Debugf("[%d][%s] get src status(%s)", task.ID, task.SrcAddr, srcstatus)
+		} else {
+			tasker.Debugf("[%d][%s] fail to get src status, not found", task.ID, task.SrcAddr)
+		}
 		if !srcfound || srcstatus != OK {
-			tl = append(tl, task)
+			tl = append(tl, task.ID)
 			tasker.Infof("[%d] with srcHost's status NOTOK, delete task(%s)", task.ID, task)
 			continue
 		}
 
 		dststatus, dstfound := DstServers.getHostStatus(task.DstAddr)
+		if dstfound {
+			tasker.Debugf("[%d][%s] get dst status(%s)", task.ID, task.DstAddr, dststatus)
+		} else {
+			tasker.Debugf("[%d][%s] fail to get dst status, not found", task.ID, task.DstAddr)
+		}
 		if !dstfound || dststatus != OK {
-			tl = append(tl, task)
+			tl = append(tl, task.ID)
 			tasker.Infof("[%d] with dstHost's status NOTOK, delete task(%s)", task.ID, task)
 			continue
 		}
 	}
 
-	for _, t := range tl {
-		tasks.DeleteTask(t.ID)
-	}
+	tasks.DeleteTasks(tl)
+
+	return tasks.GetTaskList()
 }
 
 // task list 를 검사해서
@@ -556,16 +681,13 @@ func (srcs *SrcHosts) setSelected(curtasks []Task) {
 func (srcs *SrcHosts) getHostStatus(addr string) (HostStatus, bool) {
 	for _, src := range *srcs {
 		if src.Addr == addr {
-			tasker.Debugf("[%s] get src status(%s)", src, src.Status)
 			return src.Status, true
 		}
 	}
-	tasker.Debugf("[%s] fail to get status, not found", addr)
 	return NOTOK, false
 }
 
 // 상태가 OK 이고, selected가 false 인 src 서버 개수 반환
-// FIXME: disk 상태도 고려하면 좋을 듯
 func (srcs *SrcHosts) getSelectableCount() int {
 	cnt := 0
 	for _, src := range *srcs {
@@ -583,7 +705,6 @@ func (srcs *SrcHosts) getSelectableCount() int {
 // status 가 OK 인 source 선택되고, selected가 true로 update
 //
 // 선택된 source: *SrcHost와 선택 여부가 retrun 된다.
-// FIXME: disk 상태도 고려하면 좋을 듯
 func (srcs *SrcHosts) selectSourceServer() (SrcHost, bool) {
 
 	for _, src := range *srcs {
@@ -622,7 +743,6 @@ func (dsts *DstHosts) getAllHostStatus() {
 //
 // task list 를 검사해서
 // task에서 사용 중인 dest 의 selected 상태를 true 변경
-//
 func (dsts *DstHosts) setSelected(curtasks []Task) {
 	for _, dst := range *dsts {
 		dst.selected = false
@@ -657,11 +777,9 @@ func (dsts *DstHosts) getSelectableList() (rl []DstHost) {
 func (dsts *DstHosts) getHostStatus(addr string) (HostStatus, bool) {
 	for _, dst := range *dsts {
 		if dst.Addr == addr {
-			tasker.Debugf("[%s] get dst status(%s)", dst, dst.Status)
 			return dst.Status, true
 		}
 	}
-	tasker.Debugf("[%s] fail to get status, not found", addr)
 	return NOTOK, false
 }
 
@@ -685,21 +803,19 @@ func collectRemoteFileList(destList *DstHosts, remoteFiles FileFreqMap) {
 
 // getFileMetaListForTask:
 //
-// 배포 대상이 되는 파일 리스트 retrun
+// 높은 등급 순서로 정렬하기 위해 빈 Slice 생성 하고 배포 대상이 되는파일 return
 //
-// - 이미 배포 대상이 되는 파일은 제외
+// ignore.prefix로 시작하는 파일 배포 제외 : 광고 파일 배포 제외
 //
-// - 서버에 이미 있는 파일은 제외
+// .grade.info, .hitcount.history 에서 file meta를 구할 수 없는 파일은 배포에서 제외
 //
-// - ignore.prefix로 시작하는 파일(광고 파일)은 제외
+// task 에 이미 있는 파일 제외
 //
-// - source path 에 없는 파일은 제외
+// source path에 있는 지 검사해서 없는 파일 제외 : SAN 에 없는 파일 배포에서 제외
 //
-// rising hits 파일은 제일 앞에
+// 급 상승 Hit 수가 많은 순서대로 정렬
 //
-// grade 값이 작은(등급이 높은) 파일이 그 다음 순에
-//
-// sort 된 list return
+// 높은 등급 순서로 정렬 (가장 높은 등급:1)
 func getFileMetaListForTask(allfmm FileMetaPtrMap,
 	risinghits map[string]int, curtasks []Task,
 	serverfiles FileFreqMap) []FileMetaPtr {
@@ -709,6 +825,10 @@ func getFileMetaListForTask(allfmm FileMetaPtrMap,
 
 	taskfilelist := make([]FileMetaPtr, 0, len(allfmm))
 	for _, fmm := range allfmm {
+		if !updateFileMetaForSrcFilePath(fmm) {
+			tasker.Debugf("skip file by not.found.in.the.source.paths, file(%s)", fmm)
+			continue
+		}
 		if !checkForTask(fmm, usedtaskfiles, serverfiles) {
 			continue
 		}
@@ -758,18 +878,36 @@ func updateFileMetasForRisingHitsFiles(allfmm FileMetaPtrMap,
 	}
 }
 
+// file 이 source path 에 있는 지 검사하고 있으면
+// file meta의 SrcPath에 update
+func updateFileMetaForSrcFilePath(fmm *common.FileMeta) bool {
+	srcFilePath, exists := SourcePath.IsExistOnSource(fmm.Name)
+	if !exists {
+		return false
+	}
+	fmm.SrcFilePath = srcFilePath
+	return true
+}
+
 // - 이미 배포 대상이 되는 파일은 제외
 //
 // - 서버에 이미 있는 파일은 제외
 //
 // - ignore.prefix로 시작하는 파일(광고 파일)은 제외
 //
-// - source path 에 없는 파일은 제외
+// - source path 값이 비어있으면 제외
 func checkForTask(fmm *common.FileMeta,
 	taskfiles FileFreqMap,
 	serverfiles FileFreqMap) bool {
 
 	fn := fmm.Name
+
+	// ignore.prefix 로 시작하는 파일 제외(광고 파일)
+	if common.IsPrefix(fn, ignorePrefixes) {
+		tasker.Debugf("skip file by ignore.prefix, file(%s)", fmm)
+		return false
+	}
+
 	// 이미 배포 task에 사용되는 파일 제외
 	if n, using := taskfiles[fn]; using && n > 0 {
 		tasker.Debugf("skip file, found in the tasks, file(%s)", fmm)
@@ -782,16 +920,14 @@ func checkForTask(fmm *common.FileMeta,
 		return false
 	}
 
-	// ignore.prefix 로 시작하는 파일 제외(광고 파일)
-	if common.IsPrefix(fn, ignorePrefixes) {
-		tasker.Debugf("skip file by ignore.prefix, file(%s)", fmm)
-		return false
-	}
-
-	// 소스 directory 에 없는 파일 제외(SAN 에 없는 파일 제외)
-	if _, exists := SourcePath.IsExistOnSource(fn); !exists {
+	// 소스 directory에 없는 파일 제외(SAN 에 없는 파일 제외)
+	if fmm.SrcFilePath == "" {
 		tasker.Debugf("skip file by not.found.in.the.source.paths, file(%s)", fmm)
 		return false
 	}
 	return true
+}
+
+func logElapased(message string, start time.Time) {
+	tasker.Infof("%s, time(%s)", message, common.Elapsed(start))
 }

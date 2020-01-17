@@ -95,7 +95,7 @@ func SetSleepSec(s uint) {
 	sleepSec = s
 }
 
-// RunForever :
+// RunForever is to run tasker as go routine
 func RunForever() {
 	for {
 		run(time.Now())
@@ -103,7 +103,7 @@ func RunForever() {
 	}
 }
 
-// Run :
+// run :
 func run(basetm time.Time) error {
 	remover.Infof("start remover process")
 	defer logElapased("end remover process", common.Start())
@@ -137,7 +137,7 @@ func run(basetm time.Time) error {
 	return nil
 }
 
-// runWithInfo
+// runWithInfo :
 func runWithInfo(
 	fileMetaMap FileMetaPtrMap,
 	duplicatedFileMap FileMetaPtrMap,

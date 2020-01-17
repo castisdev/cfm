@@ -62,6 +62,13 @@ func init() {
 		Mod:    "heartbeater"}
 }
 
+func Release() {
+	rwlock.Lock()
+	defer rwlock.Unlock()
+
+	hosts = make(map[string]*HBHost, 0)
+}
+
 func SetTimoutSec(s uint) {
 	hber.Debugf("set timeoutSec(%d)", s)
 	timeoutSec = s

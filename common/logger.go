@@ -44,42 +44,55 @@ func (l *MLogger) Log(calldepth int, lvl cilog.Level, msg string, t time.Time) {
 		return
 	}
 	timeStr := t.Format("2006-01-02,15:04:05.000000")
+
+	var where string
 	var file string
 	var line int
 	var ok bool
 	var pc uintptr
 	var pkg string
 	var fn string
-
 	pc, file, line, ok = runtime.Caller(calldepth)
 	if !ok {
 		file = "???"
 		line = 0
 		pkg = "???"
-		fn = ""
+		fn = "???"
 	} else {
 		file = filepath.Base(file)
 		pkg = cilog.PackageBase(runtime.FuncForPC(pc).Name())
 		fn = filepath.Base(runtime.FuncForPC(pc).Name())
 		fn = fn[strings.Index(fn, ".")+1:]
 	}
-	var pcc uintptr
-	var okc bool
-	var linec int
-	var fnc string
-	pcc, _, linec, okc = runtime.Caller(calldepth + 1)
-	if !okc {
-		fnc = ""
-	} else {
-		fnc = filepath.Base(runtime.FuncForPC(pcc).Name())
-		fnc = fnc[strings.Index(fnc, ".")+1:]
-		fn = fnc + ":" + strconv.Itoa(linec) + "|" + fn
+	where = pkg + "::" + file + "::" + fn + ":" + strconv.Itoa(line)
+
+	if lvl == cilog.DEBUG {
+		var pfile string
+		var pline int
+		var pok bool
+		var ppc uintptr
+		var ppkg string
+		var pfn string
+		ppc, pfile, pline, pok = runtime.Caller(calldepth + 1)
+		if !pok {
+			pfn = ""
+		} else {
+			pfile = filepath.Base(pfile)
+			ppkg = cilog.PackageBase(runtime.FuncForPC(ppc).Name())
+			pfn = filepath.Base(runtime.FuncForPC(ppc).Name())
+			pfn = pfn[strings.Index(pfn, ".")+1:]
+			if ppkg != pkg || pfile != file {
+				where = ppkg + "::" + pfile + "::" + pfn + ":" + strconv.Itoa(pline) +
+					"|" + where
+			} else {
+				where = pkg + "::" + file + "::" +
+					pfn + ":" + strconv.Itoa(pline) + "|" + fn + ":" + strconv.Itoa(line)
+			}
+		}
 	}
 
 	m := l.GetModule() + "," + l.GetModuleVer() + "," + timeStr + "," +
-		lvl.Output() + "," + pkg + "::" + file + "::" + fn + ":" +
-		strconv.Itoa(line) + "," +
-		l.Mod + "," + msg
+		lvl.Output() + "," + where + "," + l.Mod + "," + msg
 	if len(msg) == 0 || msg[len(msg)-1] != '\n' {
 		m += "\n"
 	}

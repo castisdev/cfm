@@ -20,6 +20,7 @@ type FileMeta struct {
 	RisingHit   int            // LB EventLog 에서 Hit 가 급격하게 오른 파일들의 Hit 수
 	ServerCount int            // 이 파일을 가지고 있는 서버 개수
 	ServerIPs   map[string]int // 이 파일을 가지고 있는 [서버 IP]개수
+	SrcFilePath string         // source file full path : cfm이 구함
 }
 
 // NewFileMeta :
@@ -45,8 +46,9 @@ func (fm FileMeta) String() string {
 		sl = sl + fmt.Sprintf("@%s(%d)", serverIP, n)
 	}
 	s := fmt.Sprintf(
-		"name(%s), grade(%d), size(%d), risingHit(%d), serverCount(%d), serverIPs(%s)",
-		fm.Name, fm.Grade, fm.Size, fm.RisingHit, fm.ServerCount, sl)
+		"name(%s), srcFilePath(%s), grade(%d), size(%d), risingHit(%d)"+
+			", serverCount(%d), serverIPs(%s)",
+		fm.Name, fm.SrcFilePath, fm.Grade, fm.Size, fm.RisingHit, fm.ServerCount, sl)
 	return s
 }
 
