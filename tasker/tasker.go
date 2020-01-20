@@ -266,7 +266,6 @@ func run(basetm time.Time) error {
 }
 
 // runWithInfo :
-// FIXME: refactoring 중
 func runWithInfo(
 	fileMetaMap FileMetaPtrMap,
 	risingHitFileMap map[string]int) {

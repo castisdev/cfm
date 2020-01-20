@@ -101,8 +101,8 @@ func (t *Tailer) SetWatchHitBase(baseHit int) {
 //
 // 입력받은 시각값의 watchTermMin 전부터의 로그를 tail 한다.
 func (t *Tailer) Tail(basetm time.Time, fileMap *map[string]int) {
-	tailer.Infof("start tailer process")
-	defer logElapased("end tailer process", common.Start())
+	tailer.Infof("start tail process")
+	defer logElapased("end tail process", common.Start())
 
 	// 입력받은 시각값을 이용하여 N분 전 시각을 구하기 위해선 음수 값이 필요하다.
 	from := basetm.Add(time.Minute * time.Duration(t.watchTermMin*-1))

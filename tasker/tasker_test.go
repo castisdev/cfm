@@ -10,11 +10,13 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/castisdev/cfm/common"
 	"github.com/castisdev/cfm/heartbeater"
+	"github.com/castisdev/cfm/tailer"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 )
@@ -2369,6 +2371,645 @@ func Test_runWithInfo_drepreacted(t *testing.T) {
 	// 사용가능한 dst 서버가 없어서 새로 만들어지지는 않음
 	assert.Equal(t, 1, len(tasks.TaskMap))
 	assertTask(t, tasks, "M.mpg", s4, d1)
+}
+
+func Test_run(t *testing.T) {
+
+	makePresetS4D5()
+
+	s1 := "127.0.0.1:8081"
+	s1files := []string{}
+	s1du := common.DiskUsage{
+		TotalSize: 1000, UsedSize: 750,
+		FreeSize: 250, AvailSize: 250, UsedPercent: 75,
+	}
+	cfws1 := cfw(s1, s1du, s1files)
+	cfws1.Start()
+	defer cfws1.Close()
+
+	s2 := "127.0.0.2:8082"
+	s2files := []string{}
+	s2du := common.DiskUsage{
+		TotalSize: 1000, UsedSize: 750,
+		FreeSize: 250, AvailSize: 250, UsedPercent: 75,
+	}
+	cfws2 := cfw(s2, s2du, s2files)
+	cfws2.Start()
+	defer cfws2.Close()
+
+	s3 := "127.0.0.3:8083"
+	s3files := []string{}
+	s3du := common.DiskUsage{
+		TotalSize: 1000, UsedSize: 750,
+		FreeSize: 250, AvailSize: 250, UsedPercent: 75,
+	}
+	cfws3 := cfw(s3, s3du, s3files)
+	cfws3.Start()
+	defer cfws3.Close()
+
+	s4 := "127.0.0.4:8084"
+	s4files := []string{}
+	s4du := common.DiskUsage{
+		TotalSize: 1000, UsedSize: 750,
+		FreeSize: 250, AvailSize: 250, UsedPercent: 75,
+	}
+	cfws4 := cfw(s4, s4du, s4files)
+	cfws4.Start()
+	defer cfws4.Close()
+
+	//////////////////////////////////////////////////////////////////////////////
+	d1 := "127.0.0.1:18081"
+	d1files := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg", "SERVER1-5.mpg"}
+	d1du := common.DiskUsage{
+		TotalSize: 1000, UsedSize: 750,
+		FreeSize: 250, AvailSize: 250, UsedPercent: 75,
+	}
+	d2 := "127.0.0.2:18082"
+	d2files := []string{"B.mpg", "C.mpg", "E.mpg", "F.mpg", "SERVER2.mpg"}
+	d2du := common.DiskUsage{
+		TotalSize: 1000, UsedSize: 600,
+		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
+	}
+	d3 := "127.0.0.3:18083"
+	d3files := []string{"SERVER3.mpg", "G.mpg"}
+	d3du := common.DiskUsage{
+		TotalSize: 1000, UsedSize: 600,
+		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
+	}
+	d4 := "127.0.0.4:18084"
+	d4files := []string{}
+	d4du := common.DiskUsage{
+		TotalSize: 1000, UsedSize: 600,
+		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
+	}
+	d5 := "127.0.0.5:18085"
+	d5files := []string{"SERVER1-5.mpg"}
+	d5du := common.DiskUsage{
+		TotalSize: 1000, UsedSize: 600,
+		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
+	}
+
+	cfw1 := cfw(d1, d1du, d1files)
+	cfw1.Start()
+	defer cfw1.Close()
+
+	cfw2 := cfw(d2, d2du, d2files)
+	cfw2.Start()
+	defer cfw2.Close()
+
+	cfw3 := cfw(d3, d3du, d3files)
+	cfw3.Start()
+	defer cfw3.Close()
+
+	cfw4 := cfw(d4, d4du, d4files)
+	cfw4.Start()
+	defer cfw4.Close()
+
+	cfw5 := cfw(d5, d5du, d5files)
+	cfw5.Start()
+	defer cfw5.Close()
+
+	///////////////////////////////////////////////////////////////////////////////
+	base := "testsourcefolder"
+	SourcePath.Add(base)
+
+	// source path 에 파일 생성
+	for _, f := range d1files {
+		createfile(base, f)
+	}
+	for _, f := range d2files {
+		createfile(base, f)
+	}
+	for _, f := range d3files {
+		createfile(base, f)
+	}
+	for _, f := range d4files {
+		createfile(base, f)
+	}
+	for _, f := range d5files {
+		createfile(base, f)
+	}
+
+	createfile(base, "H.mpg")
+	createfile(base, "I.mpg")
+	createfile(base, "J.mpg")
+	//createfile(base, "K.mpg")
+	createfile(base, "L.mpg")
+	createfile(base, "M.mpg")
+	createfile(base, "N.mpg")
+	//createfile(base, "O.mpg")
+	createfile(base, "P.mpg")
+
+	// C.mpg 는 source path 에서 삭제
+	deletefile(base, "C.mpg")
+
+	defer deletefile(base, "")
+
+	serverfs := make(FileFreqMap)
+	collectRemoteFileList(DstServers, serverfs)
+	assert.Equal(t, 10, len(serverfs))
+	assert.Equal(t, 1, int(serverfs["A.mpg"]))
+	assert.Equal(t, 2, int(serverfs["B.mpg"]))
+	assert.Equal(t, 2, int(serverfs["C.mpg"]))
+	assert.Equal(t, 1, int(serverfs["D.mpg"]))
+	assert.Equal(t, 1, int(serverfs["E.mpg"]))
+	assert.Equal(t, 1, int(serverfs["F.mpg"]))
+	assert.Equal(t, 1, int(serverfs["G.mpg"]))
+	assert.Equal(t, 2, int(serverfs["SERVER1-5.mpg"]))
+	assert.Equal(t, 1, int(serverfs["SERVER2.mpg"]))
+	assert.Equal(t, 1, int(serverfs["SERVER3.mpg"]))
+
+	ignores := []string{"AD1", "H", "I", "AD2"}
+	SetIgnorePrefixes(ignores)
+
+	rhfiles := []string{"E.mpg", "F.mpg", "J.mpg", "RH1.mpg", "M.mpg", "H.mpg", "O.mpg", "RH2.mpg"}
+
+	gradedir := "gradeinfofolder"
+	gradefile := ".grade.info"
+	makeGradeInfoFileABCDEFGHIJKLMNO(gradedir, gradefile)
+	defer deletefile(gradedir, "")
+
+	SetGradeInfoFile(filepath.Join(gradedir, gradefile))
+
+	hcdir := "hitcounthistoryinfofolder"
+	hcfile := ".hitcount.history"
+	makeHitcountHistoryFileABCDEFGHIJKLMNO(hcdir, hcfile)
+	defer deletefile(hcdir, "")
+
+	SetHitcountHistoryFile(filepath.Join(hcdir, hcfile))
+
+	taildir := "taildir"
+	tailip := "255.255.255.255"
+	watchmin := 10
+	hitbase := 5
+
+	Tail.SetWatchDir(taildir)
+	Tail.SetWatchIPString(tailip)
+	Tail.SetWatchTermMin(watchmin)
+	Tail.SetWatchHitBase(hitbase)
+	basetm := time.Now()
+	makeRisingHitFiles9(taildir, tailip, basetm, watchmin, rhfiles)
+	defer deletefile(taildir, "")
+
+	// heartbeater에 등록
+	defer heartbeater.Release()
+	heartbeater.Add(s1)
+	heartbeater.Add(s2)
+	heartbeater.Add(s3)
+	heartbeater.Add(s4)
+
+	heartbeater.Add(d1)
+	heartbeater.Add(d2)
+	heartbeater.Add(d3)
+	heartbeater.Add(d4)
+	heartbeater.Add(d5)
+
+	var t1, t2, t3 Task
+
+	ts := NewTasks()
+	tasks = ts
+	defer tasks.Release()
+
+	t.Log("tasks 1-------------------------------------")
+	t1 = ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
+		FileName: "A.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.1:18081"})
+	t.Log(t1)
+	t2 = ts.CreateTask(&Task{SrcIP: "127.0.0.2", FilePath: "/data2/B.mpg",
+		FileName: "B.mpg", SrcAddr: "127.0.0.2:8082", DstAddr: "127.0.0.2:18082"})
+	t.Log(t2)
+	t3 = ts.CreateTask(&Task{SrcIP: "127.0.0.3", FilePath: "/data2/DANGLING1.mpg",
+		FileName: "DANGLING1.mpg", SrcAddr: "127.0.0.3:8083", DstAddr: "127.0.0.2:18082"})
+	t.Log(t3)
+
+	run(basetm)
+
+	t.Log("tasks 2-------------------------------------")
+	// src server heartbeat fail 로 모든 task 가 clear 됨
+	for _, task := range tasks.GetTaskList() {
+		t.Log(task)
+	}
+
+	assert.Equal(t, 0, len(tasks.TaskMap))
+
+	t.Log("tasks 3-------------------------------------")
+	t1 = ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
+		FileName: "A.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.1:18081"})
+	t.Log(t1)
+	t2 = ts.CreateTask(&Task{SrcIP: "127.0.0.2", FilePath: "/data2/B.mpg",
+		FileName: "B.mpg", SrcAddr: "127.0.0.2:8082", DstAddr: "127.0.0.2:18082"})
+	t.Log(t2)
+	t3 = ts.CreateTask(&Task{SrcIP: "127.0.0.3", FilePath: "/data2/DANGLING1.mpg",
+		FileName: "DANGLING1.mpg", SrcAddr: "127.0.0.3:8083", DstAddr: "127.0.0.2:18082"})
+	t.Log(t3)
+
+	assert.Equal(t, 3, len(tasks.TaskMap))
+	assertTask(t, tasks, "A.mpg", s1, d1)
+	assertTask(t, tasks, "B.mpg", s2, d2)
+	assertTask(t, tasks, "DANGLING1.mpg", s3, d2)
+
+	heartbeater.Heartbeat()
+	// src server와 dst server의 heartbeat 가 살아난 후에는 task 가 그대로 있음
+
+	// 배포 대상 파일 :
+	// A, B, C, D, E, F, G 는 이미 서버에 있으므로 제외
+	// I, H 는 ignore.prefix 이기 때문에 제외
+
+	// RH2.mpg, RH1.mpg는
+	// 	all meta 에 없으므로 제외
+	// O.mpg 는 source path에 없으므로 제외
+	// rising hits file인 M.mpg, J.mpg는 우선순위가 높음
+
+	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
+	// src 서버 선택은 s4, s3,s2,s1 순임
+	// dst 서버 선택은 d5, d4, d3, d2, d1 순임
+
+	// 배포 중 : "A.mpg", s1, d1
+	// 배포 중 : "B.mpg", s2, d2
+	// 배포 중 : "DANGLING1.mpg", s3, d2
+
+	// 배포 중이 아닌 서버 : s4
+	// 배포 중이 아닌 서버 : d5, d4, d3
+	// 배포 중이 아닌 파일 : M, J, L, N
+
+	// M.mpg, s4 -> d5 task 가 하나 만들어져야 함
+	run(basetm)
+
+	t.Log("tasks 4-------------------------------------")
+	// src server heartbeat fail 로 모든 task 가 clear 됨
+	for _, task := range tasks.GetTaskList() {
+		t.Log(task)
+	}
+
+	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
+	// src 서버 선택은 s4, s3,s2,s1 순임
+	// dst 서버 선택은 d5, d4, d3, d2, d1 순임
+
+	// 기존의 task는 그대로 있고
+	// M.mpg, s4 -> d5 task 가 하나 만들어져야 함
+	assert.Equal(t, 4, len(tasks.TaskMap))
+
+	// file, src, dst 로 간접 확인
+	// 기존 task 에
+	assert.Equal(t, 4, len(tasks.TaskMap))
+	assertTask(t, tasks, "A.mpg", s1, d1)
+	assertTask(t, tasks, "B.mpg", s2, d2)
+	assertTask(t, tasks, "DANGLING1.mpg", s3, d2)
+	// M.mpg, s4 -> d5 task 가 하나 만들어져야 함
+	assertTask(t, tasks, "M.mpg", s4, d5)
+
+	//////////////////////////////////////////////////////////////////////////////
+	// t1이 DONE이 된 경우
+	tasks.UpdateStatus(t1.ID, DONE)
+
+	run(basetm)
+
+	t.Log("tasks 5-------------------------------------")
+	// src server heartbeat fail 로 모든 task 가 clear 됨
+	for _, task := range tasks.GetTaskList() {
+		t.Log(task)
+	}
+
+	assert.Equal(t, 4, len(tasks.TaskMap))
+
+	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
+	// src 서버 선택은 s4, s3,s2,s1 순임
+	// dst 서버 선택은 d5, d4, d3, d2, d1 순임
+
+	// 배포 중 : "B.mpg", s2, d2
+	// 배포 중 : "DANGLING1.mpg", s3, d2
+	// 배포 중 : "M.mpg", s4, d5
+
+	// 배포 중이 아닌 서버 : s1
+	// 배포 중이 아닌 서버 : d4, d3, d1
+	// 배포 중이 아닌 파일 : J, L, N
+
+	// file, src, dst 로 간접 확인
+	// 기존의 t1 task 가 없어지고, 새로운 task 생성
+	assert.Equal(t, 4, len(tasks.TaskMap))
+	assertTask(t, tasks, "B.mpg", s2, d2)
+	assertTask(t, tasks, "DANGLING1.mpg", s3, d2)
+	assertTask(t, tasks, "M.mpg", s4, d5)
+	// J.mpg, s1 -> d4 task 가 하나 만들어져야 함
+	assertTask(t, tasks, "J.mpg", s1, d4)
+
+	//////////////////////////////////////////////////////////////////////////////
+	// t3 이 DONE이 된 경우
+	updateStatus(t, tasks, "DANGLING1.mpg", DONE)
+
+	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
+	// src 서버 선택은 s4, s3, s2, s1 순임
+	// dst 서버 선택은 d5, d4, d3, d2, d1 순임
+
+	// DANGLING1.mpg, s3, d2 가 삭제되고 나면
+
+	// 배포 중 : "B.mpg", s2, d2
+	// 배포 중 : "M.mpg", s4, d5
+	// 배포 중 : "J.mpg", s1, d4
+
+	// 배포 중이 아닌 서버 : s3
+	// 배포 중이 아닌 서버 : d3, d1
+	// 배포 중이 아닌 파일 : L, N
+
+	run(basetm)
+
+	t.Log("tasks 6-------------------------------------")
+	// src server heartbeat fail 로 모든 task 가 clear 됨
+	for _, task := range tasks.GetTaskList() {
+		t.Log(task)
+	}
+
+	// L.mpg, s3 -> d3 task 가 하나 만들어져야 함
+	assert.Equal(t, 4, len(tasks.TaskMap))
+	assertTask(t, tasks, "B.mpg", s2, d2)
+	assertTask(t, tasks, "M.mpg", s4, d5)
+	assertTask(t, tasks, "J.mpg", s1, d4)
+	assertTask(t, tasks, "L.mpg", s3, d3)
+
+	//////////////////////////////////////////////////////////////////////////////
+	// B가 DONE 된 경우
+	// M이 TIMEOUT된 경우, d5와 통신은 되는 경우
+	updateStatus(t, tasks, "B.mpg", DONE)
+	updateStatus(t, tasks, "M.mpg", TIMEOUT)
+
+	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
+	// src 서버 선택은 s4, s3, s2, s1 순임
+	// dst 서버 선택은 d5, d4, d3, d2, d1 순임
+
+	// 배포 중 : "J.mpg", s1, d4
+	// 배포 중 : "L.mpg", s3, d3
+
+	// 배포 중이 아닌 서버 : s4, s2
+	// 배포 중이 아닌 서버 : d5, d2, d1
+	// 배포 중이 아닌 파일 : M, N
+	// M은 배포 실패햇다고 생각하고, 다시 배포 task에  넣을 수 있다고 가정함
+	run(basetm)
+
+	t.Log("tasks 7-------------------------------------")
+	// src server heartbeat fail 로 모든 task 가 clear 됨
+	for _, task := range tasks.GetTaskList() {
+		t.Log(task)
+	}
+
+	assert.Equal(t, 4, len(tasks.TaskMap))
+	assertTask(t, tasks, "J.mpg", s1, d4)
+	assertTask(t, tasks, "L.mpg", s3, d3)
+	// M, s4, d5 추가
+	// N, s2, d2 추가
+	assertTask(t, tasks, "M.mpg", s4, d5)
+	assertTask(t, tasks, "N.mpg", s2, d2)
+
+	//////////////////////////////////////////////////////////////////////////////
+	// d2와 통신 실패
+	// d5와 통신 실패
+	// d3와 통신 실패
+	// 통신에 실패하면 task가 삭제됨
+
+	// heartbeater에서 제거만 되도, heartbeat 결과를 가져올 수 없어서
+	// 통신에 실패한 것으로 간주함
+	heartbeater.Delete(d2)
+	heartbeater.Delete(d5)
+	heartbeater.Delete(d3)
+
+	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
+	// src 서버 선택은 s4, s3, s2, s1 순임
+	// dst 서버 선택은 d5, d4, d3, d2, d1 순임
+
+	// 배포 중 : "J.mpg", s1, d4
+
+	// 배포 중이 아닌 서버 : s4, s3, s2
+	// 배포 중이 아닌 서버 : d1
+	// 통신 실패 : (d5, d3, d2)
+	// 배포 중이 아닌 파일 : M, L, N
+	run(basetm)
+
+	t.Log("tasks 8-------------------------------------")
+	// src server heartbeat fail 로 모든 task 가 clear 됨
+	for _, task := range tasks.GetTaskList() {
+		t.Log(task)
+	}
+
+	assert.Equal(t, 4, len(tasks.TaskMap))
+	assertTask(t, tasks, "J.mpg", s1, d4)
+	// 여러 source 서버에서 하나의 destination 서버로 배포가 가능
+	// M, s4, d1 추가
+	// L, s3, d1 추가
+	// N, s2, d1 추가
+	assertTask(t, tasks, "M.mpg", s4, d1)
+	assertTask(t, tasks, "L.mpg", s3, d1)
+	assertTask(t, tasks, "N.mpg", s2, d1)
+
+	//////////////////////////////////////////////////////////////////////////////
+	// s1와 통신 실패
+	// s2와 통신 실패
+	// s3와 통신 실패
+	// d4과 통신 실패
+	// 통신에 실패하면 task가 삭제됨
+
+	// heartbeater에서 제거만 되도, heartbeat 결과를 가져올 수 없어서
+	// 통신에 실패한 것으로 간주함
+	heartbeater.Delete(s1)
+	heartbeater.Delete(s2)
+	heartbeater.Delete(s3)
+
+	heartbeater.Delete(d4)
+
+	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
+	// src 서버 선택은 s4, s3, s2, s1 순임
+	// dst 서버 선택은 d5, d4, d3, d2, d1 순임
+
+	// 배포 중 : "M.mpg", s4, d1
+
+	// 배포 중이 아닌 서버 :
+	// 배포 중이 아닌 서버 :
+	// 통신 실패 : (s3, s2, s1)
+	// 통신 실패 : (d5, d4, d3, d2)
+	// 배포 중이 아닌 파일 : J. L, N
+	run(basetm)
+
+	t.Log("tasks 9-------------------------------------")
+	// src server heartbeat fail 로 모든 task 가 clear 됨
+	for _, task := range tasks.GetTaskList() {
+		t.Log(task)
+	}
+	// M만 남고, 사용 가능한 src서버가 없어서 새로 만들어지지는 않음
+	assert.Equal(t, 1, len(tasks.TaskMap))
+	assertTask(t, tasks, "M.mpg", s4, d1)
+
+	//////////////////////////////////////////////////////////////////////////////
+	// s1은 통신 성공
+	heartbeater.Add(s1)
+	heartbeater.Heartbeat()
+
+	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
+	// src 서버 선택은 s4, s3, s2, s1 순임
+	// dst 서버 선택은 d5, d4, d3, d2, d1 순임
+
+	// 배포 중 : "M.mpg", s4, d1
+
+	// 배포 중이 아닌 서버 : s1
+	// 배포 중이 아닌 서버 :
+	// 통신 실패 : (s3, s2)
+	// 통신 실패 : (d5, d4, d3, d2)
+	// 배포 중이 아닌 파일 : J. L, N
+	run(basetm)
+
+	t.Log("tasks 10-------------------------------------")
+	// src server heartbeat fail 로 모든 task 가 clear 됨
+	for _, task := range tasks.GetTaskList() {
+		t.Log(task)
+	}
+	// M만 남고,
+	// 사용가능한 src 서버 s1이 있지만,
+	// 사용가능한 dst 서버가 없어서 새로 만들어지지는 않음
+	assert.Equal(t, 1, len(tasks.TaskMap))
+	assertTask(t, tasks, "M.mpg", s4, d1)
+}
+
+func makeGradeInfoFileABCDEFGHIJKLMNO(dir string, filename string) {
+	makeGradeInfoFile(dir, filename, 'A', 'O', 'O'-'A')
+}
+
+func makeGradeInfoFile(dir string, filename string, chs, che byte, n uint) {
+	fp := filepath.Join(dir, filename)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dir, os.FileMode(0755)); err != nil {
+			log.Fatal(err)
+		}
+	}
+	f, err := os.Create(fp)
+	if err != nil {
+		f.Close()
+		log.Fatal(err)
+	}
+
+	fmt.Fprintf(f, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", "filename", "weightcount", "bitrate", "grade", "sumHitCount", "historyCount", "TargetCopyCount")
+
+	ixl := uint(che - chs + 1)
+	for i := uint(0); i <= n; i++ {
+		ix := i % ixl
+		fn := fmt.Sprintf("%s", string(chs+byte(ix)))
+		if i < ixl {
+			fn = fn + ".mpg"
+		} else {
+			ix2 := i / ixl
+			fn = fn + strconv.FormatUint(uint64(ix2), 10) + ".mpg"
+		}
+
+		fmt.Fprintf(f, "%s\t%d\t%d\t%d\t%d\t%d\t%d\n", fn, 4144, 1000, 1, 1554, 24, 5)
+	}
+
+	f.Close()
+}
+
+func makeHitcountHistoryFileABCDEFGHIJKLMNO(dir string, filename string) {
+	makeHitcountHistoryFile(dir, filename, 'A', 'O', 'O'-'A')
+}
+
+func makeHitcountHistoryFile(dir string, filename string, chs, che byte, n uint) {
+	fp := filepath.Join(dir, filename)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dir, os.FileMode(0755)); err != nil {
+			log.Fatal(err)
+		}
+	}
+	f, err := os.Create(fp)
+	if err != nil {
+		f.Close()
+		log.Fatal(err)
+	}
+
+	fmt.Fprintln(f, "historyheader:1524047082")
+
+	ixl := uint(che - chs + 1)
+	for i := uint(0); i <= n; i++ {
+		ix := i % uint(che-chs+1)
+		fn := fmt.Sprintf("%s", string(chs+byte(ix)))
+		if i < ixl {
+			fn = fn + ".mpg"
+		} else {
+			ix2 := i / uint(che-chs+1)
+			fn = fn + strconv.FormatUint(uint64(ix2), 10) + ".mpg"
+		}
+
+		fmt.Fprintf(f, "%s,1428460337,1000,100,127.0.0.1,2,0,0,0=0 0\n", fn)
+	}
+
+	f.Close()
+}
+
+func makeRisingHitFiles9(dir string, watchip string,
+	basetm time.Time, watchmin int,
+	risingfilenames []string) {
+
+	// 현재 시각값을 이용하여 N분 전 시각을 구하기 위해선 음수 값이 필요하다.
+	from := basetm.Add(time.Minute * time.Duration(watchmin*-1))
+	logFileNames := tailer.GetLogFileName(basetm, dir, watchmin)
+
+	baselogTime := from.Unix()
+	logFileName := (*logFileNames)[0]
+	fp := filepath.Clean(logFileName)
+
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dir, os.FileMode(0755)); err != nil {
+			log.Fatal(err)
+		}
+	}
+	f, err := os.Create(fp)
+	if err != nil {
+		f.Close()
+		log.Fatal(err)
+	}
+
+	for i, risingfile := range risingfilenames {
+		writeRisingHit(f, watchip, risingfile, 9+int64(i), baselogTime, watchmin)
+	}
+
+	f.Close()
+}
+
+func writeRisingHit(f *os.File,
+	watchip string,
+	risingfile string,
+	n int64,
+	baselogTime int64, watchmin int) {
+
+	// ------------------------------------------------- 테스트 기준 시각 - 4
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : 3f004a6e-82af-4dce-85ba-9bbf9c7cb8cb, ClientID : 0, GLB IP : 125.144.96.6's file(MCLE901VSGL1500001_K20140915224744.mpg) Request", baselogTime-4, watchip)
+	fmt.Fprintln(f)
+	fmt.Fprintf(f, "0x40ffff,4,%d,File Not Found, UUID : fffb233a-376a-4c2f-842e-553fb68af9cf, GLB IP : 125.144.161.6, MV6F9001SGL1500001_K20150909214818.mpg", baselogTime-4)
+	fmt.Fprintln(f)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.91.87 Selected for Client StreamID : 360527d4-44b3-4b8f-aef7-dbf8fd230d54, ClientID : 0, GLB IP : 125.144.169.6's file(M33E80DTSGL1500001_K20141022144006.mpg) Request", baselogTime-4)
+	fmt.Fprintln(f)
+	// ------------------------------------------------- 테스트 기준 시각 - 2
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : c93a7db2-ccaf-4765-af8d-7ddc2d33a812, ClientID : 0, GLB IP : 125.159.40.5's file(%s) Request", baselogTime-2, watchip, risingfile)
+	fmt.Fprintln(f)
+	fmt.Fprintf(f, "0x40ffff,4,%d,File Not Found, UUID : f1add5cf-75ac-41ab-a6ff-85d9e0927762, GLB IP : 125.144.169.6, MK4E7BK2SGL0800014_K20120725124707.mpg", baselogTime-2)
+	fmt.Fprintln(f)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.97.67 Selected for Client StreamID : 06fb572e-7602-4231-8670-cb6526603fb0, ClientID : 0, GLB IP : 125.146.8.6's file(M33H90E2SGL1500001_K20171008222635.mpg) Request", baselogTime-2)
+	fmt.Fprintln(f)
+	// ------------------------------------------------- 테스트 기준 시각 - 1
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : 3c61af91-cd6a-4dd6-bc04-5ec6bc78b94f, ClientID : 0, GLB IP : 125.159.40.5's file(MWGI5006SGL1500001_K20180524203234.mpg) Request", baselogTime-1, watchip)
+	fmt.Fprintln(f)
+	fmt.Fprintf(f, "0x40ffff,4,%d,File Not Found, UUID : c585905f-9980-49b1-89bc-97c7140eaa83, GLB IP : 125.159.40.5, M34G80A3SGL1500001_K20160827230242.mpg", baselogTime-1)
+	fmt.Fprintln(f)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.97.74 Selected for Client StreamID : 7cf6b886-edd2-471b-9cfd-12763a160b0b, GLB IP : 125.159.40.5's file(M34F60QHSGL1500001_K20150701232550.mpg) Request", baselogTime-1)
+	fmt.Fprintln(f)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.97.77 Selected for Client StreamID : 23dd1489-543b-4051-b07a-e877f8b2e052, GLB IP : 125.147.192.6's file(MW0E6JE3SGL0800014_K20120601193450.mpg) Request", baselogTime-1)
+	fmt.Fprintln(f)
+	// ------------------------------------------------- 테스트 기준 시각
+	//fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : 97096b41-afe1-44d8-b57c-e758a70883d9, GLB IP : 125.159.40.5's file(M33F3MA3SGL0800038_K20130326135640.mpg) Request", baselogTime, watchip)
+	//fmt.Fprintln(f)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.91.83 Selected for Client StreamID : aa7de9a1-7d0d-40d5-9586-31dc275a0634, ClientID : 0, GLB IP : 125.147.36.6's file(MADI4008SGL1500001_K20180506231943.mpg) Request", baselogTime)
+	fmt.Fprintln(f)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.91.84 Selected for Client StreamID : 1926c2ba-c313-48fb-977a-b7f3fd27ea98, ClientID : 0, GLB IP : 125.148.160.6's file(MEQI405ISGL1500001_K20180509034746.mpg) Request", baselogTime)
+	fmt.Fprintln(f)
+	fmt.Fprintf(f, "0x40ffff,1,%d,Server 125.144.97.73 Selected for Client StreamID : f179c61a-d5e0-45b9-b046-a3cd4e3dbbfc, ClientID : 0, GLB IP : 125.147.192.6's file(MIAF51OLSGL1500001_K20150511175323.mpg) Request", baselogTime)
+	fmt.Fprintln(f)
+
+	for i := int64(0); i < n; i++ {
+		fmt.Fprintf(f, "0x40ffff,1,%d,Server %s Selected for Client StreamID : 3894d674-d74b-4eca-a2ea-fafbfa1113a8, ClientID : 0, GLB IP : 125.159.40.5's file(%s) Request", baselogTime, watchip, risingfile)
+		fmt.Fprintln(f)
+	}
 }
 
 func updateStatus(t *testing.T, tsks *Tasks, filename string, status Status) {
