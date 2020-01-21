@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"testing"
 	"time"
@@ -318,6 +319,31 @@ func makeFileMetaMapABCDEFGHIJKLMNO() (FileMetaPtrMap, FileMetaPtrMap) {
 	dupfmm := make(FileMetaPtrMap)
 	dupfmm["B.mpg"] = fmm["B.mpg"]
 	dupfmm["C.mpg"] = fmm["C.mpg"]
+
+	return fmm, dupfmm
+}
+
+func makeFileMetaMap(chs, che byte, n uint) (FileMetaPtrMap, FileMetaPtrMap) {
+	fmm := make(FileMetaPtrMap)
+
+	ixl := uint(che - chs + 1)
+	for i := uint(0); i <= n; i++ {
+		ix := i % ixl
+		fn := fmt.Sprintf("%s", string(chs+byte(ix)))
+		if i < ixl {
+			fn = fn + ".mpg"
+		} else {
+			ix2 := i / ixl
+			fn = fn + strconv.FormatUint(uint64(ix2), 10) + ".mpg"
+		}
+		// put grade, size , and severs
+		fmm[fn] = &common.FileMeta{
+			Name:  fn,
+			Grade: 1, Size: 100, RisingHit: 0,
+			ServerCount: 1,
+			ServerIPs:   map[string]int{"127.0.0.1": 1}}
+	}
+	dupfmm := make(FileMetaPtrMap)
 
 	return fmm, dupfmm
 }
@@ -1904,475 +1930,6 @@ func Test_runWithInfo(t *testing.T) {
 	assertTask(t, tasks, "M.mpg", s4, d1)
 }
 
-// deprecated : runWithInfo_drepreacted 필요없게되면 삭제 예정
-func Test_runWithInfo_drepreacted(t *testing.T) {
-
-	makePresetS4D5()
-
-	s1 := "127.0.0.1:8081"
-	s1files := []string{}
-	s1du := common.DiskUsage{
-		TotalSize: 1000, UsedSize: 750,
-		FreeSize: 250, AvailSize: 250, UsedPercent: 75,
-	}
-	cfws1 := cfw(s1, s1du, s1files)
-	cfws1.Start()
-	defer cfws1.Close()
-
-	s2 := "127.0.0.2:8082"
-	s2files := []string{}
-	s2du := common.DiskUsage{
-		TotalSize: 1000, UsedSize: 750,
-		FreeSize: 250, AvailSize: 250, UsedPercent: 75,
-	}
-	cfws2 := cfw(s2, s2du, s2files)
-	cfws2.Start()
-	defer cfws2.Close()
-
-	s3 := "127.0.0.3:8083"
-	s3files := []string{}
-	s3du := common.DiskUsage{
-		TotalSize: 1000, UsedSize: 750,
-		FreeSize: 250, AvailSize: 250, UsedPercent: 75,
-	}
-	cfws3 := cfw(s3, s3du, s3files)
-	cfws3.Start()
-	defer cfws3.Close()
-
-	s4 := "127.0.0.4:8084"
-	s4files := []string{}
-	s4du := common.DiskUsage{
-		TotalSize: 1000, UsedSize: 750,
-		FreeSize: 250, AvailSize: 250, UsedPercent: 75,
-	}
-	cfws4 := cfw(s4, s4du, s4files)
-	cfws4.Start()
-	defer cfws4.Close()
-
-	//////////////////////////////////////////////////////////////////////////////
-	d1 := "127.0.0.1:18081"
-	d1files := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg", "SERVER1-5.mpg"}
-	d1du := common.DiskUsage{
-		TotalSize: 1000, UsedSize: 750,
-		FreeSize: 250, AvailSize: 250, UsedPercent: 75,
-	}
-	d2 := "127.0.0.2:18082"
-	d2files := []string{"B.mpg", "C.mpg", "E.mpg", "F.mpg", "SERVER2.mpg"}
-	d2du := common.DiskUsage{
-		TotalSize: 1000, UsedSize: 600,
-		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
-	}
-	d3 := "127.0.0.3:18083"
-	d3files := []string{"SERVER3.mpg", "G.mpg"}
-	d3du := common.DiskUsage{
-		TotalSize: 1000, UsedSize: 600,
-		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
-	}
-	d4 := "127.0.0.4:18084"
-	d4files := []string{}
-	d4du := common.DiskUsage{
-		TotalSize: 1000, UsedSize: 600,
-		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
-	}
-	d5 := "127.0.0.5:18085"
-	d5files := []string{"SERVER1-5.mpg"}
-	d5du := common.DiskUsage{
-		TotalSize: 1000, UsedSize: 600,
-		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
-	}
-
-	cfw1 := cfw(d1, d1du, d1files)
-	cfw1.Start()
-	defer cfw1.Close()
-
-	cfw2 := cfw(d2, d2du, d2files)
-	cfw2.Start()
-	defer cfw2.Close()
-
-	cfw3 := cfw(d3, d3du, d3files)
-	cfw3.Start()
-	defer cfw3.Close()
-
-	cfw4 := cfw(d4, d4du, d4files)
-	cfw4.Start()
-	defer cfw4.Close()
-
-	cfw5 := cfw(d5, d5du, d5files)
-	cfw5.Start()
-	defer cfw5.Close()
-
-	base := "testsourcefolder"
-	SourcePath.Add(base)
-
-	// source path 에 파일 생성
-	for _, f := range d1files {
-		createfile(base, f)
-	}
-	for _, f := range d2files {
-		createfile(base, f)
-	}
-	for _, f := range d3files {
-		createfile(base, f)
-	}
-	for _, f := range d4files {
-		createfile(base, f)
-	}
-	for _, f := range d5files {
-		createfile(base, f)
-	}
-
-	createfile(base, "H.mpg")
-	createfile(base, "I.mpg")
-	createfile(base, "J.mpg")
-	//createfile(base, "K.mpg")
-	createfile(base, "L.mpg")
-	createfile(base, "M.mpg")
-	createfile(base, "N.mpg")
-	//createfile(base, "O.mpg")
-	createfile(base, "P.mpg")
-
-	// C.mpg 는 source path 에서 삭제
-	deletefile(base, "C.mpg")
-
-	defer deletefile(base, "")
-
-	serverfs := make(FileFreqMap)
-	collectRemoteFileList(DstServers, serverfs)
-	assert.Equal(t, 10, len(serverfs))
-	assert.Equal(t, 1, int(serverfs["A.mpg"]))
-	assert.Equal(t, 2, int(serverfs["B.mpg"]))
-	assert.Equal(t, 2, int(serverfs["C.mpg"]))
-	assert.Equal(t, 1, int(serverfs["D.mpg"]))
-	assert.Equal(t, 1, int(serverfs["E.mpg"]))
-	assert.Equal(t, 1, int(serverfs["F.mpg"]))
-	assert.Equal(t, 1, int(serverfs["G.mpg"]))
-	assert.Equal(t, 2, int(serverfs["SERVER1-5.mpg"]))
-	assert.Equal(t, 1, int(serverfs["SERVER2.mpg"]))
-	assert.Equal(t, 1, int(serverfs["SERVER3.mpg"]))
-
-	allfmm, _ := makeFileMetaMapABCDEFGHIJKLMNO()
-
-	ignores := []string{"AD1", "H", "I", "AD2"}
-	SetIgnorePrefixes(ignores)
-
-	rhfiles := []string{"E.mpg", "F.mpg", "J.mpg", "RH1.mpg", "M.mpg", "H.mpg", "O.mpg", "RH2.mpg"}
-	rhitfmm := makeRisingHitFileMap(rhfiles)
-
-	// heartbeater에 등록
-	defer heartbeater.Release()
-	heartbeater.Add(s1)
-	heartbeater.Add(s2)
-	heartbeater.Add(s3)
-	heartbeater.Add(s4)
-
-	heartbeater.Add(d1)
-	heartbeater.Add(d2)
-	heartbeater.Add(d3)
-	heartbeater.Add(d4)
-	heartbeater.Add(d5)
-
-	var t1, t2, t3 Task
-
-	ts := NewTasks()
-	tasks = ts
-	defer tasks.Release()
-
-	t.Log("tasks -------------------------------------")
-	t1 = ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
-		FileName: "A.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.1:18081"})
-	t.Log(t1)
-	t2 = ts.CreateTask(&Task{SrcIP: "127.0.0.2", FilePath: "/data2/B.mpg",
-		FileName: "B.mpg", SrcAddr: "127.0.0.2:8082", DstAddr: "127.0.0.2:18082"})
-	t.Log(t2)
-	t3 = ts.CreateTask(&Task{SrcIP: "127.0.0.3", FilePath: "/data2/DANGLING1.mpg",
-		FileName: "DANGLING1.mpg", SrcAddr: "127.0.0.3:8083", DstAddr: "127.0.0.2:18082"})
-	t.Log(t3)
-
-	runWithInfo_drepreacted(allfmm, rhitfmm)
-
-	t.Log("tasks -------------------------------------")
-	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
-		t.Log(task)
-	}
-
-	assert.Equal(t, 0, len(tasks.TaskMap))
-
-	t.Log("tasks -------------------------------------")
-	t1 = ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
-		FileName: "A.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.1:18081"})
-	t.Log(t1)
-	t2 = ts.CreateTask(&Task{SrcIP: "127.0.0.2", FilePath: "/data2/B.mpg",
-		FileName: "B.mpg", SrcAddr: "127.0.0.2:8082", DstAddr: "127.0.0.2:18082"})
-	t.Log(t2)
-	t3 = ts.CreateTask(&Task{SrcIP: "127.0.0.3", FilePath: "/data2/DANGLING1.mpg",
-		FileName: "DANGLING1.mpg", SrcAddr: "127.0.0.3:8083", DstAddr: "127.0.0.2:18082"})
-	t.Log(t3)
-
-	assert.Equal(t, 3, len(tasks.TaskMap))
-	assertTask(t, tasks, "A.mpg", s1, d1)
-	assertTask(t, tasks, "B.mpg", s2, d2)
-	assertTask(t, tasks, "DANGLING1.mpg", s3, d2)
-
-	heartbeater.Heartbeat()
-	// src server와 dst server의 heartbeat 가 살아난 후에는 task 가 그대로 있음
-
-	// 배포 대상 파일 :
-	// A, B, C, D, E, F, G 는 이미 서버에 있으므로 제외
-	// I, H 는 ignore.prefix 이기 때문에 제외
-
-	// FIXME: RH2.mpg, RH1.mpg는
-	// source path 에 없어서 제외되는데,
-	// 	all meta 에 없으므로 제외되게 수정 필요
-	// O.mpg 는 source path에 없으므로 제외
-	// rising hits file인 M.mpg, J.mpg는 우선순위가 높음
-
-	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
-	// src 서버 선택은 s4, s3,s2,s1 순임
-	// dst 서버 선택은 d5, d4, d3, d2, d1 순임
-
-	// 배포 중 : "A.mpg", s1, d1
-	// 배포 중 : "B.mpg", s2, d2
-	// 배포 중 : "DANGLING1.mpg", s3, d2
-
-	// 배포 중이 아닌 서버 : s4
-	// 배포 중이 아닌 서버 : d5, d4, d3
-	// 배포 중이 아닌 파일 : M, J, L, N
-
-	// M.mpg, s4 -> d5 task 가 하나 만들어져야 함
-	runWithInfo_drepreacted(allfmm, rhitfmm)
-
-	t.Log("tasks -------------------------------------")
-	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
-		t.Log(task)
-	}
-
-	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
-	// src 서버 선택은 s4, s3,s2,s1 순임
-	// dst 서버 선택은 d5, d4, d3, d2, d1 순임
-
-	// 기존의 task는 그대로 있고
-	// M.mpg, s4 -> d5 task 가 하나 만들어져야 함
-	assert.Equal(t, 4, len(tasks.TaskMap))
-
-	// file, src, dst 로 간접 확인
-	// 기존 task 에
-	assert.Equal(t, 4, len(tasks.TaskMap))
-	assertTask(t, tasks, "A.mpg", s1, d1)
-	assertTask(t, tasks, "B.mpg", s2, d2)
-	assertTask(t, tasks, "DANGLING1.mpg", s3, d2)
-	// M.mpg, s4 -> d5 task 가 하나 만들어져야 함
-	assertTask(t, tasks, "M.mpg", s4, d5)
-
-	//////////////////////////////////////////////////////////////////////////////
-	// t1이 DONE이 된 경우
-	tasks.UpdateStatus(t1.ID, DONE)
-
-	runWithInfo_drepreacted(allfmm, rhitfmm)
-
-	t.Log("tasks -------------------------------------")
-	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
-		t.Log(task)
-	}
-
-	assert.Equal(t, 4, len(tasks.TaskMap))
-
-	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
-	// src 서버 선택은 s4, s3,s2,s1 순임
-	// dst 서버 선택은 d5, d4, d3, d2, d1 순임
-
-	// 배포 중 : "B.mpg", s2, d2
-	// 배포 중 : "DANGLING1.mpg", s3, d2
-	// 배포 중 : "M.mpg", s4, d5
-
-	// 배포 중이 아닌 서버 : s1
-	// 배포 중이 아닌 서버 : d4, d3, d1
-	// 배포 중이 아닌 파일 : J, L, N
-
-	// file, src, dst 로 간접 확인
-	// 기존의 t1 task 가 없어지고, 새로운 task 생성
-	assert.Equal(t, 4, len(tasks.TaskMap))
-	assertTask(t, tasks, "B.mpg", s2, d2)
-	assertTask(t, tasks, "DANGLING1.mpg", s3, d2)
-	assertTask(t, tasks, "M.mpg", s4, d5)
-	// J.mpg, s1 -> d4 task 가 하나 만들어져야 함
-	assertTask(t, tasks, "J.mpg", s1, d4)
-
-	//////////////////////////////////////////////////////////////////////////////
-	// t3 이 DONE이 된 경우
-	updateStatus(t, tasks, "DANGLING1.mpg", DONE)
-
-	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
-	// src 서버 선택은 s4, s3, s2, s1 순임
-	// dst 서버 선택은 d5, d4, d3, d2, d1 순임
-
-	// DANGLING1.mpg, s3, d2 가 삭제되고 나면
-
-	// 배포 중 : "B.mpg", s2, d2
-	// 배포 중 : "M.mpg", s4, d5
-	// 배포 중 : "J.mpg", s1, d4
-
-	// 배포 중이 아닌 서버 : s3
-	// 배포 중이 아닌 서버 : d3, d1
-	// 배포 중이 아닌 파일 : L, N
-
-	runWithInfo_drepreacted(allfmm, rhitfmm)
-
-	t.Log("tasks -------------------------------------")
-	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
-		t.Log(task)
-	}
-
-	// L.mpg, s3 -> d3 task 가 하나 만들어져야 함
-	assert.Equal(t, 4, len(tasks.TaskMap))
-	assertTask(t, tasks, "B.mpg", s2, d2)
-	assertTask(t, tasks, "M.mpg", s4, d5)
-	assertTask(t, tasks, "J.mpg", s1, d4)
-	assertTask(t, tasks, "L.mpg", s3, d3)
-
-	//////////////////////////////////////////////////////////////////////////////
-	// B가 DONE 된 경우
-	// M이 TIMEOUT된 경우, d5와 통신은 되는 경우
-	updateStatus(t, tasks, "B.mpg", DONE)
-	updateStatus(t, tasks, "M.mpg", TIMEOUT)
-
-	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
-	// src 서버 선택은 s4, s3, s2, s1 순임
-	// dst 서버 선택은 d5, d4, d3, d2, d1 순임
-
-	// 배포 중 : "J.mpg", s1, d4
-	// 배포 중 : "L.mpg", s3, d3
-
-	// 배포 중이 아닌 서버 : s4, s2
-	// 배포 중이 아닌 서버 : d5, d2, d1
-	// 배포 중이 아닌 파일 : M, N
-	// M은 배포 실패햇다고 생각하고, 다시 배포 task에  넣을 수 있다고 가정함
-	runWithInfo_drepreacted(allfmm, rhitfmm)
-
-	t.Log("tasks -------------------------------------")
-	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
-		t.Log(task)
-	}
-
-	assert.Equal(t, 4, len(tasks.TaskMap))
-	assertTask(t, tasks, "J.mpg", s1, d4)
-	assertTask(t, tasks, "L.mpg", s3, d3)
-	// M, s4, d5 추가
-	// N, s2, d2 추가
-	assertTask(t, tasks, "M.mpg", s4, d5)
-	assertTask(t, tasks, "N.mpg", s2, d2)
-
-	//////////////////////////////////////////////////////////////////////////////
-	// d2와 통신 실패
-	// d5와 통신 실패
-	// d3와 통신 실패
-	// 통신에 실패하면 task가 삭제됨
-
-	// heartbeater에서 제거만 되도, heartbeat 결과를 가져올 수 없어서
-	// 통신에 실패한 것으로 간주함
-	heartbeater.Delete(d2)
-	heartbeater.Delete(d5)
-	heartbeater.Delete(d3)
-
-	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
-	// src 서버 선택은 s4, s3, s2, s1 순임
-	// dst 서버 선택은 d5, d4, d3, d2, d1 순임
-
-	// 배포 중 : "J.mpg", s1, d4
-
-	// 배포 중이 아닌 서버 : s4, s3, s2
-	// 배포 중이 아닌 서버 : d1
-	// 통신 실패 : (d5, d3, d2)
-	// 배포 중이 아닌 파일 : M, L, N
-	runWithInfo_drepreacted(allfmm, rhitfmm)
-
-	t.Log("tasks -------------------------------------")
-	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
-		t.Log(task)
-	}
-
-	assert.Equal(t, 4, len(tasks.TaskMap))
-	assertTask(t, tasks, "J.mpg", s1, d4)
-	// 여러 source 서버에서 하나의 destination 서버로 배포가 가능
-	// M, s4, d1 추가
-	// L, s3, d1 추가
-	// N, s2, d1 추가
-	assertTask(t, tasks, "M.mpg", s4, d1)
-	assertTask(t, tasks, "L.mpg", s3, d1)
-	assertTask(t, tasks, "N.mpg", s2, d1)
-
-	//////////////////////////////////////////////////////////////////////////////
-	// s1와 통신 실패
-	// s2와 통신 실패
-	// s3와 통신 실패
-	// d4과 통신 실패
-	// 통신에 실패하면 task가 삭제됨
-
-	// heartbeater에서 제거만 되도, heartbeat 결과를 가져올 수 없어서
-	// 통신에 실패한 것으로 간주함
-	heartbeater.Delete(s1)
-	heartbeater.Delete(s2)
-	heartbeater.Delete(s3)
-
-	heartbeater.Delete(d4)
-
-	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
-	// src 서버 선택은 s4, s3, s2, s1 순임
-	// dst 서버 선택은 d5, d4, d3, d2, d1 순임
-
-	// 배포 중 : "M.mpg", s4, d1
-
-	// 배포 중이 아닌 서버 :
-	// 배포 중이 아닌 서버 :
-	// 통신 실패 : (s3, s2, s1)
-	// 통신 실패 : (d5, d4, d3, d2)
-	// 배포 중이 아닌 파일 : J. L, N
-	runWithInfo_drepreacted(allfmm, rhitfmm)
-
-	t.Log("tasks -------------------------------------")
-	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
-		t.Log(task)
-	}
-	// M만 남고, 사용 가능한 src서버가 없어서 새로 만들어지지는 않음
-	assert.Equal(t, 1, len(tasks.TaskMap))
-	assertTask(t, tasks, "M.mpg", s4, d1)
-
-	//////////////////////////////////////////////////////////////////////////////
-	// s1은 통신 성공
-	heartbeater.Add(s1)
-	heartbeater.Heartbeat()
-
-	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
-	// src 서버 선택은 s4, s3, s2, s1 순임
-	// dst 서버 선택은 d5, d4, d3, d2, d1 순임
-
-	// 배포 중 : "M.mpg", s4, d1
-
-	// 배포 중이 아닌 서버 : s1
-	// 배포 중이 아닌 서버 :
-	// 통신 실패 : (s3, s2)
-	// 통신 실패 : (d5, d4, d3, d2)
-	// 배포 중이 아닌 파일 : J. L, N
-	runWithInfo_drepreacted(allfmm, rhitfmm)
-
-	t.Log("tasks -------------------------------------")
-	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
-		t.Log(task)
-	}
-	// M만 남고,
-	// 사용가능한 src 서버 s1이 있지만,
-	// 사용가능한 dst 서버가 없어서 새로 만들어지지는 않음
-	assert.Equal(t, 1, len(tasks.TaskMap))
-	assertTask(t, tasks, "M.mpg", s4, d1)
-}
-
 func Test_run(t *testing.T) {
 
 	makePresetS4D5()
@@ -3028,4 +2585,53 @@ func assertTask(t *testing.T, tsks *Tasks, filename, srcaddr, dstaddr string) {
 	assert.Equal(t, true, ok)
 	assert.Equal(t, srcaddr, tsk.SrcAddr)
 	assert.Equal(t, dstaddr, tsk.DstAddr)
+}
+
+func Benchmark_MakeAllFileMetas(t *testing.B) {
+	gradedir := "gradeinfofolder"
+	gradefile := ".grade.info"
+
+	makeGradeInfoFile(gradedir, gradefile, 'A', 'O', 100000)
+	defer deletefile(gradedir, "")
+
+	gradeInfoFile := filepath.Join(gradedir, gradefile)
+
+	hcdir := "hitcounthistoryinfofolder"
+	hcfile := ".hitcount.history"
+	makeHitcountHistoryFile(hcdir, hcfile, 'A', 'O', 100000)
+	defer deletefile(hcdir, "")
+
+	hitcountHistoryFile := filepath.Join(hcdir, hcfile)
+
+	fileMetaMap := make(map[string]*common.FileMeta)
+	duplicatedFileMap := make(map[string]*common.FileMeta)
+
+	dstIPMap := make(map[string]int)
+	dstIPMap["127.0.0.1"]++
+
+	t.StopTimer()
+	t.StartTimer()
+	err := common.MakeAllFileMetas(gradeInfoFile, hitcountHistoryFile,
+		fileMetaMap, dstIPMap, duplicatedFileMap)
+	if err != nil {
+		t.Errorf("error(%s)", err)
+	}
+}
+
+func Benchmark_MakeAllFileMetas_simpleGetFileMetaListForTask(t *testing.B) {
+	allfmm, _ := makeFileMetaMap('A', 'O', 100000)
+
+	t.StopTimer()
+	t.StartTimer()
+	taskfilelist := make([]FileMetaPtr, 0, len(allfmm))
+	for _, fmm := range allfmm {
+		taskfilelist = append(taskfilelist, fmm)
+	}
+	sort.Slice(taskfilelist, func(i, j int) bool {
+		if taskfilelist[i].RisingHit != taskfilelist[j].RisingHit {
+			return taskfilelist[i].RisingHit > taskfilelist[j].RisingHit
+		} else {
+			return taskfilelist[i].Grade < taskfilelist[j].Grade
+		}
+	})
 }
