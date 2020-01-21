@@ -64,10 +64,7 @@ func Heartbeat(host *Host, timeoutSec uint) (bool, error) {
 	// 데이터가 필요없더라도 응답 바디를 읽어야함
 	// 응답 바디를 읽음. (데이터가 필요 없으므로 devnull에 write)
 	// https: //stackoverflow.com/questions/17959732/why-is-go-https-client-not-reusing-connections
-	_, err := io.Copy(ioutil.Discard, res.Body)
-	if err != nil {
-		return false, err
-	}
+	io.Copy(ioutil.Discard, res.Body)
 
 	if res.StatusCode != 200 {
 		return false, errors.New(res.Status)
@@ -101,6 +98,7 @@ func GetRemoteFileList(host *Host, fileList *[]string) error {
 	}
 
 	if res.StatusCode != 200 {
+		io.Copy(ioutil.Discard, res.Body)
 		return errors.New(res.Status)
 	}
 
@@ -170,10 +168,7 @@ func DeleteFileOnRemote(host *Host, fileName string) error {
 	if res != nil {
 		defer res.Body.Close()
 	}
-	_, err = io.Copy(ioutil.Discard, res.Body)
-	if err != nil {
-		return err
-	}
+	io.Copy(ioutil.Discard, res.Body)
 
 	if res.StatusCode != 200 {
 		return errors.New(res.Status)
