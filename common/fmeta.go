@@ -9,9 +9,6 @@ import (
 	"strings"
 )
 
-type Freq uint64
-type Hits uint64
-
 // FileMeta is struct to save file meta info
 type FileMeta struct {
 	Name        string
@@ -176,11 +173,21 @@ func IsPrefix(f string, prefixes []string) bool {
 //
 // gradeinfo file과 hitcount history file로 부터
 //
-// 파일의 meta 정보 목록 만들기
+// file의 meta 정보 목록 만들기
 //
 // parseGradeFileAndNewFileMeta, parseHitcountFileAndUpdateFileMeta 순으로 호출
 //
 // -> grade file parsing 이 실패하면, hitcount history file 은 parsing 시도도 하지 않음
+//
+// gradeInfoFile : grade info file path + file 이름
+//
+// hitcountHistoryFile : hitcount history file path + file 이름
+//
+// fileMetaMap : grade info file과 hitcount history file에서 구한 file 의 meta 정보
+//
+// serverIPMap : server ip 주소, hitcount history file에서 해당 주소들을 찾을 수 있는 경우, file meta에 추가
+//
+// duplicatedFileMap : file meta 에 server ip 주소가 두 개 이상 추가되는 file들의 meta 정보
 func MakeAllFileMetas(gradeInfoFile string, hitcountHistoryFile string,
 	fileMetaMap map[string]*FileMeta,
 	serverIPMap map[string]int,

@@ -21,10 +21,8 @@ type FileMetaPtrMap map[string]*common.FileMeta
 type ServerFileMetaPtrMap map[string]FileMetaPtrMap
 
 // map : file name -> Hits
-type FileHitsMap map[string]common.Hits
-
-// map : file name -> Hits
-type FileFreqMap map[string]common.Freq
+type Freq uint64
+type FileFreqMap map[string]Freq
 
 var sleepSec uint
 var taskTimeout time.Duration
@@ -235,10 +233,6 @@ func run(basetm time.Time) error {
 		tasker.Errorf("tasker endded, the number of the dest srvers is 0")
 		return errors.New("tasker endded, the number of the dest srvers is 0")
 	}
-	dstIPMap := make(map[string]int)
-	for _, dst := range *DstServers {
-		dstIPMap[dst.IP]++
-	}
 	fileMetaMap := make(map[string]*common.FileMeta)
 	duplicatedFileMap := make(map[string]*common.FileMeta)
 	risingHitFileMap := make(map[string]int)
@@ -247,11 +241,10 @@ func run(basetm time.Time) error {
 	// gradeinfoFile 과 hitcountHistoryFile로 file meta list 생성
 	est := common.Start()
 	err := common.MakeAllFileMetas(gradeInfoFile, hitcountHistoryFile,
-		fileMetaMap, dstIPMap, duplicatedFileMap)
+		fileMetaMap, map[string]int{}, duplicatedFileMap)
 
 	if err != nil {
 		tasker.Errorf("fail to make file metas, error(%s)", err.Error())
-		//time.Sleep(time.Second * 5)
 		return err
 	}
 	tasker.Infof("make file metas(name, grade, size, servers), time(%s)", common.Elapsed(est))
@@ -291,8 +284,6 @@ func runWithInfo(
 	if srccnt == 0 {
 		tasker.Debugf("no src is available")
 		return
-		//time.Sleep(time.Second * 5)
-		//continue
 	}
 
 	// task queue 에 있는 dest를 할당된 상태로 변경
@@ -304,8 +295,6 @@ func runWithInfo(
 	if dstRing == nil {
 		tasker.Debugf("no dst is available")
 		return
-		// time.Sleep(time.Second * 5)
-		// continue
 	}
 
 	// 모든 서버의 파일 리스트 수집

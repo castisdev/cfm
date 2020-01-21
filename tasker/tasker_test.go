@@ -327,7 +327,7 @@ func makeFileMetaMap(chs, che byte, n uint) (FileMetaPtrMap, FileMetaPtrMap) {
 	fmm := make(FileMetaPtrMap)
 
 	ixl := uint(che - chs + 1)
-	for i := uint(0); i <= n; i++ {
+	for i := uint(0); i < n; i++ {
 		ix := i % ixl
 		fn := fmt.Sprintf("%s", string(chs+byte(ix)))
 		if i < ixl {
@@ -2442,7 +2442,7 @@ func makeGradeInfoFile(dir string, filename string, chs, che byte, n uint) {
 	fmt.Fprintf(f, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", "filename", "weightcount", "bitrate", "grade", "sumHitCount", "historyCount", "TargetCopyCount")
 
 	ixl := uint(che - chs + 1)
-	for i := uint(0); i <= n; i++ {
+	for i := uint(0); i < n; i++ {
 		ix := i % ixl
 		fn := fmt.Sprintf("%s", string(chs+byte(ix)))
 		if i < ixl {
@@ -2478,7 +2478,7 @@ func makeHitcountHistoryFile(dir string, filename string, chs, che byte, n uint)
 	fmt.Fprintln(f, "historyheader:1524047082")
 
 	ixl := uint(che - chs + 1)
-	for i := uint(0); i <= n; i++ {
+	for i := uint(0); i < n; i++ {
 		ix := i % uint(che-chs+1)
 		fn := fmt.Sprintf("%s", string(chs+byte(ix)))
 		if i < ixl {
@@ -2588,17 +2588,18 @@ func assertTask(t *testing.T, tsks *Tasks, filename, srcaddr, dstaddr string) {
 }
 
 func Benchmark_MakeAllFileMetas(t *testing.B) {
+	t.StopTimer()
 	gradedir := "gradeinfofolder"
 	gradefile := ".grade.info"
 
-	makeGradeInfoFile(gradedir, gradefile, 'A', 'O', 100000)
+	makeGradeInfoFile(gradedir, gradefile, 'A', 'O', 1000000)
 	defer deletefile(gradedir, "")
 
 	gradeInfoFile := filepath.Join(gradedir, gradefile)
 
 	hcdir := "hitcounthistoryinfofolder"
 	hcfile := ".hitcount.history"
-	makeHitcountHistoryFile(hcdir, hcfile, 'A', 'O', 100000)
+	makeHitcountHistoryFile(hcdir, hcfile, 'A', 'O', 1000000)
 	defer deletefile(hcdir, "")
 
 	hitcountHistoryFile := filepath.Join(hcdir, hcfile)
@@ -2609,19 +2610,21 @@ func Benchmark_MakeAllFileMetas(t *testing.B) {
 	dstIPMap := make(map[string]int)
 	dstIPMap["127.0.0.1"]++
 
-	t.StopTimer()
 	t.StartTimer()
 	err := common.MakeAllFileMetas(gradeInfoFile, hitcountHistoryFile,
 		fileMetaMap, dstIPMap, duplicatedFileMap)
 	if err != nil {
 		t.Errorf("error(%s)", err)
 	}
+
+	t.Logf("len: %d", len(fileMetaMap))
+	assert.Equal(t, 1000000, len(fileMetaMap))
 }
 
 func Benchmark_MakeAllFileMetas_simpleGetFileMetaListForTask(t *testing.B) {
-	allfmm, _ := makeFileMetaMap('A', 'O', 100000)
-
 	t.StopTimer()
+	allfmm, _ := makeFileMetaMap('A', 'O', 1000000)
+
 	t.StartTimer()
 	taskfilelist := make([]FileMetaPtr, 0, len(allfmm))
 	for _, fmm := range allfmm {
@@ -2634,4 +2637,7 @@ func Benchmark_MakeAllFileMetas_simpleGetFileMetaListForTask(t *testing.B) {
 			return taskfilelist[i].Grade < taskfilelist[j].Grade
 		}
 	})
+
+	t.Logf("len: %d", len(taskfilelist))
+	assert.Equal(t, 1000000, len(taskfilelist))
 }

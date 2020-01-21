@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"html/template"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 
@@ -69,10 +71,16 @@ func TaskUpdate(w http.ResponseWriter, r *http.Request) {
 		Status tasker.Status `json:"status"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&s); err != nil {
 		api.Errorf("fail to update task status, decode json fail : %s", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
+	}
+	// https://stackoverflow.com/questions/33229860/go-http-requests-json-reusing-connections
+	if dec.More() {
+		// there's more data in the stream, so discard whatever is left
+		io.Copy(ioutil.Discard, r.Body)
 	}
 	defer r.Body.Close()
 

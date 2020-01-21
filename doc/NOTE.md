@@ -1,3 +1,8 @@
+## 2020-01-21
+- 메모리 누수 방지 위한 코드 추가, keep alive 설정 시에 문제 방지 코드 추가
+  - // https://stackoverflow.com/questions/33229860/go-http-requests-json-reusing-connections
+   - // https: //stackoverflow.com/questions/17959732/why-is-go-https-client-not-reusing-connections
+
 ## 2020-01-16
 - FIXME: disk 상태도 고려하면 좋을 듯
 - 삭제할 때는 전체 file meta 에도 있고, 서버에도 있어야 함

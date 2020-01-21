@@ -6,11 +6,37 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"time"
 )
+
+func defaultHttpClient() http.Client {
+	return httpClient(600, 5)
+}
+
+func httpTimoutClient(timeoutSec uint) http.Client {
+	return httpClient(600, timeoutSec)
+}
+
+func httpClient(keepaliveTOsec, httpTOsec uint) http.Client {
+	keepAliveTimeout := time.Duration(keepaliveTOsec) * time.Second
+	timeout := time.Duration(httpTOsec) * time.Second
+	defaultTransport := &http.Transport{
+		Dial: (&net.Dialer{
+			KeepAlive: keepAliveTimeout,
+		}).Dial,
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 100,
+	}
+	return http.Client{
+		Transport: defaultTransport,
+		Timeout:   timeout,
+	}
+}
 
 // Heartbeat : host에 heartbeat 요청, 응답받기
 // URL : hostip(ipv4):port/hb
@@ -21,24 +47,31 @@ func Heartbeat(host *Host, timeoutSec uint) (bool, error) {
 	if urlErr != nil {
 		return false, urlErr
 	}
-	httpClient := http.Client{
-		Timeout: time.Second * time.Duration(timeoutSec),
-	}
+	httpClient := httpTimoutClient(timeoutSec)
 
 	req, reqErr := http.NewRequest(http.MethodHead, serverURL, nil)
 	if reqErr != nil {
 		return false, reqErr
 	}
 	res, resErr := httpClient.Do(req)
+	if res != nil {
+		defer res.Body.Close()
+	}
 	if resErr != nil {
 		return false, resErr
 	}
-	defer res.Body.Close()
+	// HTTP 커넥션을 재사용할때 메모리 누수를 피하기 위해선
+	// 데이터가 필요없더라도 응답 바디를 읽어야함
+	// 응답 바디를 읽음. (데이터가 필요 없으므로 devnull에 write)
+	// https: //stackoverflow.com/questions/17959732/why-is-go-https-client-not-reusing-connections
+	_, err := io.Copy(ioutil.Discard, res.Body)
+	if err != nil {
+		return false, err
+	}
 
 	if res.StatusCode != 200 {
 		return false, errors.New(res.Status)
 	}
-
 	return true, nil
 }
 
@@ -52,9 +85,7 @@ func GetRemoteFileList(host *Host, fileList *[]string) error {
 		return urlErr
 	}
 
-	httpClient := http.Client{
-		Timeout: time.Second * 2,
-	}
+	httpClient := defaultHttpClient()
 
 	req, reqErr := http.NewRequest(http.MethodGet, serverURL, nil)
 	if reqErr != nil {
@@ -65,7 +96,9 @@ func GetRemoteFileList(host *Host, fileList *[]string) error {
 	if resErr != nil {
 		return resErr
 	}
-	defer res.Body.Close()
+	if res != nil {
+		defer res.Body.Close()
+	}
 
 	if res.StatusCode != 200 {
 		return errors.New(res.Status)
@@ -91,9 +124,7 @@ func GetRemoteDiskUsage(host *Host, du *DiskUsage) error {
 		return urlErr
 	}
 
-	httpClient := http.Client{
-		Timeout: time.Second * 2,
-	}
+	httpClient := defaultHttpClient()
 
 	req, err := http.NewRequest(http.MethodGet, serverURL, nil)
 	if err != nil {
@@ -104,7 +135,9 @@ func GetRemoteDiskUsage(host *Host, du *DiskUsage) error {
 	if getErr != nil {
 		return getErr
 	}
-	defer res.Body.Close()
+	if res != nil {
+		defer res.Body.Close()
+	}
 
 	body, err := ioutil.ReadAll(res.Body)
 
@@ -123,9 +156,7 @@ func DeleteFileOnRemote(host *Host, fileName string) error {
 		return urlErr
 	}
 
-	httpClient := http.Client{
-		Timeout: time.Second * 2,
-	}
+	httpClient := defaultHttpClient()
 
 	req, err := http.NewRequest(http.MethodDelete, serverURL, nil)
 	if err != nil {
@@ -136,7 +167,13 @@ func DeleteFileOnRemote(host *Host, fileName string) error {
 	if getErr != nil {
 		return getErr
 	}
-	defer res.Body.Close()
+	if res != nil {
+		defer res.Body.Close()
+	}
+	_, err = io.Copy(ioutil.Discard, res.Body)
+	if err != nil {
+		return err
+	}
 
 	if res.StatusCode != 200 {
 		return errors.New(res.Status)
