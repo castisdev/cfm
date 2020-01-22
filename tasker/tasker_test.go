@@ -175,6 +175,7 @@ func makePresetS4D5() {
 }
 
 // all meta : A, B, C, D, E, F
+// A,B,C,D,E,F 는 이미 서버에 있는 파일
 func makeFileMetaMapABCDEF() (FileMetaPtrMap, FileMetaPtrMap) {
 	fmm := make(FileMetaPtrMap)
 
@@ -222,6 +223,9 @@ func makeFileMetaMapABCDEF() (FileMetaPtrMap, FileMetaPtrMap) {
 	return fmm, dupfmm
 }
 
+// A,B,C,D,E,F,G,H,I 는 이미 서버에 있는 파일
+// B, C 는 두 개의 서버에 있는 파일
+// J,K,L,M,N,O 는 서버에 없는 파일
 func makeFileMetaMapABCDEFGHIJKLMNO() (FileMetaPtrMap, FileMetaPtrMap) {
 	fmm := make(FileMetaPtrMap)
 
@@ -323,6 +327,7 @@ func makeFileMetaMapABCDEFGHIJKLMNO() (FileMetaPtrMap, FileMetaPtrMap) {
 	return fmm, dupfmm
 }
 
+// 서버 위치 정보는 없는 파일
 func makeFileMetaMap(chs, che byte, n uint) (FileMetaPtrMap, FileMetaPtrMap) {
 	fmm := make(FileMetaPtrMap)
 
@@ -340,8 +345,8 @@ func makeFileMetaMap(chs, che byte, n uint) (FileMetaPtrMap, FileMetaPtrMap) {
 		fmm[fn] = &common.FileMeta{
 			Name:  fn,
 			Grade: 1, Size: 100, RisingHit: 0,
-			ServerCount: 1,
-			ServerIPs:   map[string]int{"127.0.0.1": 1}}
+			ServerCount: 0,
+			ServerIPs:   map[string]int{}}
 	}
 	dupfmm := make(FileMetaPtrMap)
 
@@ -1149,6 +1154,7 @@ func Test_checkForTask(t *testing.T) {
 	}
 	defer deletefile(base, "")
 
+	//
 	allfmm, _ := makeFileMetaMapABCDEFGHIJKLMNO()
 
 	// source path 에 없는 파일
@@ -1177,6 +1183,7 @@ func Test_checkForTask(t *testing.T) {
 
 	// 실제 src 에 있다고 해도 src 정보를 update 해주지 않으면,
 	// checkForTask 함수는 실패함
+	// A, B, C, D, E, F, G, H, I 는 이미 서버에 있는 파일이므로, 배포에서 제외됨
 
 	// 배포에 사용되므로, false
 	updateFileMetaForSrcFilePath(allfmm["A.mpg"])
@@ -1194,28 +1201,33 @@ func Test_checkForTask(t *testing.T) {
 	// checkForTask 함수는 실패함
 	assert.Equal(t, false, checkForTask(allfmm["D.mpg"], taskfilenames, serverfiles))
 
-	// src 정보를 update 해주어야 성공
-	// 배포 대상
+	// src path 정보를 update 해주어도
+	// D는 이미 서버에 있는 파일이어서 실패함
 	updateFileMetaForSrcFilePath(allfmm["D.mpg"])
-	assert.Equal(t, true, checkForTask(allfmm["D.mpg"], taskfilenames, serverfiles))
+	assert.Equal(t, false, checkForTask(allfmm["D.mpg"], taskfilenames, serverfiles))
 
-	// 배포 대상
+	// src path 정보를 update 해주어도
+	// E는 이미 서버에 있는 파일이어서 실패함
 	updateFileMetaForSrcFilePath(allfmm["E.mpg"])
-	assert.Equal(t, true, checkForTask(allfmm["E.mpg"], taskfilenames, serverfiles))
+	assert.Equal(t, false, checkForTask(allfmm["E.mpg"], taskfilenames, serverfiles))
 
 	// 배포에 사용되므로, false
+	// E는 이미 서버에 있는 파일이어서 실패함
 	updateFileMetaForSrcFilePath(allfmm["F.mpg"])
 	assert.Equal(t, false, checkForTask(allfmm["F.mpg"], taskfilenames, serverfiles))
 
 	// 배포에 사용되므로, false
+	// E는 이미 서버에 있는 파일이어서 실패함
 	updateFileMetaForSrcFilePath(allfmm["G.mpg"])
 	assert.Equal(t, false, checkForTask(allfmm["G.mpg"], taskfilenames, serverfiles))
 
 	// ignore prefix, false
+	// E는 이미 서버에 있는 파일이어서 실패함
 	updateFileMetaForSrcFilePath(allfmm["H.mpg"])
 	assert.Equal(t, false, checkForTask(allfmm["H.mpg"], taskfilenames, serverfiles))
 
 	// ignore prefix, false
+	// E는 이미 서버에 있는 파일이어서 실패함
 	updateFileMetaForSrcFilePath(allfmm["I.mpg"])
 	assert.Equal(t, false, checkForTask(allfmm["I.mpg"], taskfilenames, serverfiles))
 
@@ -1636,7 +1648,7 @@ func Test_runWithInfo(t *testing.T) {
 	tasks = ts
 	defer tasks.Release()
 
-	t.Log("tasks -------------------------------------")
+	t.Log("tasks 1-------------------------------------")
 	t1 = ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
 		FileName: "A.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.1:18081"})
 	t.Log(t1)
@@ -1649,7 +1661,7 @@ func Test_runWithInfo(t *testing.T) {
 
 	runWithInfo(allfmm, rhitfmm)
 
-	t.Log("tasks -------------------------------------")
+	t.Log("tasks 2-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
 	for _, task := range tasks.GetTaskList() {
 		t.Log(task)
@@ -1657,7 +1669,7 @@ func Test_runWithInfo(t *testing.T) {
 
 	assert.Equal(t, 0, len(tasks.TaskMap))
 
-	t.Log("tasks -------------------------------------")
+	t.Log("tasks 3-------------------------------------")
 	t1 = ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
 		FileName: "A.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.1:18081"})
 	t.Log(t1)
@@ -1699,7 +1711,7 @@ func Test_runWithInfo(t *testing.T) {
 	// M.mpg, s4 -> d5 task 가 하나 만들어져야 함
 	runWithInfo(allfmm, rhitfmm)
 
-	t.Log("tasks -------------------------------------")
+	t.Log("tasks 4-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
 	for _, task := range tasks.GetTaskList() {
 		t.Log(task)
@@ -1728,7 +1740,7 @@ func Test_runWithInfo(t *testing.T) {
 
 	runWithInfo(allfmm, rhitfmm)
 
-	t.Log("tasks -------------------------------------")
+	t.Log("tasks 5-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
 	for _, task := range tasks.GetTaskList() {
 		t.Log(task)
@@ -1777,7 +1789,7 @@ func Test_runWithInfo(t *testing.T) {
 
 	runWithInfo(allfmm, rhitfmm)
 
-	t.Log("tasks -------------------------------------")
+	t.Log("tasks 6-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
 	for _, task := range tasks.GetTaskList() {
 		t.Log(task)
@@ -1809,7 +1821,7 @@ func Test_runWithInfo(t *testing.T) {
 	// M은 배포 실패햇다고 생각하고, 다시 배포 task에  넣을 수 있다고 가정함
 	runWithInfo(allfmm, rhitfmm)
 
-	t.Log("tasks -------------------------------------")
+	t.Log("tasks 7-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
 	for _, task := range tasks.GetTaskList() {
 		t.Log(task)
@@ -1847,7 +1859,7 @@ func Test_runWithInfo(t *testing.T) {
 	// 배포 중이 아닌 파일 : M, L, N
 	runWithInfo(allfmm, rhitfmm)
 
-	t.Log("tasks -------------------------------------")
+	t.Log("tasks 8-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
 	for _, task := range tasks.GetTaskList() {
 		t.Log(task)
@@ -1891,7 +1903,7 @@ func Test_runWithInfo(t *testing.T) {
 	// 배포 중이 아닌 파일 : J. L, N
 	runWithInfo(allfmm, rhitfmm)
 
-	t.Log("tasks -------------------------------------")
+	t.Log("tasks 9-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
 	for _, task := range tasks.GetTaskList() {
 		t.Log(task)
@@ -1918,7 +1930,7 @@ func Test_runWithInfo(t *testing.T) {
 	// 배포 중이 아닌 파일 : J. L, N
 	runWithInfo(allfmm, rhitfmm)
 
-	t.Log("tasks -------------------------------------")
+	t.Log("tasks 10-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
 	for _, task := range tasks.GetTaskList() {
 		t.Log(task)
@@ -2091,6 +2103,7 @@ func Test_run(t *testing.T) {
 	hcdir := "hitcounthistoryinfofolder"
 	hcfile := ".hitcount.history"
 	makeHitcountHistoryFileABCDEFGHIJKLMNO(hcdir, hcfile)
+
 	defer deletefile(hcdir, "")
 
 	SetHitcountHistoryFile(filepath.Join(hcdir, hcfile))
@@ -2462,6 +2475,7 @@ func makeHitcountHistoryFileABCDEFGHIJKLMNO(dir string, filename string) {
 	makeHitcountHistoryFile(dir, filename, 'A', 'O', 'O'-'A')
 }
 
+// 서버 위치 정보는 없는 파일
 func makeHitcountHistoryFile(dir string, filename string, chs, che byte, n uint) {
 	fp := filepath.Join(dir, filename)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -2488,7 +2502,7 @@ func makeHitcountHistoryFile(dir string, filename string, chs, che byte, n uint)
 			fn = fn + strconv.FormatUint(uint64(ix2), 10) + ".mpg"
 		}
 
-		fmt.Fprintf(f, "%s,1428460337,1000,100,127.0.0.1,2,0,0,0=0 0\n", fn)
+		fmt.Fprintf(f, "%s,1428460337,1000,100,,2,0,0,0=0 0\n", fn)
 	}
 
 	f.Close()

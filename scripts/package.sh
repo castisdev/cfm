@@ -30,10 +30,15 @@ mkdir -p ${PackDir}/doc
 mv ./${BuildDir}/${PackAppName}* ${PackDir}/bin
 cp doc/${AppName}.yml ${PackDir}/doc
 cp doc/ReleaseNote-${CapitalAppName}.txt ${PackDir}/doc
+cp doc/*.png ${PackDir}/doc/.
 
 scripts/md_to_pdf.py doc/API.md ${PackDir}/doc/API.pdf
 scripts/md_to_pdf.py doc/CHANGELOG.md ${PackDir}/doc/CHANGELOG.pdf
 scripts/md_to_pdf.py doc/SEQUENCE.md ${PackDir}/doc/SEQUENCE.pdf
+
+scripts/md_to_html.py doc/API.md ${PackDir}/doc/API.html
+scripts/md_to_html.py doc/CHANGELOG.md ${PackDir}/doc/CHANGELOG.html
+scripts/md_to_html.py doc/SEQUENCE.md ${PackDir}/doc/SEQUENCE.html
 
 mv ${PackDir} ${PackName}
 tar cvzf ${PackName}.tar.gz ${PackName}

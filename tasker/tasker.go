@@ -173,19 +173,19 @@ func SetTaskTimeout(t time.Duration) error {
 
 // SetHitcountHistoryFile :
 func SetHitcountHistoryFile(f string) {
-	tasker.Debugf("set hitcountHistory file path(%s)", f)
+	tasker.Infof("set hitcountHistory file path(%s)", f)
 	hitcountHistoryFile = f
 }
 
 // SetGradeInfoFile :
 func SetGradeInfoFile(f string) {
-	tasker.Debugf("set gradeInfo file path(%s)", f)
+	tasker.Infof("set gradeInfo file path(%s)", f)
 	gradeInfoFile = f
 }
 
 // SetTaskCopySpeed :
 func SetTaskCopySpeed(speed string) {
-	tasker.Debugf("set task copy speed(%s)", speed)
+	tasker.Infof("set task copy speed(%s)", speed)
 	taskCopySpeed = speed
 }
 
@@ -197,7 +197,7 @@ func SetSleepSec(s uint) {
 
 // SetIgnorePrefixes
 func SetIgnorePrefixes(p []string) {
-	tasker.Debugf("set ignore prefixes(%v)", p)
+	tasker.Infof("set ignore prefixes(%v)", p)
 	ignorePrefixes = p
 }
 
@@ -233,15 +233,21 @@ func run(basetm time.Time) error {
 		tasker.Errorf("tasker endded, the number of the dest srvers is 0")
 		return errors.New("tasker endded, the number of the dest srvers is 0")
 	}
+	dstIPMap := make(map[string]int)
+	for _, dst := range *DstServers {
+		dstIPMap[dst.IP]++
+	}
 	fileMetaMap := make(map[string]*common.FileMeta)
 	duplicatedFileMap := make(map[string]*common.FileMeta)
 	risingHitFileMap := make(map[string]int)
 
-	// 4. 파일 등급 list 생성
-	// gradeinfoFile 과 hitcountHistoryFile로 file meta list 생성
+	// 전체 파일 정보 목록 구하기
+	// 파일 이름, 파일 등급, file size, 파일 위치 정보 구하기
+	// 서버 별로 구할 필요 없음
+	// 구하지 못하는 경우, 다음 번 주기로 넘어감
 	est := common.Start()
 	err := common.MakeAllFileMetas(gradeInfoFile, hitcountHistoryFile,
-		fileMetaMap, map[string]int{}, duplicatedFileMap)
+		fileMetaMap, dstIPMap, duplicatedFileMap)
 
 	if err != nil {
 		tasker.Errorf("fail to make file metas, error(%s)", err.Error())
@@ -273,48 +279,57 @@ func runWithInfo(
 
 	curtasks := tasks.GetTaskList()
 
-	// task 정리 후 새로운 task 를다시 구한다.
+	// task 정리 후 새로운 task 를다시 구함
+	// - DONE task 정리
+	// - TIMEOUT 계산해서 TIMEOUT된 task 정리
+	// - Src 또는 Dest의 heartbeat 답을 구하지 못한 task 정리
 	curtasks = cleanTask(curtasks)
 
-	// unset selected flag (true->false)
-	// task queue 에 있는 src를 할당된 상태로 변경
-	// status가 OK이고, 아직 배포 task 에 할당안된 source가 없으면
-	// task를 더이상 만들지 않음
+	// src 할당 상태를 false로 변경
+	// task 에서 사용 중인 src 할당 상태를 true로 변경
+	// 배포에 할당 가능한 src 서버 개수 구하기
+	// 	- status가 OK 이고,
+	// 	- 아직 배포 task 에 할당안된 경우 할당 가능
+	// 배포에 할당 가능한 src 서버가 없으면 다음 주기로 넘어감
 	srccnt := getAvailableSrcServerCount(curtasks)
 	if srccnt == 0 {
-		tasker.Debugf("no src is available")
+		tasker.Infof("no src server is available")
 		return
 	}
 
-	// task queue 에 있는 dest를 할당된 상태로 변경
+	// dest 할당 상태를 false로 변경
+	// task 에서 사용 중인 dest 할당 상태를 true로 변경
 	// destination ip 를 round robin 으로 선택하기 위한 ring 생성
-	// status가 OK이고,
-	// 아직 배포 task 에 할당안된 dest가 없으면
-	// task를 더이상 만들지 않음
+	// 배포에 할당 가능한 dest 서버로 ring 생성
+	// 	- status가 OK 이고,
+	// 	- 아직 배포 task 에 할당안된 경우 할당 가능
+	// 배포에 할당 가능한 dest 서버가 없으면 다음 주기로 넘어감
 	dstRing := getAvailableDstServerRing(curtasks)
 	if dstRing == nil {
-		tasker.Debugf("no dst is available")
+		tasker.Infof("no dst server is available")
 		return
 	}
 
-	// 모든 서버의 파일 리스트 수집
+	// 모든 dest 서버의 파일 목록 수집
 	remoteFileSet := make(FileFreqMap)
 	collectRemoteFileList(DstServers, remoteFileSet)
 
-	// 높은 등급 순서로 정렬하기 위해 빈 Slice 생성 하고 배포 대상이 되는파일 return
-	// ignore.prefix로 시작하는 파일 배포 제외 : 광고 파일 배포 제외
-	// .grade.info, .hitcount.history 에서 file meta를 구할 수 없는 파일은 배포에서 제외
-	// task 에 이미 있는 파일 제외
-	// source path에 없는 파일 제외 :SAN 에 없는 파일 배포에서 제외
-	//   source path에 있는 파일이면, source path를 file meta에 update
+	// 배포 대상이 되는 파일 리스트 만들기
 	// 급 상승 Hit 수가 많은 순서대로 정렬
-	// 높은 등급 순서로 정렬 (가장 높은 등급:1)
+	// 급 상승 Hit 수가 같으면 높은 등급 순서로 정렬 (가장 높은 등급:1)
+	// - grade info, hitcount history 파일에서 file meta를 구할 수 없는 파일 제외
+	// - dest 서버에 이미 있는 파일 제외
+	// - ignore.prefix로 시작하는 파일 제외 (광고 파일 제외)
+	// - task 에 이미 있는 파일 제외
+	// - source path에 없는 파일 제외 (SAN 에 없는 파일 제외)
 	sortedFileList := getFileMetaListForTask(fileMetaMap, risingHitFileMap,
 		curtasks, remoteFileSet)
 
+	// 배포 task 만들기
 	for _, file := range sortedFileList {
-
-		// src ip 선택, 없으면 loop 종료
+		// src 서버 선택
+		// 	- status가 OK 이고,
+		// 	- 아직 배포 task 에 할당안된 경우
 		src, exists := SrcServers.selectSourceServer()
 		if exists != true {
 			tasker.Debugf("stop making task, no src is available")
@@ -477,7 +492,6 @@ func (srcs *SrcHosts) getAllHostStatus() {
 //
 // task list 를 검사해서
 // task에서 사용 중인 src 의 selected 상태를 true 변경
-//
 func (srcs *SrcHosts) setSelected(curtasks []Task) {
 	for _, src := range *srcs {
 		src.selected = false
@@ -578,7 +592,6 @@ func (dsts *DstHosts) getSelectableList() (rl []DstHost) {
 	for _, dst := range *dsts {
 		if dst.Status == OK && !dst.selected {
 			rl = append(rl, *dst)
-			tasker.Debugf("[%s] added in selectable dst list", dst)
 		}
 	}
 	sort.Slice(rl, func(i, j int) bool {
@@ -620,17 +633,19 @@ func collectRemoteFileList(destList *DstHosts, remoteFiles FileFreqMap) {
 //
 // 높은 등급 순서로 정렬하기 위해 빈 Slice 생성 하고 배포 대상이 되는파일 return
 //
-// ignore.prefix로 시작하는 파일 배포 제외 : 광고 파일 배포 제외
-//
-// .grade.info, .hitcount.history 에서 file meta를 구할 수 없는 파일은 배포에서 제외
-//
-// task 에 이미 있는 파일 제외
-//
-// source path에 있는 지 검사해서 없는 파일 제외 : SAN 에 없는 파일 배포에서 제외
-//
 // 급 상승 Hit 수가 많은 순서대로 정렬
 //
-// 높은 등급 순서로 정렬 (가장 높은 등급:1)
+// 급 상승 Hit 수가 같으면 높은 등급 순서로 정렬 (가장 높은 등급:1)
+//
+// - grade info, hitcount history 파일에서 file meta를 구할 수 없는 파일 제외
+//
+// - dest 서버에 이미 있는 파일 제외
+//
+// - ignore.prefix로 시작하는 파일 제외 (광고 파일 제외)
+//
+// - task 에 이미 있는 파일 제외
+//
+// - source path에 없는 파일 제외 (SAN 에 없는 파일 제외)
 func getFileMetaListForTask(allfmm FileMetaPtrMap,
 	risinghits map[string]int, curtasks []Task,
 	serverfiles FileFreqMap) []FileMetaPtr {
@@ -717,21 +732,10 @@ func checkForTask(fmm *common.FileMeta,
 
 	fn := fmm.Name
 
-	// ignore.prefix 로 시작하는 파일 제외(광고 파일)
-	if common.IsPrefix(fn, ignorePrefixes) {
-		tasker.Debugf("skip file by ignore.prefix, file(%s)", fmm)
-		return false
-	}
-
-	// 이미 배포 task에 사용되는 파일 제외
-	if n, using := taskfiles[fn]; using && n > 0 {
-		tasker.Debugf("skip file, found in the tasks, file(%s)", fmm)
-		return false
-	}
-
-	// - 서버에 이미 있는 파일은 제외
-	if n, using := serverfiles[fn]; using && n > 0 {
-		tasker.Debugf("skip file, found in the servers, file(%s)", fmm)
+	// - hitcount.history file에서 구한 서버위치 정보로
+	// 어떤 서버인가 이미 있는 파일은 제외
+	if fmm.ServerCount > 0 {
+		tasker.Debugf("skip file by found.in.the.servers, file(%s)", fmm)
 		return false
 	}
 
@@ -740,6 +744,26 @@ func checkForTask(fmm *common.FileMeta,
 		tasker.Debugf("skip file by not.found.in.the.source.paths, file(%s)", fmm)
 		return false
 	}
+
+	// ignore.prefix 로 시작하는 파일 제외(광고 파일)
+	if common.IsPrefix(fn, ignorePrefixes) {
+		tasker.Debugf("skip file by ignore.prefix, file(%s)", fmm)
+		return false
+	}
+
+	// 이미 배포 task에 사용되는 파일 제외
+	if n, using := taskfiles[fn]; using && n > 0 {
+		tasker.Debugf("skip file by found.in.the.tasks, file(%s)", fmm)
+		return false
+	}
+
+	// - 서버별로 조사한 파일 정보로
+	// 어떤 서버인가 이미 이미 있는 파일은 제외
+	if n, using := serverfiles[fn]; using && n > 0 {
+		tasker.Debugf("skip file by found.in.the.servers, file(%s)", fmm)
+		return false
+	}
+
 	return true
 }
 

@@ -67,33 +67,33 @@ func NewTailer() *Tailer {
 
 // SetWatchDir :
 func (t *Tailer) SetWatchDir(dir string) {
-	tailer.Debugf("set watch dir : (%s)", dir)
+	tailer.Infof("set watch dir : (%s)", dir)
 	t.watchDir = dir
 }
 
 // SetWatchIPString :
 func (t *Tailer) SetWatchIPString(ip string) {
-	tailer.Debugf("set watch ip string : (%s)", ip)
+	tailer.Infof("set watch ip string : (%s)", ip)
 	t.watchIPString = ip
 }
 
 // SetWatchTermMin :
 func (t *Tailer) SetWatchTermMin(minute int) {
 	if minute <= 0 {
-		tailer.Debugf("invalid value, set as default watch term min : (%d)", 10)
+		tailer.Infof("invalid value, set as default watch term min : (%d)", 10)
 		t.watchTermMin = 10
 	}
-	tailer.Debugf("set watch term min : (%d)", minute)
+	tailer.Infof("set watch term min : (%d)", minute)
 	t.watchTermMin = minute
 }
 
 // SetWatchHitBase :
 func (t *Tailer) SetWatchHitBase(baseHit int) {
 	if baseHit <= 0 {
-		tailer.Debugf("set watch hit base : (%d)", 3)
+		tailer.Infof("set watch hit base : (%d)", 3)
 		t.watchHitBase = 3
 	}
-	tailer.Debugf("set watch hit base : (%d)", baseHit)
+	tailer.Infof("set watch hit base : (%d)", baseHit)
 	t.watchHitBase = baseHit
 }
 

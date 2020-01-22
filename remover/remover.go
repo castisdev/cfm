@@ -62,7 +62,7 @@ func SetDiskUsageLimitPercent(limit uint) error {
 		return errors.New("disk usage limit percent must be less than 100")
 	}
 
-	remover.Debugf("set diskUsageLimitPercent(%d)", limit)
+	remover.Infof("set diskUsageLimitPercent(%d)", limit)
 	diskUsageLimitPercent = limit
 
 	return nil
@@ -75,23 +75,25 @@ func DiskUsageLimitPercent() uint {
 
 // SetGradeInfoFile :
 func SetGradeInfoFile(f string) {
+	remover.Infof("set gradeInfoFile(%s)", f)
 	gradeInfoFile = f
 }
 
 // SetHitcountHistoryFile :
 func SetHitcountHistoryFile(f string) {
+	remover.Infof("set hitcountHistoryFile(%s)", f)
 	hitcountHistoryFile = f
 }
 
 // SetIgnorePrefixes
 func SetIgnorePrefixes(p []string) {
-	remover.Debugf("set ignore prefixes(%v)", p)
+	remover.Infof("set ignore prefixes(%v)", p)
 	ignorePrefixes = p
 }
 
 // SetSleepSec :
 func SetSleepSec(s uint) {
-	remover.Debugf("set sleepSec(%d)", s)
+	remover.Infof("set sleepSec(%d)", s)
 	sleepSec = s
 }
 
@@ -126,7 +128,8 @@ func run(basetm time.Time) error {
 		remover.Errorf("fail to make file metas, error(%s)", err.Error())
 		return err
 	}
-	remover.Infof("make file metas(name, grade, size, servers), time(%s)", common.Elapsed(est))
+	remover.Infof("make file metas(name, grade, size, servers), time(%s)",
+		common.Elapsed(est))
 
 	// 급 hit 상승 파일 목록 구하기
 	// LB EventLog 에서 특정 IP 에 할당된 파일 목록 추출
@@ -266,12 +269,12 @@ func requestRemoveDuplicatedFiles(duplicatedFileMap FileMetaPtrMap,
 			}
 			// 제외 대상 파일 처리
 			if common.IsPrefix(fm.Name, ignorePrefixes) {
-				remover.Debugf("[%s] skip file, by ignore.prefix, file(%s)", server, fm.Name)
+				remover.Debugf("[%s] skip file by ignore.prefix, file(%s)", server, fm.Name)
 				continue
 			}
 			// SAN 에 없는 파일이면 삭제 대상에서 제외
 			if _, exists := SourcePath.IsExistOnSource(fm.Name); exists != true {
-				remover.Debugf("[%s] skip file, by not.found.in.the.source.paths, file(%s)", server, fm.Name)
+				remover.Debugf("[%s] skip file by not.found.in.the.source.paths, file(%s)", server, fm.Name)
 				continue
 			}
 			// 중복된 파일이 아니면 제외
@@ -384,13 +387,13 @@ func requestRemoveFilesForFreeDiskSpace(servers []DServer,
 			// 예외처리
 			if fm.ServerCount <= 0 {
 				remover.Debugf("[%s] skip requesting to delete"+
-					", not found in the server, file(%s)", server, fm)
+					" by not.found.in.the.server, file(%s)", server, fm)
 				continue
 			}
 			// 예외처리
 			if n, exist := fm.ServerIPs[server.IP]; !exist || n <= 0 {
 				remover.Debugf("[%s] skip requsting to delete"+
-					", not found in the server, file(%s)", server, fm)
+					" by not.found.in.the.server, file(%s)", server, fm)
 				continue
 			}
 			if err := common.DeleteFileOnRemote(server.Host, fm.Name); err != nil {
@@ -453,27 +456,27 @@ func getFileListToDeleteForFreeDiskSpace(server DServer,
 	for filename, fm := range sfmm {
 		// 예외처리
 		if fm.ServerCount <= 0 {
-			remover.Debugf("[%s] skip file, not found in the server, file(%s)", server, filename)
+			remover.Debugf("[%s] skip file by not.found.in.the.server, file(%s)", server, filename)
 			continue
 		}
 		// 예외처리
 		if n, exist := fm.ServerIPs[server.IP]; !exist || n <= 0 {
-			remover.Debugf("[%s] skip file, not found in the server, file(%s)", server, filename)
+			remover.Debugf("[%s] skip file by not.found.in.the.server, file(%s)", server, filename)
 			continue
 		}
 		// 제외 대상 파일 처리
 		if common.IsPrefix(filename, ignorePrefixes) {
-			remover.Debugf("[%s] skip file, by ignore.prefix, file(%s)", server, filename)
+			remover.Debugf("[%s] skip file by ignore.prefix, file(%s)", server, filename)
 			continue
 		}
 		// SAN 에 없는 파일이면 삭제 대상에서 제외
 		if _, exists := SourcePath.IsExistOnSource(filename); exists != true {
-			remover.Debugf("[%s] skip file, by not.found.in.the.source.paths, file(%s)", server, filename)
+			remover.Debugf("[%s] skip file by not.found.in.the.source.paths, file(%s)", server, filename)
 			continue
 		}
 		// 급 hit 상승 파일 목록에 속하는 파일이면 삭제 대상에 제외
 		if _, exists := rhitfmm[filename]; exists {
-			remover.Debugf("[%s] skip file, by rising.hit.file, file(%s)", server, filename)
+			remover.Debugf("[%s] skip file by rising.hit.file, file(%s)", server, filename)
 			continue
 		}
 		fileList = append(fileList, fm)
