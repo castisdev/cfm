@@ -1248,182 +1248,33 @@ func Test_checkForTask(t *testing.T) {
 	assert.Equal(t, false, checkForTask(allfmm["M.mpg"], taskfilenames, serverfiles))
 }
 
-func Test_getFileMetaListForTask(t *testing.T) {
-
-	makePresetS1D4()
-
-	s1 := "127.0.0.1:8081"
-	s1files := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg", "SERVER1-5.mpg"}
-	s1du := common.DiskUsage{
-		TotalSize: 1000, UsedSize: 750,
-		FreeSize: 250, AvailSize: 250, UsedPercent: 75,
-	}
-	cfws1 := cfw(s1, s1du, s1files)
-	cfws1.Start()
-	defer cfws1.Close()
-
-	d1 := "127.0.0.1:18081"
-	d1files := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg", "SERVER1-5.mpg"}
-	d1du := common.DiskUsage{
-		TotalSize: 1000, UsedSize: 750,
-		FreeSize: 250, AvailSize: 250, UsedPercent: 75,
-	}
-	d2 := "127.0.0.2:18082"
-	d2files := []string{"B.mpg", "C.mpg", "E.mpg", "F.mpg", "SERVER2.mpg"}
-	d2du := common.DiskUsage{
-		TotalSize: 1000, UsedSize: 600,
-		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
-	}
-	d3 := "127.0.0.3:18083"
-	d3files := []string{"SERVER3.mpg", "G.mpg"}
-	d3du := common.DiskUsage{
-		TotalSize: 1000, UsedSize: 600,
-		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
-	}
-	d4 := "127.0.0.4:18084"
-	d4files := []string{}
-	d4du := common.DiskUsage{
-		TotalSize: 1000, UsedSize: 600,
-		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
-	}
-	d5 := "127.0.0.5:18085"
-	d5files := []string{"SERVER1-5.mpg"}
-	d5du := common.DiskUsage{
-		TotalSize: 1000, UsedSize: 600,
-		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
-	}
-
-	cfw1 := cfw(d1, d1du, d1files)
-	cfw1.Start()
-	defer cfw1.Close()
-
-	cfw2 := cfw(d2, d2du, d2files)
-	cfw2.Start()
-	defer cfw2.Close()
-
-	cfw3 := cfw(d3, d3du, d3files)
-	cfw3.Start()
-	defer cfw3.Close()
-
-	cfw4 := cfw(d4, d4du, d4files)
-	cfw4.Start()
-	defer cfw4.Close()
-
-	cfw5 := cfw(d5, d5du, d5files)
-	cfw5.Start()
-	defer cfw5.Close()
-
-	base := "testsourcefolder"
-	SourcePath.Add(base)
-
-	// source path 에 파일 생성
-	for _, f := range d1files {
-		createfile(base, f)
-	}
-	for _, f := range d2files {
-		createfile(base, f)
-	}
-	for _, f := range d3files {
-		createfile(base, f)
-	}
-	for _, f := range d4files {
-		createfile(base, f)
-	}
-	for _, f := range d5files {
-		createfile(base, f)
-	}
-
-	createfile(base, "H.mpg")
-	createfile(base, "I.mpg")
-	createfile(base, "J.mpg")
-	//createfile(base, "K.mpg")
-	createfile(base, "L.mpg")
-	createfile(base, "M.mpg")
-	createfile(base, "N.mpg")
-	//createfile(base, "O.mpg")
-	createfile(base, "P.mpg")
-
-	// C.mpg 는 source path 에서 삭제
-	deletefile(base, "C.mpg")
-
-	defer deletefile(base, "")
-
-	serverfs := make(FileFreqMap)
-	collectRemoteFileList(DstServers, serverfs)
-	assert.Equal(t, 10, len(serverfs))
-	assert.Equal(t, 1, int(serverfs["A.mpg"]))
-	assert.Equal(t, 2, int(serverfs["B.mpg"]))
-	assert.Equal(t, 2, int(serverfs["C.mpg"]))
-	assert.Equal(t, 1, int(serverfs["D.mpg"]))
-	assert.Equal(t, 1, int(serverfs["E.mpg"]))
-	assert.Equal(t, 1, int(serverfs["F.mpg"]))
-	assert.Equal(t, 1, int(serverfs["G.mpg"]))
-	assert.Equal(t, 2, int(serverfs["SERVER1-5.mpg"]))
-	assert.Equal(t, 1, int(serverfs["SERVER2.mpg"]))
-	assert.Equal(t, 1, int(serverfs["SERVER3.mpg"]))
-
+func Test_getSortedFileMetaListForTask(t *testing.T) {
 	allfmm, _ := makeFileMetaMapABCDEFGHIJKLMNO()
-
-	ignores := []string{"AD1", "H", "I", "AD2"}
-	SetIgnorePrefixes(ignores)
-
 	rhfiles := []string{"E.mpg", "F.mpg", "J.mpg", "RH1.mpg", "M.mpg", "H.mpg", "O.mpg", "RH2.mpg"}
 	rhitfmm := makeRisingHitFileMap(rhfiles)
 
-	ts := NewTasks()
-	tasks = ts
-	defer tasks.Release()
+	sortedfmm := getSortedFileMetaListForTask(allfmm, rhitfmm)
 
-	t1 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
-		FileName: "A.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.1:18081"})
-	t.Log(t1)
-	t2 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/B.mpg",
-		FileName: "B.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.2:18082"})
-	t.Log(t2)
-
-	t3 := ts.CreateTask(&Task{SrcIP: "127.0.0.2", FilePath: "/data2/DANGLING1.mpg",
-		FileName: "DANGLING1.mpg", SrcAddr: "127.0.0.2:8082", DstAddr: "127.0.0.2:18082"})
-	t.Log(t3)
-
-	tskfiles := getFileMetaListForTask(allfmm, rhitfmm, tasks.GetTaskList(), serverfs)
-	for _, fm := range tskfiles {
-		t.Log(fm)
+	for _, fm := range sortedfmm {
+		t.Log(*fm)
 	}
+	assert.Equal(t, 15, len(sortedfmm))
+	assert.Equal(t, sortedfmm[0].Name, "O.mpg")
+	assert.Equal(t, sortedfmm[1].Name, "H.mpg")
+	assert.Equal(t, sortedfmm[2].Name, "M.mpg")
+	assert.Equal(t, sortedfmm[3].Name, "J.mpg")
+	assert.Equal(t, sortedfmm[4].Name, "F.mpg")
+	assert.Equal(t, sortedfmm[5].Name, "E.mpg")
+	assert.Equal(t, sortedfmm[6].Name, "A.mpg")
+	assert.Equal(t, sortedfmm[7].Name, "B.mpg")
+	assert.Equal(t, sortedfmm[8].Name, "C.mpg")
+	assert.Equal(t, sortedfmm[9].Name, "D.mpg")
+	assert.Equal(t, sortedfmm[10].Name, "G.mpg")
+	assert.Equal(t, sortedfmm[11].Name, "I.mpg")
+	assert.Equal(t, sortedfmm[12].Name, "K.mpg")
+	assert.Equal(t, sortedfmm[13].Name, "L.mpg")
+	assert.Equal(t, sortedfmm[14].Name, "N.mpg")
 
-	// A,B,C,D,E,F,G,H,I 는 server에 있어서 배포 제외
-	// K는 source path 에 없어서 배포 제외
-	// H는 riging hit 파일이지만, ignore prefix로 제외
-	// O는 riging hit 파일이지만, source path에 없어서 제외
-	// I는 ignore prefix로 제외
-	// M, J : rising hit 값이 큰 순서
-	// L, N : grade 값이 작은 순서
-	assert.Equal(t, 4, len(tskfiles))
-	assert.Equal(t, tskfiles[0].Name, "M.mpg")
-	assert.Equal(t, tskfiles[1].Name, "J.mpg")
-
-	assert.Equal(t, tskfiles[2].Name, "L.mpg")
-	assert.Equal(t, tskfiles[3].Name, "N.mpg")
-
-	t4 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/M.mpg",
-		FileName: "M.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.4:18084"})
-	t.Log(t4)
-	t5 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/J.mpg",
-		FileName: "J.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.5:18084"})
-	t.Log(t5)
-	t6 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/DANGLING1.mpg",
-		FileName: "DANGLING1.mpg", SrcAddr: "127.0.0.2:8081", DstAddr: "127.0.0.5:18084"})
-	t.Log(t6)
-
-	tskfiles2 := getFileMetaListForTask(allfmm, rhitfmm, tasks.GetTaskList(), serverfs)
-	for _, fm := range tskfiles2 {
-		t.Log(fm)
-	}
-	// A,B,C,D,E,F,G,H,I 는 server에 있어서 배포 제외
-	// K는 source path 에 없어서 배포 제외
-	// M, J는 배포 중이서 제외
-	assert.Equal(t, 2, len(tskfiles2))
-	assert.Equal(t, tskfiles2[0].Name, "L.mpg")
-	assert.Equal(t, tskfiles2[1].Name, "N.mpg")
 }
 
 func Test_selectSourceServer(t *testing.T) {

@@ -15,8 +15,6 @@ v1.0.0.qr2 / 2020-01-23
 - task 관리 모듈
 ![cfm_v1.0.0.qr2_tasker_State.png](cfm_v1.0.0.qr2_tasker_State.png)
 
-![cfm_v1.0.0.qr2_tasker_make_task_files_State.png](cfm_v1.0.0.qr2_tasker_make_task_files_State.png)
-
 ### remover
 
 - 파일 삭제 요청 모듈

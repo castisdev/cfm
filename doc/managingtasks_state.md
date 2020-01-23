@@ -228,9 +228,8 @@ TIMEOUT 이전에 정리될 것으로 예상되는데,
 title cfm_v1.0.0.qr2_tasker_State
 hide empty description
 
-[*]-> S0
+[*] -> S0
 S0 : 무한 반복
-S0 --> S1
 S1 : grade info, hitcount history 파일로부터\n파일 등급, 크기, 서버 위치 정보가 들어있는 파일 meta 목록 생성\n여러 server에 존재하는 파일 meta 목록 생성
 note right
 	파일 등급 : grade info 파일에서 구함
@@ -241,87 +240,57 @@ note right
 	서버 위치 정보를 이용하여 여러 server에
   존재하는 파일 목록 생성
 end note
-S1 --> S100 : 파일 parsing error 발생
-
-S1 --> S2 : parsing 성공
 S2 : 급hit 상승 파일 목록 구함
-
-S2 --> S3
 S3 : source, dest 서버의 heartbeat 결과 얻음
-
-S3 --> S4
 S4: task 정리
 note right
 	DONE task 정리
 	TIMEOUT 계산해서 TIMEOUT된 task 정리
 	Src 또는 Dest의 heartbeat 답을 구하지 못한 task 정리
 end note
-
-S4 --> S5
 S5 : 배포에 사용 가능한\nsource 서버가 있는 지 체크
-S5 --> S100 : 사용 가능한 source 서버가\n없는 경우
-
-S5 --> S6
 S6 : 배포에 사용 가능한\ndest 서버가 있는 지 체크
-S6 -> S100 : 사용 가능한 dest 서버가\n없는 경우
-
-S6 --> S7
 S7 : 모든 dest 서버의 파일 목록 수집
-
-S7 --> S8
-S8 : 배포 대상 파일 목록 만들기
-
-S8 --> S9
-S9 : 배포 대상 파일 목록에 대해서\n배포 task 만들기
-
-S9 --> S10
-S10 : src 서버 선택
-
-S10 --> S100 : 사용 가능한 source 서버가\n없는 경우
-
-S10 --> S11
-S11 : dest 서버 선택
+S8 : grade info, hitcount history로 만든\n파일 meta 목록에 급 hits 반영
+S9 : 파일 meta 목록을\n급 hits 높은 순으로 정렬\n등급값 낮은 순으로 정렬하여\n배포 대상 파일 목록 만들기
+S10 : 배포 대상 파일 목록에 대해서\n배포 task 만들기
+S11: dest 서버에 이미 있는 파일이면 제외
+S12: source path에 없는 파일이면 제외 (SAN에 는 파일이면 제외)
+S13: 특정 prefix로 시작하는 파일이면 제외 (광고 파일 제외)
+S14: 배포에 사용 중인 파일이면 제외 (광고 파일 제외)
+S15 : src 서버 선택
+S16 : dest 서버 선택
 note right
  dest 서버는 같은 서버가
  여러 번 선택될 수 있음
 end note
-
-S11 --> S12
-S12 : 배포 task 생성
-
-S12 --> S9 : 배포할 파일이 남은 경우
-
-S12 --> S100 : 더 이상 배포할 피일이 없는 경우
-
-S100 -> S0
+S17 : 배포 task 생성
 S100: sleep N초(default:10초)
-```
 
-```plantuml
-title cfm_v1.0.0.qr2_tasker_make_task_files_State
-hide empty description
-
-state S8 {
-S8 : 배포 대상 파일 목록 만들기
-
-S80: grade info, hitcount history로 만든\n파일 meta 목록에 급 hits 반영
-S81: grade info, hitcount history로 만든\n파일 meta 목록에 대해서 수행
-S82: dest 서버에 이미 있는 파일이면 제외
-S83: source path에 없는 파일이면 제외 (SAN에 는 파일이면 제외)
-S84: 특정 prefix로 시작하는 파일이면 제외 (광고 파일 제외)
-S85: 배포에 사용 중인 파일이면 제외 (광고 파일 제외)
-S86: 급 hits 높은 순으로 정렬\n등급값 낮은 순으로 정렬
-
-[*] --> S80
-S80 --> S81
-S81 --> S82
-S82 --> S83
-S83 --> S84
-S84 --> S85
-S85 --> S86
-S86 --> S81 : 처리할 파일이 남은 경우
-S86 --> [*] : 더 이상 파일이 없는 경우
-}
+S0 -> S1
+S1 -> S100 : 파일 parsing error 발생
+S1 --> S2 : parsing 성공
+S2 --> S3
+S3 --> S4
+S4 --> S5
+S5 --> S100 : 사용 가능한 source 서버가\n없는 경우
+S5 --> S6
+S6 --> S100 : 사용 가능한 dest 서버가\n없는 경우
+S6 --> S7
+S7 --> S8
+S8 --> S9
+S9 --> S10
+S10 -> S11
+S11 --> S12
+S12 --> S13
+S13 --> S14
+S14 --> S15
+S15 --> S100 : 사용 가능한 source 서버가\n없는 경우
+S15 --> S16
+S16 --> S17
+S17 --> S10 : 배포할 파일이 남은 경우
+S17 --> S100 : 더 이상 배포할 피일이 없는 경우
+S100 -> S0
 ```
 
 ## v1.0.0.qr1 / 2019-11-12

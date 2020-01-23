@@ -1017,6 +1017,103 @@ func Test_requestRemoveDuplicatedFilesIgnorePrefix(t *testing.T) {
 	assert.Equal(t, 1, allfmm["E.mpg"].ServerCount)
 }
 
+func Test_checkForDeleteServerFile(t *testing.T) {
+	Servers = common.NewHosts()
+	s1 := "127.0.0.1:18881"
+	files1 := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg"}
+	d1 := common.DiskUsage{
+		TotalSize: 1000, UsedSize: 750,
+		FreeSize: 250, AvailSize: 250, UsedPercent: 75,
+	}
+	s2 := "127.0.0.2:18882"
+	files2 := []string{"B.mpg", "C.mpg", "E.mpg", "F.mpg"}
+	d2 := common.DiskUsage{
+		TotalSize: 1000, UsedSize: 600,
+		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
+	}
+	Servers.Add(s1)
+	Servers.Add(s2)
+	cfw1 := cfw(s1, d1, files1)
+	cfw1.Start()
+	defer cfw1.Close()
+	cfw2 := cfw(s2, d2, files2)
+	cfw2.Start()
+	defer cfw2.Close()
+
+	rhfiles := []string{"F.mpg"}
+	rhitfmm := makeRisingHitFileMap(rhfiles)
+	allfmm, dupfmm := makeFileMetaMap()
+	ssfmm := getServerFileMetas(allfmm)
+	updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
+
+	SetDiskUsageLimitPercent(55)
+	servers := findServersOutOfDiskSpace(Servers)
+
+	base := "testsourcefolder"
+	SourcePath.Add(base)
+
+	for _, f1 := range files1 {
+		createfile(base, f1)
+	}
+	for _, f2 := range files2 {
+		createfile(base, f2)
+	}
+	deletefile(base, "C.mpg")
+
+	defer deletefile(base, "")
+
+	ignores := []string{"E"}
+	SetIgnorePrefixes(ignores)
+
+	for _, server := range servers {
+		for _, fm := range allfmm {
+			rc := checkForDelete(fm, server, rhitfmm)
+			switch server.Addr {
+			case s1: //127.0.0.1:18881
+				switch fm.Name {
+				case "A.mpg":
+					assert.Equal(t, true, rc)
+				case "B.mpg":
+					assert.Equal(t, true, rc)
+				// not in the source path
+				case "C.mpg":
+					assert.Equal(t, false, rc)
+				case "D.mpg":
+					assert.Equal(t, true, rc)
+				// not found in the server
+				// ignore prefix
+				case "E.mpg":
+					assert.Equal(t, false, rc)
+				// not found in the server
+				// rising hits file
+				case "F.mpg":
+					assert.Equal(t, false, rc)
+				}
+			case s2: //127.0.0.2:18882
+				switch fm.Name {
+				// not found in the server
+				case "A.mpg":
+					assert.Equal(t, false, rc)
+				case "B.mpg":
+					assert.Equal(t, true, rc)
+				// not in the source path
+				case "C.mpg":
+					assert.Equal(t, false, rc)
+				// not found in the server
+				case "D.mpg":
+					assert.Equal(t, false, rc)
+				// ignore prefix
+				case "E.mpg":
+					assert.Equal(t, false, rc)
+				// rising hits file
+				case "F.mpg":
+					assert.Equal(t, false, rc)
+				}
+			}
+		}
+	}
+}
+
 func Test_getFileListToDeleteForFreeDiskSpace(t *testing.T) {
 	Servers = common.NewHosts()
 	s1 := "127.0.0.1:18881"
@@ -1088,7 +1185,7 @@ func Test_getFileListToDeleteForFreeDiskSpace(t *testing.T) {
 		// 등급이 제일 낮은 D.mpg, C.mpg가 지워져야 함
 		// C.mpg 는 source path 에 존재하지 않으므로, B.mpg가 지워져야 함
 		// D와 B가 지워져야 함
-		case s1:
+		case s1: //127.0.0.1:18881
 			// 200 = 750(current used) - 550(limit used : 1000 * 55%)
 			assert.Equal(t, uint64(200), uint64(overUsedSize))
 			assert.Equal(t, 2, len(dels))
@@ -1101,14 +1198,13 @@ func Test_getFileListToDeleteForFreeDiskSpace(t *testing.T) {
 		// E.mpg 는 ignore prefix에 속하므로, C.mpg 가 지워져야 하지만,
 		// C.mpg 는 source path 에 존재하지 않으므로, B.mpg가 지워져야 함
 		// B가 지워져야 함
-		case s2:
+		case s2: //127.0.0.2:18882
 			// 50 = 600(current used) - 550(limit used : 1000 * 55%)
 			assert.Equal(t, uint64(50), uint64(overUsedSize))
 			assert.Equal(t, 1, len(dels))
 			assert.Contains(t, dels, B)
 		}
 	}
-
 }
 
 func Test_requestRemoveFilesForFreeDiskSpace(t *testing.T) {

@@ -11,11 +11,14 @@ import (
 func TestTasks_New(t *testing.T) {
 
 	tasks := NewTasks()
+	defer tasks.Release()
+
 	assert.Equal(t, 0, len(tasks.TaskMap))
 }
 
 func TestTasks_FindTaskByID(t *testing.T) {
 	tasks := NewTasks()
+	defer tasks.Release()
 
 	t1 := tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg"})
 	t2 := tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/B.mpg"})
@@ -33,6 +36,7 @@ func TestTasks_FindTaskByID(t *testing.T) {
 func TestTasks_CreateTask(t *testing.T) {
 
 	tasks := NewTasks()
+	defer tasks.Release()
 	tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg"})
 	tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/B.mpg"})
 	tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/C.mpg"})
@@ -43,7 +47,7 @@ func TestTasks_CreateTask(t *testing.T) {
 
 func TestTasks_Create_ManyTask(t *testing.T) {
 	tasks := NewTasks()
-	defer tasks.DeleteAllTask()
+	defer tasks.Release()
 
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
@@ -74,7 +78,7 @@ func TestTasks_Create_ManyTask(t *testing.T) {
 
 func TestTasks_TwoCreator_Create_ManyTask(t *testing.T) {
 	tasks := NewTasks()
-	defer tasks.DeleteAllTask()
+	defer tasks.Release()
 
 	wg := new(sync.WaitGroup)
 
@@ -104,6 +108,7 @@ func TestTasks_TwoCreator_Create_ManyTask(t *testing.T) {
 func TestTasks_DeleteTask(t *testing.T) {
 
 	tasks := NewTasks()
+	defer tasks.Release()
 
 	t1 := tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg"})
 	t2 := tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/B.mpg"})
@@ -126,6 +131,7 @@ func TestTasks_DeleteTask(t *testing.T) {
 
 func TestTasks_FindTaskByFileName(t *testing.T) {
 	tasks := NewTasks()
+	defer tasks.Release()
 
 	t1 := tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg", FileName: "A.mpg"})
 	t2 := tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/B.mpg", FileName: "B.mpg"})
@@ -145,6 +151,7 @@ func TestTasks_FindTaskByFileName(t *testing.T) {
 func TestTasks_UpdateStatus(t *testing.T) {
 
 	tasks := NewTasks()
+	defer tasks.Release()
 
 	// task 를 복사해서 리턴한다. 즉 값이 복사된다.
 	t1 := tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg", FileName: "A.mpg"})
@@ -163,6 +170,7 @@ func TestTasks_UpdateStatus(t *testing.T) {
 
 func TestTasks_GetTaskList(t *testing.T) {
 	tasks := NewTasks()
+	defer tasks.Release()
 
 	t1 := tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg", FileName: "A.mpg"})
 	t2 := tasks.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/B.mpg", FileName: "B.mpg"})

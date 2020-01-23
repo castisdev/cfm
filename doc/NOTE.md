@@ -228,12 +228,12 @@ hitcount 에서 구한 file list 에 중복되는 file 이 있을 수도 있을 
 
 - lb log 에서 구한 file list 에서는 광고 file 제거하는 기능이 없음
   >> 추가 필요할 듯
-- // 12. 이미 task queue 에 있는 파일이면 skip
-task 의 key 가 file name이 아닌데 왜 skip 할 까?
+- // 12. 이미 task queue 에 있는 파일이면 ignored
+task 의 key 가 file name이 아닌데 왜 ignored 할 까?
  >> file 을 1 copy 유지하는 정책이 있어서, 여러 destinatioh 에 배포할 필요가 없기 때문
 
 ``` go
-// 12. 이미 task queue 에 있는 파일이면 skip
+// 12. 이미 task queue 에 있는 파일이면 ignored
 if _, exists := tasks.FindTaskByFileName(file.Name); exists {
   // cilog.Debugf("%s is already in task queue", file.Name)
   continue

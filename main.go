@@ -48,12 +48,12 @@ func main() {
 
 	execDir, err := osext.ExecutableFolder()
 	if err != nil {
-		log.Fatalf("fail to get executable folder, %s", err)
+		log.Fatalf("failed to get executable folder, %s", err)
 	}
 
 	c, err := ReadConfig(path.Join(execDir, "cfm.yml"))
 	if err != nil {
-		log.Fatalf("fail to read config, error(%s)", err.Error())
+		log.Fatalf("failed to read config, error(%s)", err.Error())
 	}
 
 	ValidationConfig(*c)
@@ -77,7 +77,7 @@ func main() {
 		Mod:    "api"}
 
 	cilog.Set(mLogWriter, AppName, AppVersion, logLevel)
-	cilog.Infof("process start")
+	cilog.Infof("started main process")
 
 	for _, s := range c.Servers.Sources {
 		heartbeater.Add(s)
@@ -102,7 +102,7 @@ func main() {
 	remover.SetSleepSec(c.Remover.RemoverSleepSec)
 	if err := remover.SetDiskUsageLimitPercent(
 		c.Remover.StorageUsageLimitPercent); err != nil {
-		log.Fatalf("can not configure remover.storage_usage_limit_percent"+
+		log.Fatalf("can not configure remover. storage_usage_limit_percent"+
 			", error(%s)", err.Error())
 	}
 	remover.SetGradeInfoFile(c.GradeInfoFile)
@@ -152,6 +152,6 @@ func main() {
 
 	err = s.ListenAndServe()
 	if err != nil {
-		log.Fatalf("fail to start, error(%s)", err.Error())
+		log.Fatalf("failed to start, error(%s)", err.Error())
 	}
 }

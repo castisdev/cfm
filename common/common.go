@@ -207,7 +207,7 @@ func (d Disksize) FormatBytes() string {
 // String : DiskUsage to strig
 func (du DiskUsage) String() string {
 	s := fmt.Sprintf(
-		"TotalSize(%s), UsedSize(%s), AvailSize(%s), UsedPercent(%d)",
+		"totalSize(%s), usedSize(%s), availSize(%s), usedPercent(%d)",
 		du.TotalSize, du.UsedSize, du.AvailSize, du.UsedPercent)
 	return s
 }

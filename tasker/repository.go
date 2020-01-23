@@ -41,7 +41,7 @@ func (r *Repository) remove() error {
 func (r *Repository) open() error {
 	db, err := leveldb.OpenFile(r.where, nil)
 	if err != nil {
-		r.logger.Errorf("fail to open tasks repository")
+		r.logger.Errorf("failed to open tasks repository")
 		return err
 	}
 	r.db = db
@@ -55,7 +55,7 @@ func (r *Repository) close() error {
 	}
 	err := r.db.Close()
 	if err != nil {
-		r.logger.Errorf("fail to close tasks repository")
+		r.logger.Errorf("failed to close tasks repository")
 		return err
 	}
 	r.isOpen = false
@@ -71,7 +71,7 @@ func (r *Repository) saveTask(t *Task) error {
 	tv, err := json.Marshal(t)
 	err = r.db.Put([]byte(strconv.FormatInt(t.ID, 10)), []byte(tv), nil)
 	if err != nil {
-		r.logger.Errorf("[%d] fail to save task", t.ID)
+		r.logger.Errorf("[%d] failed to save task", t.ID)
 		return err
 	}
 	return nil
@@ -85,7 +85,7 @@ func (r *Repository) deleteTask(id int64) error {
 	}
 	err := r.db.Delete([]byte(strconv.FormatInt(id, 10)), nil)
 	if err != nil {
-		r.logger.Errorf("[%d] fail to delete task", id)
+		r.logger.Errorf("[%d] failed to delete task", id)
 		return err
 	}
 	return nil
@@ -106,7 +106,7 @@ func (r *Repository) loadTasks() ([]Task, error) {
 		value := iter.Value()
 		t := Task{}
 		if err := json.Unmarshal(value, &t); err != nil {
-			r.logger.Errorf("fail to load task, %s", value)
+			r.logger.Errorf("failed to load task, %s", value)
 			return tasks, err
 		}
 		tasks = append(tasks, t)

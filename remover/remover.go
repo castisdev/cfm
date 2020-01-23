@@ -2,7 +2,6 @@ package remover
 
 import (
 	"errors"
-	"fmt"
 	"sort"
 	"time"
 
@@ -107,8 +106,8 @@ func RunForever() {
 
 // run :
 func run(basetm time.Time) error {
-	remover.Infof("start remover process")
-	defer logElapased("end remover process", common.Start())
+	remover.Infof("started remover process")
+	defer logElapased("ended remover process", common.Start())
 
 	serverIPMap := make(map[string]int)
 	for _, server := range *Servers {
@@ -125,10 +124,10 @@ func run(basetm time.Time) error {
 	err := common.MakeAllFileMetas(gradeInfoFile, hitcountHistoryFile,
 		fileMetaMap, serverIPMap, duplicatedFileMap)
 	if err != nil {
-		remover.Errorf("fail to make file metas, error(%s)", err.Error())
+		remover.Errorf("failed to make file metas, error(%s)", err.Error())
 		return err
 	}
-	remover.Infof("make file metas(name, grade, size, servers), time(%s)",
+	remover.Infof("made file metas(name, grade, size, servers), time(%s)",
 		common.Elapsed(est))
 
 	// 급 hit 상승 파일 목록 구하기
@@ -146,8 +145,8 @@ func runWithInfo(
 	duplicatedFileMap FileMetaPtrMap,
 	risingHitFileMap map[string]int) {
 
-	remover.Infof("start remover inner process")
-	defer logElapased("end remover inner process", common.Start())
+	remover.Infof("started remover inner process")
+	defer logElapased("ended remover inner process", common.Start())
 
 	// 전체 파일 meta 정보에서
 	// 현재 서버(destination)에 있는 파일들의 meta만 골라내서
@@ -175,7 +174,7 @@ func getServerFileMetas(allfmm FileMetaPtrMap) ServerFileMetaPtrMap {
 		sfms, err := selectFileMetas(server, allfmm)
 		sfmm[server.Addr] = sfms
 		if err != nil {
-			remover.Errorf("[%s] fail to get server file meatas, erorr(%s)",
+			remover.Errorf("[%s] failed to get server file meatas, erorr(%s)",
 				server, err.Error())
 		}
 	}
@@ -193,34 +192,33 @@ func selectFileMetas(server *common.Host,
 	fl := make([]string, 0, 10000)
 	err := common.GetRemoteFileList(server, &fl)
 	if err != nil {
-		s := fmt.Sprintf("fail to get remote file list, error(%s)", err.Error())
-		return sfm, errors.New(s)
+		return sfm, err
 	}
 	for _, filename := range fl {
 		// 예외처리 : 아직 해당 서버의 파일 내용이 반영이 안된 상황 등으로 인해서
 		// 서버에 있지만 전체 파일 목록에서 찾을 수 없으면 제외
 		fm, ok := fileMetaMap[filename]
 		if !ok {
-			// remover.Debugf("[%s] skip file, with no grade or no size, file(%s)", server, filename)
+			// remover.Debugf("[%s] ignored, with no grade or no size, file(%s)", server, filename)
 			continue
 		}
 		// 등급이나 크기 중 하나만 있거나, 값이 잘못된 경우 제외
 		if fm.Grade <= 0 || fm.Size <= 0 {
-			// remover.Debugf("[%s] skip file, with wrong grade(%d) or wrong size(%d),"+
+			// remover.Debugf("[%s] ignored, with wrong grade(%d) or wrong size(%d),"+
 			// 	" file(%s)", server, fm.Grade, fm.Size, filename)
 			continue
 		}
 		// 예외처리
 		// 파일이 위치한 server 가 없다면 제외
 		if fm.ServerCount <= 0 {
-			//remover.Debugf("[%s] skip file, not found in the servers, file(%s)", server,  filename)
+			//remover.Debugf("[%s] ignored, not found in the servers, file(%s)", server,  filename)
 			continue
 		}
 		// 예외처리
 		// 파일이 위치한 server list에 현재 서버가 없다면 제외
 		n, exist := fm.ServerIPs[server.IP]
 		if !exist || (exist && n == 0) {
-			// remover.Debugf("[%s] skip file, not found in the servers, file(%s)"+
+			// remover.Debugf("[%s] ignored, not found in the servers, file(%s)"+
 			// 	", exist(%t), count(%d)",
 			// 	server, filename, exist, n)
 			continue
@@ -253,8 +251,7 @@ func requestRemoveDuplicatedFiles(duplicatedFileMap FileMetaPtrMap,
 		for _, server := range *Servers {
 			// 해당 서버에 중복 파일이 없을 때
 			if n, found := dfm.ServerIPs[server.IP]; !found || n == 0 {
-				remover.Debugf("[%s] skip requesting to delete duplicated"+
-					", not found in the server, file(%s)",
+				remover.Debugf("[%s] ignored by not.found.in.the.server, file(%s)",
 					server, dfm)
 				continue
 			}
@@ -262,35 +259,33 @@ func requestRemoveDuplicatedFiles(duplicatedFileMap FileMetaPtrMap,
 			// 중복 파일 meta에 update 한 후라면 필요없는 예외 처리
 			// 해당 서버에 중복 파일이 없을 때
 			if !ok {
-				remover.Debugf("[%s] skip requesting to delete duplicated"+
-					", not found in the server, file(%s)",
+				remover.Debugf("[%s] ignored by not.found.in.the.server, file(%s)",
 					server, dfn)
 				continue
 			}
 			// 제외 대상 파일 처리
 			if common.IsPrefix(fm.Name, ignorePrefixes) {
-				remover.Debugf("[%s] skip file by ignore.prefix, file(%s)", server, fm.Name)
+				remover.Debugf("[%s] ignored by ignore.prefix, file(%s)", server, fm.Name)
 				continue
 			}
 			// SAN 에 없는 파일이면 삭제 대상에서 제외
 			if _, exists := SourcePath.IsExistOnSource(fm.Name); exists != true {
-				remover.Debugf("[%s] skip file by not.found.in.the.source.paths, file(%s)", server, fm.Name)
+				remover.Debugf("[%s] ignored by not.found.in.the.source.paths, file(%s)", server, fm.Name)
 				continue
 			}
 			// 중복된 파일이 아니면 제외
 			if fm.ServerCount < 2 {
-				remover.Debugf("[%s] skip requesting to delete duplicated"+
-					", one copy left in the servers, file(%s)",
+				remover.Debugf("[%s] ignored by one.copy.left.in.the.servers, file(%s)",
 					server, dfn)
 				continue
 			}
 			if err := common.DeleteFileOnRemote(server, fm.Name); err != nil {
-				remover.Errorf("[%s] fail to request to delete duplicated"+
+				remover.Errorf("[%s] failed to request to delete duplicated"+
 					", file(%s), error(%s)",
 					server, fm, err.Error())
 				continue
 			}
-			remover.Infof("[%s] request to delete duplicated, file(%s)", server, fm)
+			remover.Infof("[%s] requested to delete duplicated, file(%s)", server, fm)
 			// 현재 server에 delete 요청 성공한 파일에 대해서
 			// file meta 정보에서 현재 서버 정보 삭제
 			// - file meta 정보를 다시 읽지 않고 현재 file meta 정보를 가지고,
@@ -341,10 +336,10 @@ func findServersOutOfDiskSpace(serverList *common.Hosts) []DServer {
 		du := new(common.DiskUsage)
 		err := common.GetRemoteDiskUsage(server, du)
 		if err != nil {
-			remover.Errorf("[%s] fail to get disk usage, error(%s)", server, err.Error())
+			remover.Errorf("[%s] failed to get disk usage, error(%s)", server, err.Error())
 			continue
 		}
-		// limit used size 까지 사용하지 않았으면 skip
+		// limit used size 까지 사용하지 않았으면 ignored
 		limitUsedSize := du.GetLimitUsedSize(diskUsageLimitPercent)
 		if du.UsedSize <= limitUsedSize {
 			remover.Debugf("[%s] enough disk space, used(%s) <= limit(%s)"+
@@ -386,21 +381,21 @@ func requestRemoveFilesForFreeDiskSpace(servers []DServer,
 		for _, fm := range fileListToDelete {
 			// 예외처리
 			if fm.ServerCount <= 0 {
-				remover.Debugf("[%s] skip requesting to delete"+
-					" by not.found.in.the.server, file(%s)", server, fm)
+				remover.Debugf("[%s] ignored by not.found.in.the.server, file(%s)",
+					server, fm)
 				continue
 			}
 			// 예외처리
 			if n, exist := fm.ServerIPs[server.IP]; !exist || n <= 0 {
-				remover.Debugf("[%s] skip requsting to delete"+
-					" by not.found.in.the.server, file(%s)", server, fm)
+				remover.Debugf("[%s] ignored by not.found.in.the.server, file(%s)",
+					server, fm)
 				continue
 			}
 			if err := common.DeleteFileOnRemote(server.Host, fm.Name); err != nil {
-				remover.Errorf("[%s] fail to request to delete, file(%s), error(%s)",
+				remover.Errorf("[%s] failed to request to delete, file(%s), error(%s)",
 					server, fm, err.Error())
 			} else {
-				remover.Infof("[%s] request to delete, file(%s)", server, fm)
+				remover.Infof("[%s] requested to delete, file(%s)", server, fm)
 				deletingSize = deletingSize + common.Disksize(fm.Size)
 				// 현재 server에 delete 요청 성공한 파일에 대해서
 				// file meta 정보에서 현재 서버 정보 삭제
@@ -421,8 +416,8 @@ func requestRemoveFilesForFreeDiskSpace(servers []DServer,
 			}
 		}
 		if deletingSize > 0 {
-			remover.Infof("[%s] request for free disk space(%s / %s)", server,
-				deletingSize, server.Du.GetOverUsedSize(diskUsageLimitPercent))
+			remover.Infof("[%s] requested to delete files for free disk space(%s / %s)",
+				server, deletingSize, server.Du.GetOverUsedSize(diskUsageLimitPercent))
 		}
 	}
 }
@@ -453,59 +448,72 @@ func getFileListToDeleteForFreeDiskSpace(server DServer,
 	}
 
 	fileList := make([]*common.FileMeta, 0, len(sfmm))
-	for filename, fm := range sfmm {
-		// 예외처리
-		if fm.ServerCount <= 0 {
-			remover.Debugf("[%s] skip file by not.found.in.the.server, file(%s)", server, filename)
-			continue
-		}
-		// 예외처리
-		if n, exist := fm.ServerIPs[server.IP]; !exist || n <= 0 {
-			remover.Debugf("[%s] skip file by not.found.in.the.server, file(%s)", server, filename)
-			continue
-		}
-		// 제외 대상 파일 처리
-		if common.IsPrefix(filename, ignorePrefixes) {
-			remover.Debugf("[%s] skip file by ignore.prefix, file(%s)", server, filename)
-			continue
-		}
-		// SAN 에 없는 파일이면 삭제 대상에서 제외
-		if _, exists := SourcePath.IsExistOnSource(filename); exists != true {
-			remover.Debugf("[%s] skip file by not.found.in.the.source.paths, file(%s)", server, filename)
-			continue
-		}
-		// 급 hit 상승 파일 목록에 속하는 파일이면 삭제 대상에 제외
-		if _, exists := rhitfmm[filename]; exists {
-			remover.Debugf("[%s] skip file by rising.hit.file, file(%s)", server, filename)
-			continue
-		}
-		fileList = append(fileList, fm)
-	}
-	if len(fileList) == 0 {
+	if len(sfmm) == 0 {
 		remover.Debugf("[%s] no file to delete", server)
 		return fileList
 	}
-
+	for _, fm := range sfmm {
+		fileList = append(fileList, fm)
+	}
 	// 낮은 등급순(숫자는 큰 순서로 999999 -> 1 순으로) 정렬
 	sort.Slice(fileList, func(i, j int) bool {
 		return fileList[i].Grade > fileList[j].Grade
 	})
 
-	fileListToDelete := make([]*common.FileMeta, 0, len(fileList)/10)
 	// 용량 확보될때까지 삭제할 파일에 추가
+	fileListToDelete := make([]*common.FileMeta, 0, len(fileList)/10)
 	overUsedSize := server.Du.GetOverUsedSize(diskUsageLimitPercent)
 	deletingSize := common.Disksize(0)
 	for _, fm := range fileList {
+		if !checkForDelete(fm, server, rhitfmm) {
+			continue
+		}
 		if deletingSize >= overUsedSize {
 			break
 		}
 		deletingSize += common.Disksize(fm.Size)
-		remover.Debugf("[%s] deleting size(%s / %s), add file to delete-list"+
+		remover.Debugf("[%s] added file to delete-list, total deleting size(%s / %s)"+
 			", file(%s)", server, common.Disksize(deletingSize), overUsedSize, fm)
 		fileListToDelete = append(fileListToDelete, fm)
 	}
 
 	return fileListToDelete
+}
+
+func checkForDelete(fm *common.FileMeta, server DServer,
+	rhitfmm map[string]int) bool {
+	// 예외처리
+	if fm.ServerCount <= 0 {
+		remover.Debugf("[%s] ignored by not.found.in.the.server, file(%s)",
+			server, fm)
+		return false
+	}
+	// 예외처리
+	if n, exist := fm.ServerIPs[server.IP]; !exist || n <= 0 {
+		remover.Debugf("[%s] ignored by not.found.in.the.server, file(%s)",
+			server, fm)
+		return false
+	}
+	// 제외 대상 파일 처리
+	if common.IsPrefix(fm.Name, ignorePrefixes) {
+		remover.Debugf("[%s] ignored by ignore.prefix, file(%s)",
+			server, fm)
+		return false
+	}
+	// SAN 에 없는 파일이면 삭제 대상에서 제외
+	if _, exists := SourcePath.IsExistOnSource(fm.Name); exists != true {
+		remover.Debugf("[%s] ignored by not.found.in.the.source.paths, file(%s)",
+			server, fm)
+		return false
+	}
+	// 급 hit 상승 파일 목록에 속하는 파일이면 삭제 대상에 제외
+	if _, exists := rhitfmm[fm.Name]; exists {
+		remover.Debugf("[%s] ignored by rising.hit.file, file(%s)",
+			server, fm)
+		return false
+	}
+
+	return true
 }
 
 func logElapased(message string, start time.Time) {

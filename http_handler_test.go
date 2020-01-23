@@ -83,7 +83,7 @@ func TestAPI_TaskIndex(t *testing.T) {
 	url := fmt.Sprintf("http://%s/tasks", serverAddr)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		t.Errorf("fail to get task list, error(%s)", err.Error())
+		t.Errorf("failed to get task list, error(%s)", err.Error())
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -91,13 +91,13 @@ func TestAPI_TaskIndex(t *testing.T) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		t.Errorf("fail to get task list, error(%s)", err.Error())
+		t.Errorf("failed to get task list, error(%s)", err.Error())
 		return
 	}
 
 	clienttaskList := make([]tasker.Task, 0)
 	if err := json.NewDecoder(resp.Body).Decode(&clienttaskList); err != nil {
-		t.Errorf("fail to get task list, error(%s)", err.Error())
+		t.Errorf("failed to get task list, error(%s)", err.Error())
 		return
 	}
 
@@ -166,7 +166,7 @@ func TestAPI_TaskIndex_EmptyList(t *testing.T) {
 	url := fmt.Sprintf("http://%s/tasks", serverAddr)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		t.Errorf("fail to get task list, error(%s)", err.Error())
+		t.Errorf("failed to get task list, error(%s)", err.Error())
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -174,13 +174,13 @@ func TestAPI_TaskIndex_EmptyList(t *testing.T) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		t.Errorf("fail to get task list, error(%s)", err.Error())
+		t.Errorf("failed to get task list, error(%s)", err.Error())
 		return
 	}
 
 	clienttaskList := make([]tasker.Task, 0)
 	if err := json.NewDecoder(resp.Body).Decode(&clienttaskList); err != nil {
-		t.Errorf("fail to get task list, error(%s)", err.Error())
+		t.Errorf("failed to get task list, error(%s)", err.Error())
 		return
 	}
 
@@ -262,7 +262,7 @@ func TestAPI_TaskDelete(t *testing.T) {
 	url := fmt.Sprintf("http://%s/tasks/%d", serverAddr, t3.ID)
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
-		t.Errorf("fail to delete task, error(%s)", err.Error())
+		t.Errorf("failed to delete task, error(%s)", err.Error())
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -270,11 +270,11 @@ func TestAPI_TaskDelete(t *testing.T) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		t.Errorf("fail to delete task, error(%s)", err.Error())
+		t.Errorf("failed to delete task, error(%s)", err.Error())
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
-		t.Errorf("fail to delete task, response(%s)", resp.Status)
+		t.Errorf("failed to delete task, response(%s)", resp.Status)
 		return
 	}
 
@@ -357,14 +357,14 @@ func TestAPI_TaskUpdate(t *testing.T) {
 	}
 	body, err := json.Marshal(&st)
 	if err != nil {
-		t.Errorf("fail to update task, error(%s)", err.Error())
+		t.Errorf("failed to update task, error(%s)", err.Error())
 		return
 	}
 
 	url := fmt.Sprintf("http://%s/tasks/%d", serverAddr, t3.ID)
 	req, err := http.NewRequest("PATCH", url, bytes.NewBuffer(body))
 	if err != nil {
-		t.Errorf("fail to update task, error(%s)", err.Error())
+		t.Errorf("failed to update task, error(%s)", err.Error())
 		return
 	}
 	t.Logf("request body: %s", body)
@@ -374,11 +374,11 @@ func TestAPI_TaskUpdate(t *testing.T) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		t.Errorf("fail to update task, error(%s)", err.Error())
+		t.Errorf("failed to update task, error(%s)", err.Error())
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
-		t.Errorf("fail to update task, response(%s)", resp.Status)
+		t.Errorf("failed to update task, response(%s)", resp.Status)
 		return
 	}
 

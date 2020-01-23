@@ -67,33 +67,33 @@ func NewTailer() *Tailer {
 
 // SetWatchDir :
 func (t *Tailer) SetWatchDir(dir string) {
-	tailer.Infof("set watch dir : (%s)", dir)
+	tailer.Infof("set watchDir : (%s)", dir)
 	t.watchDir = dir
 }
 
 // SetWatchIPString :
 func (t *Tailer) SetWatchIPString(ip string) {
-	tailer.Infof("set watch ip string : (%s)", ip)
+	tailer.Infof("set watchIpString : (%s)", ip)
 	t.watchIPString = ip
 }
 
 // SetWatchTermMin :
 func (t *Tailer) SetWatchTermMin(minute int) {
 	if minute <= 0 {
-		tailer.Infof("invalid value, set as default watch term min : (%d)", 10)
+		tailer.Infof("invalid value, set as default watchTermMin : (%d)", 10)
 		t.watchTermMin = 10
 	}
-	tailer.Infof("set watch term min : (%d)", minute)
+	tailer.Infof("set watchTermMin : (%d)", minute)
 	t.watchTermMin = minute
 }
 
 // SetWatchHitBase :
 func (t *Tailer) SetWatchHitBase(baseHit int) {
 	if baseHit <= 0 {
-		tailer.Infof("set watch hit base : (%d)", 3)
+		tailer.Infof("set watchHitBase : (%d)", 3)
 		t.watchHitBase = 3
 	}
-	tailer.Infof("set watch hit base : (%d)", baseHit)
+	tailer.Infof("set watchHitBase : (%d)", baseHit)
 	t.watchHitBase = baseHit
 }
 
@@ -101,8 +101,8 @@ func (t *Tailer) SetWatchHitBase(baseHit int) {
 //
 // 입력받은 시각값의 watchTermMin 전부터의 로그를 tail 한다.
 func (t *Tailer) Tail(basetm time.Time, fileMap *map[string]int) {
-	tailer.Infof("start tail process")
-	defer logElapased("end tail process", common.Start())
+	tailer.Infof("started tail process")
+	defer logElapased("ended tail process", common.Start())
 
 	// 입력받은 시각값을 이용하여 N분 전 시각을 구하기 위해선 음수 값이 필요하다.
 	from := basetm.Add(time.Minute * time.Duration(t.watchTermMin*-1))
@@ -113,21 +113,22 @@ func (t *Tailer) Tail(basetm time.Time, fileMap *map[string]int) {
 		startOffset := int64(0)
 		readOffset, err := t.parseLBEventLog(file, startOffset, from.Unix(), fileMap)
 		if err != nil {
-			tailer.Errorf("fail to parse,file(%s),error(%s)", file, err.Error())
+			tailer.Errorf("failed to parse, file(%s),error(%s)", file, err.Error())
 			continue
 		}
-		tailer.Infof("parse file(%s) from (%d) to (%d)", file, startOffset, readOffset)
+		tailer.Infof("parsed file(%s) from (%d) to (%d)", file, startOffset, readOffset)
 	}
 
-	tailer.Debugf("hit files(%d)", len(*fileMap))
+	tailer.Debugf("total hit files(%d)", len(*fileMap))
 	// Hit 수가 기준 미달일 경우 file list 에서 제외
 	for fileName, hitCount := range *fileMap {
-		tailer.Debugf("rising hit file(%s), hit(%d)", fileName, hitCount)
+		tailer.Debugf("hit file(%s), hit(%d)", fileName, hitCount)
 		if hitCount < t.watchHitBase {
 			delete(*fileMap, fileName)
 		}
 	}
-	tailer.Debugf("rising hit files(%d), hits > base hits(%d) ", len(*fileMap), t.watchHitBase)
+	tailer.Debugf("total rising hit files(%d), hits > base hits(%d)",
+		len(*fileMap), t.watchHitBase)
 
 	return
 }
@@ -190,7 +191,7 @@ func (t *Tailer) parseLBEventLog(fileName string, offset int64, baseTime int64, 
 
 		logTime, err := strconv.ParseInt(ss[2], 10, 64)
 		if err != nil {
-			// tailer.Debugf("fail to strconv (%s)", ss[2])
+			// tailer.Debugf("failed to strconv (%s)", ss[2])
 			continue
 		}
 

@@ -39,7 +39,7 @@ func (t HBTime) String() string {
 
 func (h HBHost) String() string {
 	s := fmt.Sprintf(
-		"Host(%s), Status(%s), Mtime(%s)",
+		"host(%s), status(%s), mtime(%s)",
 		h.Host, h.Status, h.Mtime)
 
 	return s
@@ -70,12 +70,12 @@ func Release() {
 }
 
 func SetTimoutSec(s uint) {
-	hber.Debugf("set timeoutSec(%d)", s)
+	hber.Infof("set timeoutSec(%d)", s)
 	timeoutSec = s
 }
 
 func SetSleepSec(s uint) {
-	hber.Debugf("set sleepSec(%d)", s)
+	hber.Infof("set sleepSec(%d)", s)
 	sleepSec = s
 }
 
@@ -182,15 +182,16 @@ func Heartbeat() {
 		if rc {
 			h.Status = OK
 			h.Mtime = HBTime(time.Now().Unix())
-			hber.Debugf("[%s] heartbeat, host(%s)", h.Host, h)
+			hber.Debugf("[%s] checked heartbeat ok, host(%s)", h.Host, h)
 		} else {
 			h.Status = NOTOK
 			h.Mtime = HBTime(time.Now().Unix())
 			if err != nil {
-				hber.Errorf("[%s] fail to heartbeat, host(%s), timeout(%d), error(%s)",
-					h.Host, h, timeoutSec, err.Error())
+				hber.Errorf("[%s] failed to check heartbeat, host(%s), timeout(%d)"+
+					", error(%s)", h.Host, h, timeoutSec, err.Error())
 			} else {
-				hber.Errorf("[%s] fail to heartbeat, host(%s), timeout(%d)", h.Host, h, timeoutSec)
+				hber.Errorf("[%s] checked heartbeat not ok, host(%s), timeout(%d)",
+					h.Host, h, timeoutSec)
 			}
 		}
 		newhl = append(newhl, h)

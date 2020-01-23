@@ -194,13 +194,13 @@ func MakeAllFileMetas(gradeInfoFile string, hitcountHistoryFile string,
 	duplicatedFileMap map[string]*FileMeta) error {
 
 	if err := parseGradeFileAndNewFileMetas(gradeInfoFile, fileMetaMap); err != nil {
-		s := fmt.Sprintf("fail to parse file(%s), error(%s)", gradeInfoFile, err.Error())
+		s := fmt.Sprintf("failed to parse file(%s), error(%s)", gradeInfoFile, err.Error())
 		return errors.New(s)
 	}
 	// 파일 등급 list에 있는 파일들의 file size, 파일 위치 정보 구하기
 	if err := parseHitcountFileAndUpdateFileMetas(hitcountHistoryFile, fileMetaMap,
 		serverIPMap, duplicatedFileMap); err != nil {
-		s := fmt.Sprintf("fail to parse file(%s), error(%s)", hitcountHistoryFile, err.Error())
+		s := fmt.Sprintf("failed to parse file(%s), error(%s)", hitcountHistoryFile, err.Error())
 		return errors.New(s)
 	}
 	return nil
