@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/castisdev/cfm/common"
+	"github.com/castisdev/cfm/fmfm"
 	"github.com/castisdev/cfm/heartbeater"
 	"github.com/castisdev/cfm/remover"
 	"github.com/castisdev/cfm/tasker"
@@ -25,13 +26,33 @@ var api common.MLogger
 const (
 	AppName      = "cfm"
 	AppVersion   = "1.0.0"
-	AppPreRelVer = "qr2"
+	AppPreRelVer = "qr3"
 )
 
 func main() {
-
 	debug.SetTraceback("crash")
+	doCli()
+	c := newConfig()
+	enableCoreDump(c)
+	configCiLogger(c)
 
+	cilog.Infof("started main process")
+	startHeartbeater(c)
+
+	//startManager(c)
+
+	startRemover(c)
+	tskr := startTasker(c)
+
+	api = common.MLogger{
+		Logger: cilog.StdLogger(),
+		Mod:    "api"}
+	tasks = tskr.GetTaskListInstance()
+
+	startHttpServer(c)
+}
+
+func doCli() {
 	printSimpleVer := flag.Bool("v", false, "print version")
 	printVer := flag.Bool("version", false, "print version includes pre-release version")
 	flag.Parse()
@@ -45,25 +66,30 @@ func main() {
 		fmt.Println(AppName + " " + AppVersion + "-" + AppPreRelVer)
 		os.Exit(0)
 	}
+}
 
+func newConfig() *Config {
 	execDir, err := osext.ExecutableFolder()
 	if err != nil {
 		log.Fatalf("failed to get executable folder, %s", err)
 	}
-
 	c, err := ReadConfig(path.Join(execDir, "cfm.yml"))
 	if err != nil {
 		log.Fatalf("failed to read config, error(%s)", err.Error())
 	}
-
 	ValidationConfig(*c)
+	return c
+}
 
+func enableCoreDump(c *Config) {
 	if c.EnableCoreDump {
 		if err := common.EnableCoreDump(); err != nil {
 			log.Fatalf("can not enable coredump, error(%s)", err.Error())
 		}
 	}
+}
 
+func configCiLogger(c *Config) {
 	logLevel, _ := cilog.LevelFromString(c.LogLevel)
 
 	mLogWriter := common.MLogWriter{
@@ -72,13 +98,10 @@ func main() {
 		App:       AppName,
 		MaxSize:   (10 * 1024 * 1024)}
 
-	api = common.MLogger{
-		Logger: cilog.StdLogger(),
-		Mod:    "api"}
-
 	cilog.Set(mLogWriter, AppName, AppVersion, logLevel)
-	cilog.Infof("started main process")
+}
 
+func startHeartbeater(c *Config) {
 	for _, s := range c.Servers.Sources {
 		heartbeater.Add(s)
 	}
@@ -92,56 +115,80 @@ func main() {
 	// heartbeater가 한 번 실행하고, tasker 가 실행될 수 있도록 한 번 실행시킴
 	heartbeater.Heartbeat()
 	go heartbeater.RunForever()
+}
 
+func startRemover(c *Config) (rmr *remover.Remover) {
+	rmr = remover.NewRemover()
 	for _, s := range c.Servers.Destinations {
-		remover.Servers.Add(s)
+		rmr.Servers.Add(s)
 	}
 	for _, s := range c.SourceDirs {
-		remover.SourcePath.Add(s)
+		rmr.SourcePath.Add(s)
 	}
-	remover.SetSleepSec(c.Remover.RemoverSleepSec)
-	if err := remover.SetDiskUsageLimitPercent(
+	rmr.SetSleepSec(c.Remover.RemoverSleepSec)
+	if err := rmr.SetDiskUsageLimitPercent(
 		c.Remover.StorageUsageLimitPercent); err != nil {
 		log.Fatalf("can not configure remover. storage_usage_limit_percent"+
 			", error(%s)", err.Error())
 	}
-	remover.SetGradeInfoFile(c.GradeInfoFile)
-	remover.SetHitcountHistoryFile(c.HitcountHistoryFile)
-	remover.SetIgnorePrefixes(c.Ignore.Prefixes)
-	remover.Tail.SetWatchDir(c.WatchDir)
-	remover.Tail.SetWatchIPString(c.WatchIPString)
-	remover.Tail.SetWatchTermMin(c.WatchTermMin)
-	remover.Tail.SetWatchHitBase(c.WatchHitBase)
+	rmr.SetGradeInfoFile(c.GradeInfoFile)
+	rmr.SetHitcountHistoryFile(c.HitcountHistoryFile)
+	rmr.SetIgnorePrefixes(c.Ignore.Prefixes)
+	rmr.Tail.SetWatchDir(c.WatchDir)
+	rmr.Tail.SetWatchIPString(c.WatchIPString)
+	rmr.Tail.SetWatchTermMin(c.WatchTermMin)
+	rmr.Tail.SetWatchHitBase(c.WatchHitBase)
 
-	go remover.RunForever()
+	go rmr.RunForever()
+	return rmr
+}
 
+func startTasker(c *Config) (tskr *tasker.Tasker) {
+	tskr = tasker.NewTasker()
 	for _, s := range c.Servers.Sources {
-		tasker.SrcServers.Add(s)
+		tskr.SrcServers.Add(s)
 	}
-
 	for _, s := range c.Servers.Destinations {
-		tasker.DstServers.Add(s)
+		tskr.DstServers.Add(s)
 	}
-
-	tasker.SetSleepSec(c.Tasker.TaskerSleepSec)
-	tasker.SetTaskTimeout(time.Duration(c.Tasker.TaskTimeout) * time.Second)
-	tasker.SetHitcountHistoryFile(c.HitcountHistoryFile)
-	tasker.SetGradeInfoFile(c.GradeInfoFile)
-	tasker.SetTaskCopySpeed(c.Tasker.TaskCopySpeedBPS)
-	tasker.SetIgnorePrefixes(c.Ignore.Prefixes)
-	tasker.Tail.SetWatchDir(c.WatchDir)
-	tasker.Tail.SetWatchIPString(c.WatchIPString)
-	tasker.Tail.SetWatchTermMin(c.WatchTermMin)
-	tasker.Tail.SetWatchHitBase(c.WatchHitBase)
+	tskr.SetSleepSec(c.Tasker.TaskerSleepSec)
+	tskr.SetTaskTimeout(time.Duration(c.Tasker.TaskTimeout) * time.Second)
+	tskr.SetHitcountHistoryFile(c.HitcountHistoryFile)
+	tskr.SetGradeInfoFile(c.GradeInfoFile)
+	tskr.SetTaskCopySpeed(c.Tasker.TaskCopySpeedBPS)
+	tskr.SetIgnorePrefixes(c.Ignore.Prefixes)
+	tskr.Tail.SetWatchDir(c.WatchDir)
+	tskr.Tail.SetWatchIPString(c.WatchIPString)
+	tskr.Tail.SetWatchTermMin(c.WatchTermMin)
+	tskr.Tail.SetWatchHitBase(c.WatchHitBase)
 
 	for _, s := range c.SourceDirs {
-		tasker.SourcePath.Add(s)
+		tskr.SourcePath.Add(s)
 	}
 
-	tasker.InitTasks()
-	tasks = tasker.GetTaskListInstance()
-	go tasker.RunForever()
+	tskr.InitTasks()
+	go tskr.RunForever()
 
+	return tskr
+}
+
+func startManager(c *Config) {
+	watcher, err := fmfm.NewFMFWatcher(
+		c.GradeInfoFile, c.HitcountHistoryFile,
+		c.Watcher.FireInitialEvent, c.Watcher.EventTimeoutSec)
+	if err != nil {
+		log.Fatalf("failed to start, error(%s)", err.Error())
+		return
+	}
+	runner := fmfm.NewFMFRunner(
+		c.GradeInfoFile, c.HitcountHistoryFile,
+		c.Runner.PeriodicRunSec, c.Runner.PeriodicRunSec)
+	manager := fmfm.NewFMFManger(watcher, runner)
+
+	go manager.Manage()
+}
+
+func startHttpServer(c *Config) {
 	router := NewRouter()
 	s := &http.Server{
 		Addr:         c.ListenAddr,
@@ -150,7 +197,7 @@ func main() {
 		WriteTimeout: 5 * time.Second,
 	}
 
-	err = s.ListenAndServe()
+	err := s.ListenAndServe()
 	if err != nil {
 		log.Fatalf("failed to start, error(%s)", err.Error())
 	}

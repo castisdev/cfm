@@ -32,6 +32,16 @@ type Ignore struct {
 	Prefixes []string `mapstructure:"prefixes"`
 }
 
+type Watcher struct {
+	FireInitialEvent bool   `mapstructure:"fire_initial_event"`
+	EventTimeoutSec  uint32 `mapstructure:"event_timeout_sec"`
+}
+
+type Runner struct {
+	PeriodicRunSec              uint32 `mapstructure:"periodic_run_sec"`
+	PeriodicRunBetweenEventsSec uint32 `mapstructure:"periodic_run_between_events_sec"`
+}
+
 // Config :
 type Config struct {
 	SourceDirs          []string `mapstructure:"source_dirs"`
@@ -49,6 +59,8 @@ type Config struct {
 	Remover             Remover  `mapstructure:"remover"`
 	Tasker              Tasker   `mapstructure:"tasker"`
 	Ignore              Ignore   `mapstructure:"ignore"`
+	Watcher             Watcher  `mapstructure:"watcher"`
+	Runner              Runner   `mapstructure:"runner"`
 }
 
 // ReadConfig :
@@ -64,6 +76,10 @@ func ReadConfig(configFile string) (*Config, error) {
 	viper.SetDefault("servers.heartbeat_sleep_sec", uint(30))
 	viper.SetDefault("remover.remover_sleep_sec", uint(30))
 	viper.SetDefault("remover.storage_usage_limit_percent", uint(90))
+	viper.SetDefault("watcher.fire_initial_event", true)
+	viper.SetDefault("watcher.event_timeout_sec", uint32(3600))
+	viper.SetDefault("runner.periodic_run_sec", uint32(60))
+	viper.SetDefault("runner.periodic_run_between_events_sec", uint32(60))
 
 	var c Config
 	viper.SetConfigFile(configFile)

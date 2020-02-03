@@ -114,25 +114,24 @@ func deletefile(dir string, filename string) {
 // (*DstServers)[2] // 127.0.0.3:18083
 // (*DstServers)[3] // 127.0.0.2:18082
 // (*DstServers)[4] // 127.0.0.1:18081
-func makePresetS1D4() {
-	SrcServers = NewSrcHosts()
+func makePresetS1D4(tskr *Tasker) {
 	// sort 되어 들어감
-	SrcServers.Add("127.0.0.1:8081")
-	(*SrcServers)[0].Status = OK // 127.0.0.1:8081
+	tskr.SrcServers.Add("127.0.0.1:8081")
+	(*tskr.SrcServers)[0].Status = OK // 127.0.0.1:8081
 
-	DstServers = NewDstHosts()
+	tskr.DstServers = NewDstHosts()
 	// sort 되어 들어감
-	DstServers.Add("127.0.0.1:18081")
-	DstServers.Add("127.0.0.2:18082")
-	DstServers.Add("127.0.0.3:18083")
-	DstServers.Add("127.0.0.4:18084")
-	DstServers.Add("127.0.0.5:18085")
+	tskr.DstServers.Add("127.0.0.1:18081")
+	tskr.DstServers.Add("127.0.0.2:18082")
+	tskr.DstServers.Add("127.0.0.3:18083")
+	tskr.DstServers.Add("127.0.0.4:18084")
+	tskr.DstServers.Add("127.0.0.5:18085")
 
-	(*DstServers)[0].Status = OK // 127.0.0.5:18085
-	(*DstServers)[1].Status = OK // 127.0.0.4:18082
-	(*DstServers)[2].Status = OK // 127.0.0.3:18083
-	(*DstServers)[3].Status = OK // 127.0.0.2:18082
-	(*DstServers)[4].Status = OK // 127.0.0.1:18081
+	(*tskr.DstServers)[0].Status = OK // 127.0.0.5:18085
+	(*tskr.DstServers)[1].Status = OK // 127.0.0.4:18082
+	(*tskr.DstServers)[2].Status = OK // 127.0.0.3:18083
+	(*tskr.DstServers)[3].Status = OK // 127.0.0.2:18082
+	(*tskr.DstServers)[4].Status = OK // 127.0.0.1:18081
 }
 
 // makePresetS1D4 :
@@ -147,31 +146,29 @@ func makePresetS1D4() {
 // (*DstServers)[2] // 127.0.0.3:18083
 // (*DstServers)[3] // 127.0.0.2:18082
 // (*DstServers)[4] // 127.0.0.1:18081
-func makePresetS4D5() {
-	SrcServers = NewSrcHosts()
+func makePresetS4D5(tskr *Tasker) {
 	// sort 되어 들어감
-	SrcServers.Add("127.0.0.1:8081")
-	SrcServers.Add("127.0.0.2:8082")
-	SrcServers.Add("127.0.0.3:8083")
-	SrcServers.Add("127.0.0.4:8084")
-	(*SrcServers)[0].Status = OK // 127.0.0.4:8084
-	(*SrcServers)[1].Status = OK // 127.0.0.3:8083
-	(*SrcServers)[2].Status = OK // 127.0.0.2:8082
-	(*SrcServers)[3].Status = OK // 127.0.0.1:8081
+	tskr.SrcServers.Add("127.0.0.1:8081")
+	tskr.SrcServers.Add("127.0.0.2:8082")
+	tskr.SrcServers.Add("127.0.0.3:8083")
+	tskr.SrcServers.Add("127.0.0.4:8084")
+	(*tskr.SrcServers)[0].Status = OK // 127.0.0.4:8084
+	(*tskr.SrcServers)[1].Status = OK // 127.0.0.3:8083
+	(*tskr.SrcServers)[2].Status = OK // 127.0.0.2:8082
+	(*tskr.SrcServers)[3].Status = OK // 127.0.0.1:8081
 
-	DstServers = NewDstHosts()
 	// sort 되어 들어감
-	DstServers.Add("127.0.0.1:18081")
-	DstServers.Add("127.0.0.2:18082")
-	DstServers.Add("127.0.0.3:18083")
-	DstServers.Add("127.0.0.4:18084")
-	DstServers.Add("127.0.0.5:18085")
+	tskr.DstServers.Add("127.0.0.1:18081")
+	tskr.DstServers.Add("127.0.0.2:18082")
+	tskr.DstServers.Add("127.0.0.3:18083")
+	tskr.DstServers.Add("127.0.0.4:18084")
+	tskr.DstServers.Add("127.0.0.5:18085")
 
-	(*DstServers)[0].Status = OK // 127.0.0.5:18085
-	(*DstServers)[1].Status = OK // 127.0.0.4:18082
-	(*DstServers)[2].Status = OK // 127.0.0.3:18083
-	(*DstServers)[3].Status = OK // 127.0.0.2:18082
-	(*DstServers)[4].Status = OK // 127.0.0.1:18081
+	(*tskr.DstServers)[0].Status = OK // 127.0.0.5:18085
+	(*tskr.DstServers)[1].Status = OK // 127.0.0.4:18082
+	(*tskr.DstServers)[2].Status = OK // 127.0.0.3:18083
+	(*tskr.DstServers)[3].Status = OK // 127.0.0.2:18082
+	(*tskr.DstServers)[4].Status = OK // 127.0.0.1:18081
 }
 
 // all meta : A, B, C, D, E, F
@@ -425,42 +422,44 @@ func Test_getAllHostStatus(t *testing.T) {
 	cfwd1.Start()
 	defer cfwd1.Close()
 
-	SrcServers = NewSrcHosts()
-	SrcServers.Add(s1)
+	tskr := NewTasker()
+	//tskr.SrcServers = NewSrcHosts()
+	tskr.SrcServers.Add(s1)
 
 	// heartbeater가 동작하기 전이라, status가 NOTOK
-	SrcServers.getAllHostStatus()
-	assert.Equal(t, NOTOK, (*SrcServers)[0].Status)
+	tskr.SrcServers.getAllHostStatus()
+	assert.Equal(t, NOTOK, (*tskr.SrcServers)[0].Status)
 
 	heartbeater.Add(s1)
 	heartbeater.Heartbeat()
 
 	// heartbeater가 동작하고 나면, status가 OK
-	SrcServers.getAllHostStatus()
-	assert.Equal(t, OK, (*SrcServers)[0].Status)
+	tskr.SrcServers.getAllHostStatus()
+	assert.Equal(t, OK, (*tskr.SrcServers)[0].Status)
 
-	DstServers = NewDstHosts()
-	DstServers.Add(d1)
+	//tskr.DstServers = NewDstHosts()
+	tskr.DstServers.Add(d1)
 
 	// heartbeater가 동작하기 전이라, status가 NOTOK
-	DstServers.getAllHostStatus()
-	assert.Equal(t, NOTOK, (*DstServers)[0].Status)
+	tskr.DstServers.getAllHostStatus()
+	assert.Equal(t, NOTOK, (*tskr.DstServers)[0].Status)
 
 	heartbeater.Add(d1)
 	heartbeater.Heartbeat()
 
 	// heartbeater가 동작하고 나면, status가 OK
-	DstServers.getAllHostStatus()
-	assert.Equal(t, OK, (*DstServers)[0].Status)
+	tskr.DstServers.getAllHostStatus()
+	assert.Equal(t, OK, (*tskr.DstServers)[0].Status)
 
 }
 
 func Test_cleanTask(t *testing.T) {
-	makePresetS1D4()
+	tskr := NewTasker()
+	makePresetS1D4(tskr)
 
 	ts := NewTasks()
-	tasks = ts
-	defer tasks.Release()
+	tskr.tasks = ts
+	defer tskr.tasks.Release()
 
 	t1 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
 		FileName: "A.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.1:18081"})
@@ -476,30 +475,31 @@ func Test_cleanTask(t *testing.T) {
 	ts.TaskMap[t1.ID].Status = DONE
 	ts.TaskMap[t2.ID].Status = DONE
 
-	cleanTask(ts.GetTaskList())
+	tskr.cleanTask(ts.GetTaskList())
 	// 2개의 DONE task 삭제된 후 task 개수
 	// t1, t2 삭제
 	assert.Equal(t, 3, len(ts.TaskMap))
 	assert.NotContains(t, ts.TaskMap, t1.ID)
 	assert.NotContains(t, ts.TaskMap, t2.ID)
 
-	(*DstServers)[2].Status = NOTOK
-	cleanTask(ts.GetTaskList())
+	(*tskr.DstServers)[2].Status = NOTOK
+	tskr.cleanTask(ts.GetTaskList())
 	// dest server 127.0.0.3:8080 의 상태가 NOTOK 로 바뀌어서 삭제됨
 	// 따라서 t3(dest가 127.0.0.3:8080인 task) 삭제됨
 	assert.Equal(t, 2, len(ts.TaskMap))
 	assert.NotContains(t, ts.TaskMap, t3.ID)
 
-	SetTaskTimeout(time.Second * 1)
+	tskr.SetTaskTimeout(time.Second * 1)
 	time.Sleep(time.Second * 2)
-	cleanTask(ts.GetTaskList())
+	tskr.cleanTask(ts.GetTaskList())
 	// 2개 중 2개의 task 가 timeout으로 삭제됨
 	assert.Equal(t, 0, len(ts.TaskMap))
 
 }
 
 func Test_getAllHostStatusAndcleanTask(t *testing.T) {
-	makePresetS1D4()
+	tskr := NewTasker()
+	makePresetS1D4(tskr)
 
 	s1 := "127.0.0.1:8081"
 	s1files := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg"}
@@ -562,20 +562,20 @@ func Test_getAllHostStatusAndcleanTask(t *testing.T) {
 	heartbeater.Add(s1)
 
 	// heartbeater가 동작하기 전이라, status가 NOTOK
-	SrcServers.getAllHostStatus()
-	assert.Equal(t, NOTOK, (*SrcServers)[0].Status)
+	tskr.SrcServers.getAllHostStatus()
+	assert.Equal(t, NOTOK, (*tskr.SrcServers)[0].Status)
 
 	// heartbeater가 동작하기 전이라, status가 NOTOK
-	DstServers.getAllHostStatus()
-	assert.Equal(t, NOTOK, (*DstServers)[0].Status)
-	assert.Equal(t, NOTOK, (*DstServers)[1].Status)
-	assert.Equal(t, NOTOK, (*DstServers)[2].Status)
-	assert.Equal(t, NOTOK, (*DstServers)[3].Status)
-	assert.Equal(t, NOTOK, (*DstServers)[4].Status)
+	tskr.DstServers.getAllHostStatus()
+	assert.Equal(t, NOTOK, (*tskr.DstServers)[0].Status)
+	assert.Equal(t, NOTOK, (*tskr.DstServers)[1].Status)
+	assert.Equal(t, NOTOK, (*tskr.DstServers)[2].Status)
+	assert.Equal(t, NOTOK, (*tskr.DstServers)[3].Status)
+	assert.Equal(t, NOTOK, (*tskr.DstServers)[4].Status)
 
 	ts := NewTasks()
-	tasks = ts
-	defer tasks.Release()
+	tskr.tasks = ts
+	defer tskr.tasks.Release()
 
 	ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
 		FileName: "A.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.1:18081"})
@@ -589,17 +589,17 @@ func Test_getAllHostStatusAndcleanTask(t *testing.T) {
 		FileName: "E.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.5:18085"})
 
 	// src status 가 NOT OK 여서 모두 삭제
-	cleanTask(tasks.GetTaskList())
-	assert.Equal(t, 0, len(tasks.TaskMap))
+	tskr.cleanTask(tskr.tasks.GetTaskList())
+	assert.Equal(t, 0, len(tskr.tasks.TaskMap))
 
 	heartbeater.Heartbeat()
 	// heartbeater가 동작하고 나면, s1 status가 OK
-	SrcServers.getAllHostStatus()
-	assert.Equal(t, OK, (*SrcServers)[0].Status)
+	tskr.SrcServers.getAllHostStatus()
+	assert.Equal(t, OK, (*tskr.SrcServers)[0].Status)
 
 	// heartbeater가 동작하기 전이라, status가 NOTOK
-	DstServers.getAllHostStatus()
-	assert.Equal(t, NOTOK, (*DstServers)[0].Status)
+	tskr.DstServers.getAllHostStatus()
+	assert.Equal(t, NOTOK, (*tskr.DstServers)[0].Status)
 
 	ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
 		FileName: "A.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.1:18081"})
@@ -613,8 +613,8 @@ func Test_getAllHostStatusAndcleanTask(t *testing.T) {
 		FileName: "E.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.5:18085"})
 
 	// dest status 가 NOT OK 여서 모두 삭제
-	cleanTask(tasks.GetTaskList())
-	assert.Equal(t, 0, len(tasks.TaskMap))
+	tskr.cleanTask(tskr.tasks.GetTaskList())
+	assert.Equal(t, 0, len(tskr.tasks.TaskMap))
 
 	ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
 		FileName: "A.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.1:18081"})
@@ -634,65 +634,66 @@ func Test_getAllHostStatusAndcleanTask(t *testing.T) {
 	heartbeater.Add(d5)
 	heartbeater.Heartbeat()
 
-	SrcServers.getAllHostStatus()
-	assert.Equal(t, OK, (*SrcServers)[0].Status)
+	tskr.SrcServers.getAllHostStatus()
+	assert.Equal(t, OK, (*tskr.SrcServers)[0].Status)
 
 	// heartbeater가 동작하고 나면, status가 OK
-	DstServers.getAllHostStatus()
-	assert.Equal(t, OK, (*DstServers)[0].Status)
-	assert.Equal(t, OK, (*DstServers)[1].Status)
-	assert.Equal(t, OK, (*DstServers)[2].Status)
-	assert.Equal(t, OK, (*DstServers)[3].Status)
-	assert.Equal(t, OK, (*DstServers)[4].Status)
+	tskr.DstServers.getAllHostStatus()
+	assert.Equal(t, OK, (*tskr.DstServers)[0].Status)
+	assert.Equal(t, OK, (*tskr.DstServers)[1].Status)
+	assert.Equal(t, OK, (*tskr.DstServers)[2].Status)
+	assert.Equal(t, OK, (*tskr.DstServers)[3].Status)
+	assert.Equal(t, OK, (*tskr.DstServers)[4].Status)
 
 	// 안지워짐
-	cleanTask(ts.GetTaskList())
-	assert.Equal(t, 5, len(tasks.TaskMap))
+	tskr.cleanTask(ts.GetTaskList())
+	assert.Equal(t, 5, len(tskr.tasks.TaskMap))
 
-	SetTaskTimeout(time.Second * 1)
+	tskr.SetTaskTimeout(time.Second * 1)
 	time.Sleep(time.Second * 1)
-	cleanTask(ts.GetTaskList())
+	tskr.cleanTask(ts.GetTaskList())
 	// 모든 task 가 timeout으로 삭제됨
 	assert.Equal(t, 0, len(ts.TaskMap))
 
 }
 
 func Test_setSelected(t *testing.T) {
-	makePresetS1D4()
+	tskr := NewTasker()
+	makePresetS1D4(tskr)
 
 	ts := NewTasks()
-	tasks = ts
-	defer tasks.Release()
+	tskr.tasks = ts
+	defer tskr.tasks.Release()
 
 	// Task에 사용 중이지 않는 src server의 selected 상태는 false로 바뀜
-	assert.Equal(t, false, (*SrcServers)[0].selected)
+	assert.Equal(t, false, (*tskr.SrcServers)[0].selected)
 
 	// Task에 사용 중이지 않는 dest server의 selected 상태는 false로 바뀜
-	assert.Equal(t, false, (*DstServers)[0].selected)
-	assert.Equal(t, false, (*DstServers)[1].selected)
-	assert.Equal(t, false, (*DstServers)[2].selected)
-	assert.Equal(t, false, (*DstServers)[3].selected)
-	assert.Equal(t, false, (*DstServers)[4].selected)
+	assert.Equal(t, false, (*tskr.DstServers)[0].selected)
+	assert.Equal(t, false, (*tskr.DstServers)[1].selected)
+	assert.Equal(t, false, (*tskr.DstServers)[2].selected)
+	assert.Equal(t, false, (*tskr.DstServers)[3].selected)
+	assert.Equal(t, false, (*tskr.DstServers)[4].selected)
 
 	// Task에 사용 중이지 않는 src server의 selected 상태는 true 에서도
-	(*SrcServers)[0].selected = true
-	SrcServers.setSelected(tasks.GetTaskList())
+	(*tskr.SrcServers)[0].selected = true
+	tskr.SrcServers.setSelected(tskr.tasks.GetTaskList())
 	// Task에 사용 중이지 않는 src server의 selected 상태는 false로 바뀜
-	assert.Equal(t, false, (*SrcServers)[0].selected)
+	assert.Equal(t, false, (*tskr.SrcServers)[0].selected)
 
 	// Task에 사용 중이지 않는 dest server의 selected 상태는 true 에서도
-	(*DstServers)[0].selected = true
-	(*DstServers)[1].selected = true
-	(*DstServers)[2].selected = true
-	(*DstServers)[3].selected = true
-	(*DstServers)[4].selected = true
-	DstServers.setSelected(tasks.GetTaskList())
+	(*tskr.DstServers)[0].selected = true
+	(*tskr.DstServers)[1].selected = true
+	(*tskr.DstServers)[2].selected = true
+	(*tskr.DstServers)[3].selected = true
+	(*tskr.DstServers)[4].selected = true
+	tskr.DstServers.setSelected(tskr.tasks.GetTaskList())
 	// Task에 사용 중이지 않는 dest server의 selected 상태는 false로 바뀜
-	assert.Equal(t, false, (*DstServers)[0].selected)
-	assert.Equal(t, false, (*DstServers)[1].selected)
-	assert.Equal(t, false, (*DstServers)[2].selected)
-	assert.Equal(t, false, (*DstServers)[3].selected)
-	assert.Equal(t, false, (*DstServers)[4].selected)
+	assert.Equal(t, false, (*tskr.DstServers)[0].selected)
+	assert.Equal(t, false, (*tskr.DstServers)[1].selected)
+	assert.Equal(t, false, (*tskr.DstServers)[2].selected)
+	assert.Equal(t, false, (*tskr.DstServers)[3].selected)
+	assert.Equal(t, false, (*tskr.DstServers)[4].selected)
 
 	t1 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
 		FileName: "A.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.1:18081"})
@@ -710,113 +711,116 @@ func Test_setSelected(t *testing.T) {
 	t.Log(t4)
 	t.Log(t5)
 
-	(*SrcServers)[0].selected = false
-	SrcServers.setSelected(tasks.GetTaskList())
+	(*tskr.SrcServers)[0].selected = false
+	tskr.SrcServers.setSelected(tskr.tasks.GetTaskList())
 	// Task에 사용 중이면, src server의 selected 상태가 true 로 바뀜
-	assert.Equal(t, true, (*SrcServers)[0].selected)
+	assert.Equal(t, true, (*tskr.SrcServers)[0].selected)
 
-	(*DstServers)[0].selected = false
-	(*DstServers)[1].selected = false
-	(*DstServers)[2].selected = false
-	(*DstServers)[3].selected = false
-	(*DstServers)[4].selected = false
-	DstServers.setSelected(tasks.GetTaskList())
+	(*tskr.DstServers)[0].selected = false
+	(*tskr.DstServers)[1].selected = false
+	(*tskr.DstServers)[2].selected = false
+	(*tskr.DstServers)[3].selected = false
+	(*tskr.DstServers)[4].selected = false
+	tskr.DstServers.setSelected(tskr.tasks.GetTaskList())
 	// Task에 사용 중이면 dest server의 selected 상태는 true로 바뀜
-	assert.Equal(t, true, (*DstServers)[0].selected)
-	assert.Equal(t, true, (*DstServers)[1].selected)
-	assert.Equal(t, true, (*DstServers)[2].selected)
-	assert.Equal(t, true, (*DstServers)[3].selected)
-	assert.Equal(t, true, (*DstServers)[4].selected)
+	assert.Equal(t, true, (*tskr.DstServers)[0].selected)
+	assert.Equal(t, true, (*tskr.DstServers)[1].selected)
+	assert.Equal(t, true, (*tskr.DstServers)[2].selected)
+	assert.Equal(t, true, (*tskr.DstServers)[3].selected)
+	assert.Equal(t, true, (*tskr.DstServers)[4].selected)
 
 }
 
 func Test_getSelectableCount(t *testing.T) {
-	makePresetS1D4()
+	tskr := NewTasker()
+	makePresetS1D4(tskr)
 
 	ts := NewTasks()
-	tasks = ts
-	defer tasks.Release()
+	tskr.tasks = ts
+	defer tskr.tasks.Release()
 
 	// task에 사용되지 않고, 상태가 ok인 src server 개수 return
-	n := SrcServers.getSelectableCount()
+	n := tskr.SrcServers.getSelectableCount()
 	assert.Equal(t, 1, n)
 
 	// 상태가 notok 이므로, 0 return
-	(*SrcServers)[0].Status = NOTOK // 127.0.0.1:8081
-	n = SrcServers.getSelectableCount()
+	(*tskr.SrcServers)[0].Status = NOTOK // 127.0.0.1:8081
+	n = tskr.SrcServers.getSelectableCount()
 	assert.Equal(t, 0, n)
 
-	(*SrcServers)[0].Status = OK     // 127.0.0.1:8081
-	(*SrcServers)[0].selected = true // 127.0.0.1:8081
-	n = SrcServers.getSelectableCount()
+	(*tskr.SrcServers)[0].Status = OK     // 127.0.0.1:8081
+	(*tskr.SrcServers)[0].selected = true // 127.0.0.1:8081
+	n = tskr.SrcServers.getSelectableCount()
 	assert.Equal(t, 0, n)
 
-	(*SrcServers)[0].Status = OK // 127.0.0.1:8081
+	(*tskr.SrcServers)[0].Status = OK // 127.0.0.1:8081
 	t1 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
 		FileName: "A.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.1:18081"})
 	t.Log(t1)
 	// 모든 src server가 task 에 사용되므로,
 	// src server의 select 상태가 true 바뀜
-	SrcServers.setSelected(tasks.GetTaskList())
+	tskr.SrcServers.setSelected(tskr.tasks.GetTaskList())
 
 	// 상태가 ok 이고, task 에 사용되지 않는 src server가 없어서 0 return
-	n = SrcServers.getSelectableCount()
+	n = tskr.SrcServers.getSelectableCount()
 	assert.Equal(t, 0, n)
 }
 
 func Test_getAvailableSrcServerCount(t *testing.T) {
-	makePresetS1D4()
+	tskr := NewTasker()
+	makePresetS1D4(tskr)
 
 	ts := NewTasks()
-	tasks = ts
-	defer tasks.Release()
+	tskr.tasks = ts
+	defer tskr.tasks.Release()
 
 	// task에 사용되지 않고, 상태가 ok인 src server 개수 return
-	n := getAvailableSrcServerCount(tasks.GetTaskList())
+	n := tskr.getAvailableSrcServerCount(tskr.tasks.GetTaskList())
 	assert.Equal(t, 1, n)
 
 	// 상태가 notok 이므로, 사용할 수 있는 src server 개수가 0 return
-	(*SrcServers)[0].Status = NOTOK // 127.0.0.1:8081
-	n = getAvailableSrcServerCount(tasks.GetTaskList())
+	(*tskr.SrcServers)[0].Status = NOTOK // 127.0.0.1:8081
+	n = tskr.getAvailableSrcServerCount(tskr.tasks.GetTaskList())
 	assert.Equal(t, 0, n)
 
-	(*SrcServers)[0].Status = OK     // 127.0.0.1:8081
-	(*SrcServers)[0].selected = true // 127.0.0.1:8081
+	(*tskr.SrcServers)[0].Status = OK     // 127.0.0.1:8081
+	(*tskr.SrcServers)[0].selected = true // 127.0.0.1:8081
 	// 상태는 ok 이고, selected 상태가 reset 되고,
 	// task 가 만들어지지 않은 상태여서, 사용할 수 있는 src server개수가 1 return
-	n = getAvailableSrcServerCount(tasks.GetTaskList())
+	n = tskr.getAvailableSrcServerCount(tskr.tasks.GetTaskList())
 	assert.Equal(t, 1, n)
 
-	(*SrcServers)[0].Status = OK // 127.0.0.1:8081
+	(*tskr.SrcServers)[0].Status = OK // 127.0.0.1:8081
 	t1 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
 		FileName: "A.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.1:18081"})
 	t.Log(t1)
 	// 모든 src server가 task 에 사용되므로,
 	// 상태가 ok 이고, task 에 사용되지 않는 src server가 없어서 0 return
-	n = getAvailableSrcServerCount(tasks.GetTaskList())
+	n = tskr.getAvailableSrcServerCount(tskr.tasks.GetTaskList())
 	assert.Equal(t, 0, n)
 }
 
 func Test_getSelectableList(t *testing.T) {
-	makePresetS1D4()
+	tskr := NewTasker()
+	makePresetS1D4(tskr)
 
 	ts := NewTasks()
-	tasks = ts
-	defer tasks.Release()
+	tskr.tasks = ts
+	defer tskr.tasks.Release()
 
 	// task에 사용되지 않고, 상태가 ok인 src server 개수 return
-	dests := DstServers.getSelectableList()
+	dests := tskr.DstServers.getSelectableList()
 	assert.Equal(t, 5, len(dests))
 
 	// 하나의 상태가 notok 이므로, 5개가 아닌 4 return
-	(*DstServers)[0].Status = NOTOK
-	dests = DstServers.getSelectableList()
+	(*tskr.DstServers)[0].Status = NOTOK
+	dests = tskr.DstServers.getSelectableList()
 	assert.Equal(t, 4, len(dests))
 
-	(*DstServers)[0].Status = OK     // 127.0.0.1:8081
-	(*DstServers)[0].selected = true // 127.0.0.1:8081
+	(*tskr.DstServers)[0].Status = OK     // 127.0.0.1:8081
+	(*tskr.DstServers)[0].selected = true // 127.0.0.1:8081
 	// selected 가 하나 있으므로, 4 return
-	dests = DstServers.getSelectableList()
+	dests = tskr.DstServers.getSelectableList()
 	assert.Equal(t, 4, len(dests))
 
 	t1 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
@@ -827,14 +831,14 @@ func Test_getSelectableList(t *testing.T) {
 	t.Log(t2)
 
 	// dest server중, t1, t2에 사용되는 server의 select 상태가 true 바뀜
-	DstServers.setSelected(tasks.GetTaskList())
+	tskr.DstServers.setSelected(tskr.tasks.GetTaskList())
 
 	// // 127.0.0.5:18085 의 상태가 NOTOK 로 바뀐다면
-	(*DstServers)[0].Status = NOTOK // 127.0.0.5:18085
+	(*tskr.DstServers)[0].Status = NOTOK // 127.0.0.5:18085
 
 	// 상태가 ok 이고, task 에 사용되지 않는 dest server는 3개 return 해야하지만
 	// 127.0.0.5:18085 의 상태가 NOTOK 이므로, 2개 return
-	dests = DstServers.getSelectableList()
+	dests = tskr.DstServers.getSelectableList()
 	assert.Equal(t, 2, len(dests))
 	assert.Contains(t, dests, DstHost{
 		common.Host{IP: "127.0.0.3", Port: 18083, Addr: "127.0.0.3:18083"},
@@ -854,38 +858,39 @@ func Test_getSelectableList(t *testing.T) {
 	t.Log(t5)
 
 	// dest server중, t1, t2에 사용되는 server의 select 상태가 true 바뀜
-	DstServers.setSelected(tasks.GetTaskList())
-	(*DstServers)[0].Status = OK // 127.0.0.5:18085
+	tskr.DstServers.setSelected(tskr.tasks.GetTaskList())
+	(*tskr.DstServers)[0].Status = OK // 127.0.0.5:18085
 	// 127.0.0.5:18085 의 상태가 OK 로 바뀐 것과 상관없이
 	// 모든 dst server 가 task 에 사용 중이므로,
 	// 상태가 ok 이고, task 에 사용되지 않는 dest server는 없음
-	dests = DstServers.getSelectableList()
+	dests = tskr.DstServers.getSelectableList()
 	t.Log(dests)
 	assert.Equal(t, 0, len(dests))
 }
 
 func Test_getAvailableDstServerList(t *testing.T) {
-	makePresetS1D4()
+	tskr := NewTasker()
+	makePresetS1D4(tskr)
 
 	ts := NewTasks()
-	tasks = ts
-	defer tasks.Release()
+	tskr.tasks = ts
+	defer tskr.tasks.Release()
 
 	// task에 사용되지 않고, 상태가 ok인 src server 개수 return
-	dests := getAvailableDstServerList(tasks.GetTaskList())
+	dests := tskr.getAvailableDstServerList(tskr.tasks.GetTaskList())
 	assert.Equal(t, 5, len(dests))
 
 	// 하나의 상태가 notok 이므로, 5개가 아닌 4 return
-	(*DstServers)[0].Status = NOTOK
-	dests = getAvailableDstServerList(tasks.GetTaskList())
+	(*tskr.DstServers)[0].Status = NOTOK
+	dests = tskr.getAvailableDstServerList(tskr.tasks.GetTaskList())
 	assert.Equal(t, 4, len(dests))
 
-	(*DstServers)[0].Status = OK     // 127.0.0.1:8081
-	(*DstServers)[0].selected = true // 127.0.0.1:8081
+	(*tskr.DstServers)[0].Status = OK     // 127.0.0.1:8081
+	(*tskr.DstServers)[0].selected = true // 127.0.0.1:8081
 	// selected 가 하나있으나,
 	// getAvailableDstServerList 함수를 호출하면, selected 상태가 task list 검사해서 update됨
 	// task 가 현재 없으므로, available list는 5개가 됨
-	dests = getAvailableDstServerList(tasks.GetTaskList())
+	dests = tskr.getAvailableDstServerList(tskr.tasks.GetTaskList())
 	assert.Equal(t, 5, len(dests))
 
 	t1 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
@@ -896,10 +901,10 @@ func Test_getAvailableDstServerList(t *testing.T) {
 	t.Log(t2)
 
 	// // 127.0.0.5:18085 의 상태가 NOTOK 로 바뀐다면
-	(*DstServers)[0].Status = NOTOK // 127.0.0.5:18085
+	(*tskr.DstServers)[0].Status = NOTOK // 127.0.0.5:18085
 
 	// dest server중, t1, t2에 사용되는 server의 select 상태가 true 바뀜
-	dests = getAvailableDstServerList(tasks.GetTaskList())
+	dests = tskr.getAvailableDstServerList(tskr.tasks.GetTaskList())
 
 	// 상태가 ok 이고, task 에 사용되지 않는 dest server는 3개 return 해야하지만
 	// 127.0.0.5:18085 의 상태가 NOTOK 이므로, 2개 return
@@ -921,37 +926,38 @@ func Test_getAvailableDstServerList(t *testing.T) {
 		FileName: "E.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.5:18085"})
 	t.Log(t5)
 
-	(*DstServers)[0].Status = OK // 127.0.0.5:18085
+	(*tskr.DstServers)[0].Status = OK // 127.0.0.5:18085
 	// 127.0.0.5:18085 의 상태가 OK 로 바뀐 것과 상관없이
 	// 모든 dst server 가 task 에 사용 중이므로,
 	// 상태가 ok 이고, task 에 사용되지 않는 dest server는 없음
-	dests = getAvailableDstServerList(tasks.GetTaskList())
+	dests = tskr.getAvailableDstServerList(tskr.tasks.GetTaskList())
 	t.Log(dests)
 	assert.Equal(t, 0, len(dests))
 }
 
 func Test_getAvailableDstServerRing(t *testing.T) {
-	makePresetS1D4()
+	tskr := NewTasker()
+	makePresetS1D4(tskr)
 
 	ts := NewTasks()
-	tasks = ts
-	defer tasks.Release()
+	tskr.tasks = ts
+	defer tskr.tasks.Release()
 
 	// task에 사용되지 않고, 상태가 ok인 src server 개수 return
-	dests := getAvailableDstServerRing(tasks.GetTaskList())
+	dests := tskr.getAvailableDstServerRing(tskr.tasks.GetTaskList())
 	assert.Equal(t, 5, dests.Len())
 
 	// 하나의 상태가 notok 이므로, 5개가 아닌 4 return
-	(*DstServers)[0].Status = NOTOK
-	dests = getAvailableDstServerRing(tasks.GetTaskList())
+	(*tskr.DstServers)[0].Status = NOTOK
+	dests = tskr.getAvailableDstServerRing(tskr.tasks.GetTaskList())
 	assert.Equal(t, 4, dests.Len())
 
-	(*DstServers)[0].Status = OK     // 127.0.0.1:8081
-	(*DstServers)[0].selected = true // 127.0.0.1:8081
+	(*tskr.DstServers)[0].Status = OK     // 127.0.0.1:8081
+	(*tskr.DstServers)[0].selected = true // 127.0.0.1:8081
 	// selected 가 하나있으나,
 	// getAvailableDstServerList 함수를 호출하면, selected 상태가 task list 검사해서 update됨
 	// task 가 현재 없으므로, available list는 5개가 됨
-	dests = getAvailableDstServerRing(tasks.GetTaskList())
+	dests = tskr.getAvailableDstServerRing(tskr.tasks.GetTaskList())
 	assert.Equal(t, 5, dests.Len())
 
 	t1 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
@@ -962,10 +968,10 @@ func Test_getAvailableDstServerRing(t *testing.T) {
 	t.Log(t2)
 
 	// // 127.0.0.5:18085 의 상태가 NOTOK 로 바뀐다면
-	(*DstServers)[0].Status = NOTOK // 127.0.0.5:18085
+	(*tskr.DstServers)[0].Status = NOTOK // 127.0.0.5:18085
 
 	// dest server중, t1, t2에 사용되는 server의 select 상태가 true 바뀜
-	dests = getAvailableDstServerRing(tasks.GetTaskList())
+	dests = tskr.getAvailableDstServerRing(tskr.tasks.GetTaskList())
 
 	// 상태가 ok 이고, task 에 사용되지 않는 dest server는 3개 return 해야하지만
 	// 127.0.0.5:18085 의 상태가 NOTOK 이므로, 2개 return
@@ -989,11 +995,11 @@ func Test_getAvailableDstServerRing(t *testing.T) {
 	t.Log(t5)
 
 	// dest server중, t1, t2에 사용되는 server의 select 상태가 true 바뀜
-	(*DstServers)[0].Status = OK // 127.0.0.5:18085
+	(*tskr.DstServers)[0].Status = OK // 127.0.0.5:18085
 	// 127.0.0.5:18085 의 상태가 OK 로 바뀐 것과 상관없이
 	// 모든 dst server 가 task 에 사용 중이므로,
 	// 상태가 ok 이고, task 에 사용되지 않는 dest server는 없음
-	dests = getAvailableDstServerRing(tasks.GetTaskList())
+	dests = tskr.getAvailableDstServerRing(tskr.tasks.GetTaskList())
 	assert.Nil(t, dests)
 }
 
@@ -1043,9 +1049,10 @@ func TestCollectRemoteFileList(t *testing.T) {
 }
 
 func Test_getFilesInTasks(t *testing.T) {
+	tskr := NewTasker()
 	ts := NewTasks()
-	tasks = ts
-	defer tasks.Release()
+	tskr.tasks = ts
+	defer tskr.tasks.Release()
 
 	t1 := ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
 		FileName: "A.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.1:18081"})
@@ -1054,7 +1061,7 @@ func Test_getFilesInTasks(t *testing.T) {
 		FileName: "A.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.2:18082"})
 	t.Log(t2)
 
-	files := getFilesInTasks(tasks.GetTaskList())
+	files := getFilesInTasks(tskr.tasks.GetTaskList())
 	t.Log(files)
 
 	assert.Equal(t, 1, len(files))
@@ -1071,7 +1078,7 @@ func Test_getFilesInTasks(t *testing.T) {
 		FileName: "E.mpg", SrcAddr: "127.0.0.1:8081", DstAddr: "127.0.0.5:18085"})
 	t.Log(t5)
 
-	files = getFilesInTasks(tasks.GetTaskList())
+	files = getFilesInTasks(tskr.tasks.GetTaskList())
 	t.Log(files)
 
 	assert.Equal(t, 4, len(files))
@@ -1109,8 +1116,10 @@ func Test_updateFileMetasForRisingHitFiles(t *testing.T) {
 
 // src 정보를 file meta 에 update 해주는 함수 test
 func Test_updateFileMetaForSrcFilePath(t *testing.T) {
+	tskr := NewTasker()
+
 	base := "testsourcefolder"
-	SourcePath.Add(base)
+	tskr.SourcePath.Add(base)
 	files := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg",
 		"G.mpg", "H.mpg", "I.mpg", "J.mpg", "K.mpg"}
 	// source path 에 파일 생성
@@ -1121,22 +1130,22 @@ func Test_updateFileMetaForSrcFilePath(t *testing.T) {
 
 	// all meta : A, B, C, D, E, F
 	allfmm, _ := makeFileMetaMapABCDEF()
-	assert.Equal(t, true, updateFileMetaForSrcFilePath(allfmm["A.mpg"]))
+	assert.Equal(t, true, tskr.updateFileMetaForSrcFilePath(allfmm["A.mpg"]))
 	assert.Equal(t, filepath.Join(base, "A.mpg"), allfmm["A.mpg"].SrcFilePath)
 
-	assert.Equal(t, true, updateFileMetaForSrcFilePath(allfmm["B.mpg"]))
+	assert.Equal(t, true, tskr.updateFileMetaForSrcFilePath(allfmm["B.mpg"]))
 	assert.Equal(t, filepath.Join(base, "B.mpg"), allfmm["B.mpg"].SrcFilePath)
 
-	assert.Equal(t, true, updateFileMetaForSrcFilePath(allfmm["C.mpg"]))
+	assert.Equal(t, true, tskr.updateFileMetaForSrcFilePath(allfmm["C.mpg"]))
 	assert.Equal(t, filepath.Join(base, "C.mpg"), allfmm["C.mpg"].SrcFilePath)
 
-	assert.Equal(t, true, updateFileMetaForSrcFilePath(allfmm["D.mpg"]))
+	assert.Equal(t, true, tskr.updateFileMetaForSrcFilePath(allfmm["D.mpg"]))
 	assert.Equal(t, filepath.Join(base, "D.mpg"), allfmm["D.mpg"].SrcFilePath)
 
-	assert.Equal(t, false, updateFileMetaForSrcFilePath(allfmm["E.mpg"]))
+	assert.Equal(t, false, tskr.updateFileMetaForSrcFilePath(allfmm["E.mpg"]))
 	assert.Equal(t, "", allfmm["E.mpg"].SrcFilePath)
 
-	assert.Equal(t, false, updateFileMetaForSrcFilePath(allfmm["F.mpg"]))
+	assert.Equal(t, false, tskr.updateFileMetaForSrcFilePath(allfmm["F.mpg"]))
 	assert.Equal(t, "", allfmm["F.mpg"].SrcFilePath)
 }
 
@@ -1144,8 +1153,10 @@ func Test_updateFileMetaForSrcFilePath(t *testing.T) {
 // src 정보를 file meta 에 update 해주지 않으면,
 // checkForTask 함수는 실패함
 func Test_checkForTask(t *testing.T) {
+	tskr := NewTasker()
+
 	base := "testsourcefolder"
-	SourcePath.Add(base)
+	tskr.SourcePath.Add(base)
 	files := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg", "E.mpg", "F.mpg",
 		"G.mpg", "H.mpg", "I.mpg", "J.mpg", "K.mpg"}
 	// source path 에 파일 생성
@@ -1162,7 +1173,7 @@ func Test_checkForTask(t *testing.T) {
 
 	// 광고 파일
 	ignores := []string{"AD1", "H", "AD2", "I", "AD3"}
-	SetIgnorePrefixes(ignores)
+	tskr.SetIgnorePrefixes(ignores)
 
 	// 배포에 사용 중인 파일
 	taskfilenames := make(FileFreqMap)
@@ -1186,66 +1197,66 @@ func Test_checkForTask(t *testing.T) {
 	// A, B, C, D, E, F, G, H, I 는 이미 서버에 있는 파일이므로, 배포에서 제외됨
 
 	// 배포에 사용되므로, false
-	updateFileMetaForSrcFilePath(allfmm["A.mpg"])
-	assert.Equal(t, false, checkForTask(allfmm["A.mpg"], taskfilenames, serverfiles))
+	tskr.updateFileMetaForSrcFilePath(allfmm["A.mpg"])
+	assert.Equal(t, false, tskr.checkForTask(allfmm["A.mpg"], taskfilenames, serverfiles))
 
 	// 서버에 이미 있으므로, false
-	updateFileMetaForSrcFilePath(allfmm["B.mpg"])
-	assert.Equal(t, false, checkForTask(allfmm["B.mpg"], taskfilenames, serverfiles))
+	tskr.updateFileMetaForSrcFilePath(allfmm["B.mpg"])
+	assert.Equal(t, false, tskr.checkForTask(allfmm["B.mpg"], taskfilenames, serverfiles))
 
 	// source path 에 없으므로 false
-	updateFileMetaForSrcFilePath(allfmm["C.mpg"])
-	assert.Equal(t, false, checkForTask(allfmm["C.mpg"], taskfilenames, serverfiles))
+	tskr.updateFileMetaForSrcFilePath(allfmm["C.mpg"])
+	assert.Equal(t, false, tskr.checkForTask(allfmm["C.mpg"], taskfilenames, serverfiles))
 
 	// 실제 src 에 있다고 해도 src 정보를 update 해주지 않으면,
 	// checkForTask 함수는 실패함
-	assert.Equal(t, false, checkForTask(allfmm["D.mpg"], taskfilenames, serverfiles))
+	assert.Equal(t, false, tskr.checkForTask(allfmm["D.mpg"], taskfilenames, serverfiles))
 
 	// src path 정보를 update 해주어도
 	// D는 이미 서버에 있는 파일이어서 실패함
-	updateFileMetaForSrcFilePath(allfmm["D.mpg"])
-	assert.Equal(t, false, checkForTask(allfmm["D.mpg"], taskfilenames, serverfiles))
+	tskr.updateFileMetaForSrcFilePath(allfmm["D.mpg"])
+	assert.Equal(t, false, tskr.checkForTask(allfmm["D.mpg"], taskfilenames, serverfiles))
 
 	// src path 정보를 update 해주어도
 	// E는 이미 서버에 있는 파일이어서 실패함
-	updateFileMetaForSrcFilePath(allfmm["E.mpg"])
-	assert.Equal(t, false, checkForTask(allfmm["E.mpg"], taskfilenames, serverfiles))
+	tskr.updateFileMetaForSrcFilePath(allfmm["E.mpg"])
+	assert.Equal(t, false, tskr.checkForTask(allfmm["E.mpg"], taskfilenames, serverfiles))
 
 	// 배포에 사용되므로, false
 	// E는 이미 서버에 있는 파일이어서 실패함
-	updateFileMetaForSrcFilePath(allfmm["F.mpg"])
-	assert.Equal(t, false, checkForTask(allfmm["F.mpg"], taskfilenames, serverfiles))
+	tskr.updateFileMetaForSrcFilePath(allfmm["F.mpg"])
+	assert.Equal(t, false, tskr.checkForTask(allfmm["F.mpg"], taskfilenames, serverfiles))
 
 	// 배포에 사용되므로, false
 	// E는 이미 서버에 있는 파일이어서 실패함
-	updateFileMetaForSrcFilePath(allfmm["G.mpg"])
-	assert.Equal(t, false, checkForTask(allfmm["G.mpg"], taskfilenames, serverfiles))
+	tskr.updateFileMetaForSrcFilePath(allfmm["G.mpg"])
+	assert.Equal(t, false, tskr.checkForTask(allfmm["G.mpg"], taskfilenames, serverfiles))
 
 	// ignore prefix, false
 	// E는 이미 서버에 있는 파일이어서 실패함
-	updateFileMetaForSrcFilePath(allfmm["H.mpg"])
-	assert.Equal(t, false, checkForTask(allfmm["H.mpg"], taskfilenames, serverfiles))
+	tskr.updateFileMetaForSrcFilePath(allfmm["H.mpg"])
+	assert.Equal(t, false, tskr.checkForTask(allfmm["H.mpg"], taskfilenames, serverfiles))
 
 	// ignore prefix, false
 	// E는 이미 서버에 있는 파일이어서 실패함
-	updateFileMetaForSrcFilePath(allfmm["I.mpg"])
-	assert.Equal(t, false, checkForTask(allfmm["I.mpg"], taskfilenames, serverfiles))
+	tskr.updateFileMetaForSrcFilePath(allfmm["I.mpg"])
+	assert.Equal(t, false, tskr.checkForTask(allfmm["I.mpg"], taskfilenames, serverfiles))
 
 	// 배포 대상
-	updateFileMetaForSrcFilePath(allfmm["J.mpg"])
-	assert.Equal(t, true, checkForTask(allfmm["J.mpg"], taskfilenames, serverfiles))
+	tskr.updateFileMetaForSrcFilePath(allfmm["J.mpg"])
+	assert.Equal(t, true, tskr.checkForTask(allfmm["J.mpg"], taskfilenames, serverfiles))
 
 	// 서버에 이미 있는 파일, false
-	updateFileMetaForSrcFilePath(allfmm["K.mpg"])
-	assert.Equal(t, false, checkForTask(allfmm["K.mpg"], taskfilenames, serverfiles))
+	tskr.updateFileMetaForSrcFilePath(allfmm["K.mpg"])
+	assert.Equal(t, false, tskr.checkForTask(allfmm["K.mpg"], taskfilenames, serverfiles))
 
 	// source path 에 없으므로 false
-	updateFileMetaForSrcFilePath(allfmm["L.mpg"])
-	assert.Equal(t, false, checkForTask(allfmm["L.mpg"], taskfilenames, serverfiles))
+	tskr.updateFileMetaForSrcFilePath(allfmm["L.mpg"])
+	assert.Equal(t, false, tskr.checkForTask(allfmm["L.mpg"], taskfilenames, serverfiles))
 
 	// source path 에 없으므로 false
-	updateFileMetaForSrcFilePath(allfmm["M.mpg"])
-	assert.Equal(t, false, checkForTask(allfmm["M.mpg"], taskfilenames, serverfiles))
+	tskr.updateFileMetaForSrcFilePath(allfmm["M.mpg"])
+	assert.Equal(t, false, tskr.checkForTask(allfmm["M.mpg"], taskfilenames, serverfiles))
 }
 
 func Test_getSortedFileMetaListForTask(t *testing.T) {
@@ -1327,8 +1338,8 @@ func Test_selectSourceServer(t *testing.T) {
 }
 
 func Test_runWithInfo(t *testing.T) {
-
-	makePresetS4D5()
+	tskr := NewTasker()
+	makePresetS4D5(tskr)
 
 	s1 := "127.0.0.1:8081"
 	s1files := []string{}
@@ -1423,7 +1434,7 @@ func Test_runWithInfo(t *testing.T) {
 	defer cfw5.Close()
 
 	base := "testsourcefolder"
-	SourcePath.Add(base)
+	tskr.SourcePath.Add(base)
 
 	// source path 에 파일 생성
 	for _, f := range d1files {
@@ -1458,7 +1469,7 @@ func Test_runWithInfo(t *testing.T) {
 	defer deletefile(base, "")
 
 	serverfs := make(FileFreqMap)
-	collectRemoteFileList(DstServers, serverfs)
+	collectRemoteFileList(tskr.DstServers, serverfs)
 	assert.Equal(t, 10, len(serverfs))
 	assert.Equal(t, 1, int(serverfs["A.mpg"]))
 	assert.Equal(t, 2, int(serverfs["B.mpg"]))
@@ -1474,7 +1485,7 @@ func Test_runWithInfo(t *testing.T) {
 	allfmm, _ := makeFileMetaMapABCDEFGHIJKLMNO()
 
 	ignores := []string{"AD1", "H", "I", "AD2"}
-	SetIgnorePrefixes(ignores)
+	tskr.SetIgnorePrefixes(ignores)
 
 	rhfiles := []string{"E.mpg", "F.mpg", "J.mpg", "RH1.mpg", "M.mpg", "H.mpg", "O.mpg", "RH2.mpg"}
 	rhitfmm := makeRisingHitFileMap(rhfiles)
@@ -1496,8 +1507,8 @@ func Test_runWithInfo(t *testing.T) {
 	var t1, t2, t3 Task
 
 	ts := NewTasks()
-	tasks = ts
-	defer tasks.Release()
+	tskr.tasks = ts
+	defer tskr.tasks.Release()
 
 	t.Log("tasks 1-------------------------------------")
 	t1 = ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
@@ -1510,15 +1521,15 @@ func Test_runWithInfo(t *testing.T) {
 		FileName: "DANGLING1.mpg", SrcAddr: "127.0.0.3:8083", DstAddr: "127.0.0.2:18082"})
 	t.Log(t3)
 
-	runWithInfo(allfmm, rhitfmm)
+	tskr.runWithInfo(allfmm, rhitfmm)
 
 	t.Log("tasks 2-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
+	for _, task := range tskr.tasks.GetTaskList() {
 		t.Log(task)
 	}
 
-	assert.Equal(t, 0, len(tasks.TaskMap))
+	assert.Equal(t, 0, len(tskr.tasks.TaskMap))
 
 	t.Log("tasks 3-------------------------------------")
 	t1 = ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
@@ -1531,10 +1542,10 @@ func Test_runWithInfo(t *testing.T) {
 		FileName: "DANGLING1.mpg", SrcAddr: "127.0.0.3:8083", DstAddr: "127.0.0.2:18082"})
 	t.Log(t3)
 
-	assert.Equal(t, 3, len(tasks.TaskMap))
-	assertTask(t, tasks, "A.mpg", s1, d1)
-	assertTask(t, tasks, "B.mpg", s2, d2)
-	assertTask(t, tasks, "DANGLING1.mpg", s3, d2)
+	assert.Equal(t, 3, len(tskr.tasks.TaskMap))
+	assertTask(t, tskr.tasks, "A.mpg", s1, d1)
+	assertTask(t, tskr.tasks, "B.mpg", s2, d2)
+	assertTask(t, tskr.tasks, "DANGLING1.mpg", s3, d2)
 
 	heartbeater.Heartbeat()
 	// src server와 dst server의 heartbeat 가 살아난 후에는 task 가 그대로 있음
@@ -1560,11 +1571,11 @@ func Test_runWithInfo(t *testing.T) {
 	// 배포 중이 아닌 파일 : M, J, L, N
 
 	// M.mpg, s4 -> d5 task 가 하나 만들어져야 함
-	runWithInfo(allfmm, rhitfmm)
+	tskr.runWithInfo(allfmm, rhitfmm)
 
 	t.Log("tasks 4-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
+	for _, task := range tskr.tasks.GetTaskList() {
 		t.Log(task)
 	}
 
@@ -1574,30 +1585,30 @@ func Test_runWithInfo(t *testing.T) {
 
 	// 기존의 task는 그대로 있고
 	// M.mpg, s4 -> d5 task 가 하나 만들어져야 함
-	assert.Equal(t, 4, len(tasks.TaskMap))
+	assert.Equal(t, 4, len(tskr.tasks.TaskMap))
 
 	// file, src, dst 로 간접 확인
 	// 기존 task 에
-	assert.Equal(t, 4, len(tasks.TaskMap))
-	assertTask(t, tasks, "A.mpg", s1, d1)
-	assertTask(t, tasks, "B.mpg", s2, d2)
-	assertTask(t, tasks, "DANGLING1.mpg", s3, d2)
+	assert.Equal(t, 4, len(tskr.tasks.TaskMap))
+	assertTask(t, tskr.tasks, "A.mpg", s1, d1)
+	assertTask(t, tskr.tasks, "B.mpg", s2, d2)
+	assertTask(t, tskr.tasks, "DANGLING1.mpg", s3, d2)
 	// M.mpg, s4 -> d5 task 가 하나 만들어져야 함
-	assertTask(t, tasks, "M.mpg", s4, d5)
+	assertTask(t, tskr.tasks, "M.mpg", s4, d5)
 
 	//////////////////////////////////////////////////////////////////////////////
 	// t1이 DONE이 된 경우
-	tasks.UpdateStatus(t1.ID, DONE)
+	tskr.tasks.UpdateStatus(t1.ID, DONE)
 
-	runWithInfo(allfmm, rhitfmm)
+	tskr.runWithInfo(allfmm, rhitfmm)
 
 	t.Log("tasks 5-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
+	for _, task := range tskr.tasks.GetTaskList() {
 		t.Log(task)
 	}
 
-	assert.Equal(t, 4, len(tasks.TaskMap))
+	assert.Equal(t, 4, len(tskr.tasks.TaskMap))
 
 	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
 	// src 서버 선택은 s4, s3,s2,s1 순임
@@ -1613,16 +1624,16 @@ func Test_runWithInfo(t *testing.T) {
 
 	// file, src, dst 로 간접 확인
 	// 기존의 t1 task 가 없어지고, 새로운 task 생성
-	assert.Equal(t, 4, len(tasks.TaskMap))
-	assertTask(t, tasks, "B.mpg", s2, d2)
-	assertTask(t, tasks, "DANGLING1.mpg", s3, d2)
-	assertTask(t, tasks, "M.mpg", s4, d5)
+	assert.Equal(t, 4, len(tskr.tasks.TaskMap))
+	assertTask(t, tskr.tasks, "B.mpg", s2, d2)
+	assertTask(t, tskr.tasks, "DANGLING1.mpg", s3, d2)
+	assertTask(t, tskr.tasks, "M.mpg", s4, d5)
 	// J.mpg, s1 -> d4 task 가 하나 만들어져야 함
-	assertTask(t, tasks, "J.mpg", s1, d4)
+	assertTask(t, tskr.tasks, "J.mpg", s1, d4)
 
 	//////////////////////////////////////////////////////////////////////////////
 	// t3 이 DONE이 된 경우
-	updateStatus(t, tasks, "DANGLING1.mpg", DONE)
+	updateStatus(t, tskr.tasks, "DANGLING1.mpg", DONE)
 
 	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
 	// src 서버 선택은 s4, s3, s2, s1 순임
@@ -1638,26 +1649,26 @@ func Test_runWithInfo(t *testing.T) {
 	// 배포 중이 아닌 서버 : d3, d1
 	// 배포 중이 아닌 파일 : L, N
 
-	runWithInfo(allfmm, rhitfmm)
+	tskr.runWithInfo(allfmm, rhitfmm)
 
 	t.Log("tasks 6-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
+	for _, task := range tskr.tasks.GetTaskList() {
 		t.Log(task)
 	}
 
 	// L.mpg, s3 -> d3 task 가 하나 만들어져야 함
-	assert.Equal(t, 4, len(tasks.TaskMap))
-	assertTask(t, tasks, "B.mpg", s2, d2)
-	assertTask(t, tasks, "M.mpg", s4, d5)
-	assertTask(t, tasks, "J.mpg", s1, d4)
-	assertTask(t, tasks, "L.mpg", s3, d3)
+	assert.Equal(t, 4, len(tskr.tasks.TaskMap))
+	assertTask(t, tskr.tasks, "B.mpg", s2, d2)
+	assertTask(t, tskr.tasks, "M.mpg", s4, d5)
+	assertTask(t, tskr.tasks, "J.mpg", s1, d4)
+	assertTask(t, tskr.tasks, "L.mpg", s3, d3)
 
 	//////////////////////////////////////////////////////////////////////////////
 	// B가 DONE 된 경우
 	// M이 TIMEOUT된 경우, d5와 통신은 되는 경우
-	updateStatus(t, tasks, "B.mpg", DONE)
-	updateStatus(t, tasks, "M.mpg", TIMEOUT)
+	updateStatus(t, tskr.tasks, "B.mpg", DONE)
+	updateStatus(t, tskr.tasks, "M.mpg", TIMEOUT)
 
 	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
 	// src 서버 선택은 s4, s3, s2, s1 순임
@@ -1670,21 +1681,21 @@ func Test_runWithInfo(t *testing.T) {
 	// 배포 중이 아닌 서버 : d5, d2, d1
 	// 배포 중이 아닌 파일 : M, N
 	// M은 배포 실패햇다고 생각하고, 다시 배포 task에  넣을 수 있다고 가정함
-	runWithInfo(allfmm, rhitfmm)
+	tskr.runWithInfo(allfmm, rhitfmm)
 
 	t.Log("tasks 7-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
+	for _, task := range tskr.tasks.GetTaskList() {
 		t.Log(task)
 	}
 
-	assert.Equal(t, 4, len(tasks.TaskMap))
-	assertTask(t, tasks, "J.mpg", s1, d4)
-	assertTask(t, tasks, "L.mpg", s3, d3)
+	assert.Equal(t, 4, len(tskr.tasks.TaskMap))
+	assertTask(t, tskr.tasks, "J.mpg", s1, d4)
+	assertTask(t, tskr.tasks, "L.mpg", s3, d3)
 	// M, s4, d5 추가
 	// N, s2, d2 추가
-	assertTask(t, tasks, "M.mpg", s4, d5)
-	assertTask(t, tasks, "N.mpg", s2, d2)
+	assertTask(t, tskr.tasks, "M.mpg", s4, d5)
+	assertTask(t, tskr.tasks, "N.mpg", s2, d2)
 
 	//////////////////////////////////////////////////////////////////////////////
 	// d2와 통신 실패
@@ -1708,23 +1719,23 @@ func Test_runWithInfo(t *testing.T) {
 	// 배포 중이 아닌 서버 : d1
 	// 통신 실패 : (d5, d3, d2)
 	// 배포 중이 아닌 파일 : M, L, N
-	runWithInfo(allfmm, rhitfmm)
+	tskr.runWithInfo(allfmm, rhitfmm)
 
 	t.Log("tasks 8-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
+	for _, task := range tskr.tasks.GetTaskList() {
 		t.Log(task)
 	}
 
-	assert.Equal(t, 4, len(tasks.TaskMap))
-	assertTask(t, tasks, "J.mpg", s1, d4)
+	assert.Equal(t, 4, len(tskr.tasks.TaskMap))
+	assertTask(t, tskr.tasks, "J.mpg", s1, d4)
 	// 여러 source 서버에서 하나의 destination 서버로 배포가 가능
 	// M, s4, d1 추가
 	// L, s3, d1 추가
 	// N, s2, d1 추가
-	assertTask(t, tasks, "M.mpg", s4, d1)
-	assertTask(t, tasks, "L.mpg", s3, d1)
-	assertTask(t, tasks, "N.mpg", s2, d1)
+	assertTask(t, tskr.tasks, "M.mpg", s4, d1)
+	assertTask(t, tskr.tasks, "L.mpg", s3, d1)
+	assertTask(t, tskr.tasks, "N.mpg", s2, d1)
 
 	//////////////////////////////////////////////////////////////////////////////
 	// s1와 통신 실패
@@ -1752,16 +1763,16 @@ func Test_runWithInfo(t *testing.T) {
 	// 통신 실패 : (s3, s2, s1)
 	// 통신 실패 : (d5, d4, d3, d2)
 	// 배포 중이 아닌 파일 : J. L, N
-	runWithInfo(allfmm, rhitfmm)
+	tskr.runWithInfo(allfmm, rhitfmm)
 
 	t.Log("tasks 9-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
+	for _, task := range tskr.tasks.GetTaskList() {
 		t.Log(task)
 	}
 	// M만 남고, 사용 가능한 src서버가 없어서 새로 만들어지지는 않음
-	assert.Equal(t, 1, len(tasks.TaskMap))
-	assertTask(t, tasks, "M.mpg", s4, d1)
+	assert.Equal(t, 1, len(tskr.tasks.TaskMap))
+	assertTask(t, tskr.tasks, "M.mpg", s4, d1)
 
 	//////////////////////////////////////////////////////////////////////////////
 	// s1은 통신 성공
@@ -1779,23 +1790,23 @@ func Test_runWithInfo(t *testing.T) {
 	// 통신 실패 : (s3, s2)
 	// 통신 실패 : (d5, d4, d3, d2)
 	// 배포 중이 아닌 파일 : J. L, N
-	runWithInfo(allfmm, rhitfmm)
+	tskr.runWithInfo(allfmm, rhitfmm)
 
 	t.Log("tasks 10-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
+	for _, task := range tskr.tasks.GetTaskList() {
 		t.Log(task)
 	}
 	// M만 남고,
 	// 사용가능한 src 서버 s1이 있지만,
 	// 사용가능한 dst 서버가 없어서 새로 만들어지지는 않음
-	assert.Equal(t, 1, len(tasks.TaskMap))
-	assertTask(t, tasks, "M.mpg", s4, d1)
+	assert.Equal(t, 1, len(tskr.tasks.TaskMap))
+	assertTask(t, tskr.tasks, "M.mpg", s4, d1)
 }
 
 func Test_run(t *testing.T) {
-
-	makePresetS4D5()
+	tskr := NewTasker()
+	makePresetS4D5(tskr)
 
 	s1 := "127.0.0.1:8081"
 	s1files := []string{}
@@ -1891,7 +1902,7 @@ func Test_run(t *testing.T) {
 
 	///////////////////////////////////////////////////////////////////////////////
 	base := "testsourcefolder"
-	SourcePath.Add(base)
+	tskr.SourcePath.Add(base)
 
 	// source path 에 파일 생성
 	for _, f := range d1files {
@@ -1926,7 +1937,7 @@ func Test_run(t *testing.T) {
 	defer deletefile(base, "")
 
 	serverfs := make(FileFreqMap)
-	collectRemoteFileList(DstServers, serverfs)
+	collectRemoteFileList(tskr.DstServers, serverfs)
 	assert.Equal(t, 10, len(serverfs))
 	assert.Equal(t, 1, int(serverfs["A.mpg"]))
 	assert.Equal(t, 2, int(serverfs["B.mpg"]))
@@ -1940,7 +1951,7 @@ func Test_run(t *testing.T) {
 	assert.Equal(t, 1, int(serverfs["SERVER3.mpg"]))
 
 	ignores := []string{"AD1", "H", "I", "AD2"}
-	SetIgnorePrefixes(ignores)
+	tskr.SetIgnorePrefixes(ignores)
 
 	rhfiles := []string{"E.mpg", "F.mpg", "J.mpg", "RH1.mpg", "M.mpg", "H.mpg", "O.mpg", "RH2.mpg"}
 
@@ -1949,7 +1960,7 @@ func Test_run(t *testing.T) {
 	makeGradeInfoFileABCDEFGHIJKLMNO(gradedir, gradefile)
 	defer deletefile(gradedir, "")
 
-	SetGradeInfoFile(filepath.Join(gradedir, gradefile))
+	tskr.SetGradeInfoFile(filepath.Join(gradedir, gradefile))
 
 	hcdir := "hitcounthistoryinfofolder"
 	hcfile := ".hitcount.history"
@@ -1957,17 +1968,17 @@ func Test_run(t *testing.T) {
 
 	defer deletefile(hcdir, "")
 
-	SetHitcountHistoryFile(filepath.Join(hcdir, hcfile))
+	tskr.SetHitcountHistoryFile(filepath.Join(hcdir, hcfile))
 
 	taildir := "taildir"
 	tailip := "255.255.255.255"
 	watchmin := 10
 	hitbase := 5
 
-	Tail.SetWatchDir(taildir)
-	Tail.SetWatchIPString(tailip)
-	Tail.SetWatchTermMin(watchmin)
-	Tail.SetWatchHitBase(hitbase)
+	tskr.Tail.SetWatchDir(taildir)
+	tskr.Tail.SetWatchIPString(tailip)
+	tskr.Tail.SetWatchTermMin(watchmin)
+	tskr.Tail.SetWatchHitBase(hitbase)
 	basetm := time.Now()
 	makeRisingHitFiles9(taildir, tailip, basetm, watchmin, rhfiles)
 	defer deletefile(taildir, "")
@@ -1988,8 +1999,8 @@ func Test_run(t *testing.T) {
 	var t1, t2, t3 Task
 
 	ts := NewTasks()
-	tasks = ts
-	defer tasks.Release()
+	tskr.tasks = ts
+	defer tskr.tasks.Release()
 
 	t.Log("tasks 1-------------------------------------")
 	t1 = ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
@@ -2002,15 +2013,15 @@ func Test_run(t *testing.T) {
 		FileName: "DANGLING1.mpg", SrcAddr: "127.0.0.3:8083", DstAddr: "127.0.0.2:18082"})
 	t.Log(t3)
 
-	run(basetm)
+	tskr.run(basetm)
 
 	t.Log("tasks 2-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
+	for _, task := range tskr.tasks.GetTaskList() {
 		t.Log(task)
 	}
 
-	assert.Equal(t, 0, len(tasks.TaskMap))
+	assert.Equal(t, 0, len(tskr.tasks.TaskMap))
 
 	t.Log("tasks 3-------------------------------------")
 	t1 = ts.CreateTask(&Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
@@ -2023,10 +2034,10 @@ func Test_run(t *testing.T) {
 		FileName: "DANGLING1.mpg", SrcAddr: "127.0.0.3:8083", DstAddr: "127.0.0.2:18082"})
 	t.Log(t3)
 
-	assert.Equal(t, 3, len(tasks.TaskMap))
-	assertTask(t, tasks, "A.mpg", s1, d1)
-	assertTask(t, tasks, "B.mpg", s2, d2)
-	assertTask(t, tasks, "DANGLING1.mpg", s3, d2)
+	assert.Equal(t, 3, len(tskr.tasks.TaskMap))
+	assertTask(t, tskr.tasks, "A.mpg", s1, d1)
+	assertTask(t, tskr.tasks, "B.mpg", s2, d2)
+	assertTask(t, tskr.tasks, "DANGLING1.mpg", s3, d2)
 
 	heartbeater.Heartbeat()
 	// src server와 dst server의 heartbeat 가 살아난 후에는 task 가 그대로 있음
@@ -2053,11 +2064,11 @@ func Test_run(t *testing.T) {
 	// 배포 중이 아닌 파일 : M, J, L, N
 
 	// M.mpg, s4 -> d5 task 가 하나 만들어져야 함
-	run(basetm)
+	tskr.run(basetm)
 
 	t.Log("tasks 4-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
+	for _, task := range tskr.tasks.GetTaskList() {
 		t.Log(task)
 	}
 
@@ -2067,30 +2078,30 @@ func Test_run(t *testing.T) {
 
 	// 기존의 task는 그대로 있고
 	// M.mpg, s4 -> d5 task 가 하나 만들어져야 함
-	assert.Equal(t, 4, len(tasks.TaskMap))
+	assert.Equal(t, 4, len(tskr.tasks.TaskMap))
 
 	// file, src, dst 로 간접 확인
 	// 기존 task 에
-	assert.Equal(t, 4, len(tasks.TaskMap))
-	assertTask(t, tasks, "A.mpg", s1, d1)
-	assertTask(t, tasks, "B.mpg", s2, d2)
-	assertTask(t, tasks, "DANGLING1.mpg", s3, d2)
+	assert.Equal(t, 4, len(tskr.tasks.TaskMap))
+	assertTask(t, tskr.tasks, "A.mpg", s1, d1)
+	assertTask(t, tskr.tasks, "B.mpg", s2, d2)
+	assertTask(t, tskr.tasks, "DANGLING1.mpg", s3, d2)
 	// M.mpg, s4 -> d5 task 가 하나 만들어져야 함
-	assertTask(t, tasks, "M.mpg", s4, d5)
+	assertTask(t, tskr.tasks, "M.mpg", s4, d5)
 
 	//////////////////////////////////////////////////////////////////////////////
 	// t1이 DONE이 된 경우
-	tasks.UpdateStatus(t1.ID, DONE)
+	tskr.tasks.UpdateStatus(t1.ID, DONE)
 
-	run(basetm)
+	tskr.run(basetm)
 
 	t.Log("tasks 5-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
+	for _, task := range tskr.tasks.GetTaskList() {
 		t.Log(task)
 	}
 
-	assert.Equal(t, 4, len(tasks.TaskMap))
+	assert.Equal(t, 4, len(tskr.tasks.TaskMap))
 
 	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
 	// src 서버 선택은 s4, s3,s2,s1 순임
@@ -2106,16 +2117,16 @@ func Test_run(t *testing.T) {
 
 	// file, src, dst 로 간접 확인
 	// 기존의 t1 task 가 없어지고, 새로운 task 생성
-	assert.Equal(t, 4, len(tasks.TaskMap))
-	assertTask(t, tasks, "B.mpg", s2, d2)
-	assertTask(t, tasks, "DANGLING1.mpg", s3, d2)
-	assertTask(t, tasks, "M.mpg", s4, d5)
+	assert.Equal(t, 4, len(tskr.tasks.TaskMap))
+	assertTask(t, tskr.tasks, "B.mpg", s2, d2)
+	assertTask(t, tskr.tasks, "DANGLING1.mpg", s3, d2)
+	assertTask(t, tskr.tasks, "M.mpg", s4, d5)
 	// J.mpg, s1 -> d4 task 가 하나 만들어져야 함
-	assertTask(t, tasks, "J.mpg", s1, d4)
+	assertTask(t, tskr.tasks, "J.mpg", s1, d4)
 
 	//////////////////////////////////////////////////////////////////////////////
 	// t3 이 DONE이 된 경우
-	updateStatus(t, tasks, "DANGLING1.mpg", DONE)
+	updateStatus(t, tskr.tasks, "DANGLING1.mpg", DONE)
 
 	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
 	// src 서버 선택은 s4, s3, s2, s1 순임
@@ -2131,26 +2142,26 @@ func Test_run(t *testing.T) {
 	// 배포 중이 아닌 서버 : d3, d1
 	// 배포 중이 아닌 파일 : L, N
 
-	run(basetm)
+	tskr.run(basetm)
 
 	t.Log("tasks 6-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
+	for _, task := range tskr.tasks.GetTaskList() {
 		t.Log(task)
 	}
 
 	// L.mpg, s3 -> d3 task 가 하나 만들어져야 함
-	assert.Equal(t, 4, len(tasks.TaskMap))
-	assertTask(t, tasks, "B.mpg", s2, d2)
-	assertTask(t, tasks, "M.mpg", s4, d5)
-	assertTask(t, tasks, "J.mpg", s1, d4)
-	assertTask(t, tasks, "L.mpg", s3, d3)
+	assert.Equal(t, 4, len(tskr.tasks.TaskMap))
+	assertTask(t, tskr.tasks, "B.mpg", s2, d2)
+	assertTask(t, tskr.tasks, "M.mpg", s4, d5)
+	assertTask(t, tskr.tasks, "J.mpg", s1, d4)
+	assertTask(t, tskr.tasks, "L.mpg", s3, d3)
 
 	//////////////////////////////////////////////////////////////////////////////
 	// B가 DONE 된 경우
 	// M이 TIMEOUT된 경우, d5와 통신은 되는 경우
-	updateStatus(t, tasks, "B.mpg", DONE)
-	updateStatus(t, tasks, "M.mpg", TIMEOUT)
+	updateStatus(t, tskr.tasks, "B.mpg", DONE)
+	updateStatus(t, tskr.tasks, "M.mpg", TIMEOUT)
 
 	// 배포 대상은 M, J, L, N 순으로 배포되어야 함
 	// src 서버 선택은 s4, s3, s2, s1 순임
@@ -2163,21 +2174,21 @@ func Test_run(t *testing.T) {
 	// 배포 중이 아닌 서버 : d5, d2, d1
 	// 배포 중이 아닌 파일 : M, N
 	// M은 배포 실패햇다고 생각하고, 다시 배포 task에  넣을 수 있다고 가정함
-	run(basetm)
+	tskr.run(basetm)
 
 	t.Log("tasks 7-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
+	for _, task := range tskr.tasks.GetTaskList() {
 		t.Log(task)
 	}
 
-	assert.Equal(t, 4, len(tasks.TaskMap))
-	assertTask(t, tasks, "J.mpg", s1, d4)
-	assertTask(t, tasks, "L.mpg", s3, d3)
+	assert.Equal(t, 4, len(tskr.tasks.TaskMap))
+	assertTask(t, tskr.tasks, "J.mpg", s1, d4)
+	assertTask(t, tskr.tasks, "L.mpg", s3, d3)
 	// M, s4, d5 추가
 	// N, s2, d2 추가
-	assertTask(t, tasks, "M.mpg", s4, d5)
-	assertTask(t, tasks, "N.mpg", s2, d2)
+	assertTask(t, tskr.tasks, "M.mpg", s4, d5)
+	assertTask(t, tskr.tasks, "N.mpg", s2, d2)
 
 	//////////////////////////////////////////////////////////////////////////////
 	// d2와 통신 실패
@@ -2201,23 +2212,23 @@ func Test_run(t *testing.T) {
 	// 배포 중이 아닌 서버 : d1
 	// 통신 실패 : (d5, d3, d2)
 	// 배포 중이 아닌 파일 : M, L, N
-	run(basetm)
+	tskr.run(basetm)
 
 	t.Log("tasks 8-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
+	for _, task := range tskr.tasks.GetTaskList() {
 		t.Log(task)
 	}
 
-	assert.Equal(t, 4, len(tasks.TaskMap))
-	assertTask(t, tasks, "J.mpg", s1, d4)
+	assert.Equal(t, 4, len(tskr.tasks.TaskMap))
+	assertTask(t, tskr.tasks, "J.mpg", s1, d4)
 	// 여러 source 서버에서 하나의 destination 서버로 배포가 가능
 	// M, s4, d1 추가
 	// L, s3, d1 추가
 	// N, s2, d1 추가
-	assertTask(t, tasks, "M.mpg", s4, d1)
-	assertTask(t, tasks, "L.mpg", s3, d1)
-	assertTask(t, tasks, "N.mpg", s2, d1)
+	assertTask(t, tskr.tasks, "M.mpg", s4, d1)
+	assertTask(t, tskr.tasks, "L.mpg", s3, d1)
+	assertTask(t, tskr.tasks, "N.mpg", s2, d1)
 
 	//////////////////////////////////////////////////////////////////////////////
 	// s1와 통신 실패
@@ -2245,16 +2256,16 @@ func Test_run(t *testing.T) {
 	// 통신 실패 : (s3, s2, s1)
 	// 통신 실패 : (d5, d4, d3, d2)
 	// 배포 중이 아닌 파일 : J. L, N
-	run(basetm)
+	tskr.run(basetm)
 
 	t.Log("tasks 9-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
+	for _, task := range tskr.tasks.GetTaskList() {
 		t.Log(task)
 	}
 	// M만 남고, 사용 가능한 src서버가 없어서 새로 만들어지지는 않음
-	assert.Equal(t, 1, len(tasks.TaskMap))
-	assertTask(t, tasks, "M.mpg", s4, d1)
+	assert.Equal(t, 1, len(tskr.tasks.TaskMap))
+	assertTask(t, tskr.tasks, "M.mpg", s4, d1)
 
 	//////////////////////////////////////////////////////////////////////////////
 	// s1은 통신 성공
@@ -2272,18 +2283,18 @@ func Test_run(t *testing.T) {
 	// 통신 실패 : (s3, s2)
 	// 통신 실패 : (d5, d4, d3, d2)
 	// 배포 중이 아닌 파일 : J. L, N
-	run(basetm)
+	tskr.run(basetm)
 
 	t.Log("tasks 10-------------------------------------")
 	// src server heartbeat fail 로 모든 task 가 clear 됨
-	for _, task := range tasks.GetTaskList() {
+	for _, task := range tskr.tasks.GetTaskList() {
 		t.Log(task)
 	}
 	// M만 남고,
 	// 사용가능한 src 서버 s1이 있지만,
 	// 사용가능한 dst 서버가 없어서 새로 만들어지지는 않음
-	assert.Equal(t, 1, len(tasks.TaskMap))
-	assertTask(t, tasks, "M.mpg", s4, d1)
+	assert.Equal(t, 1, len(tskr.tasks.TaskMap))
+	assertTask(t, tskr.tasks, "M.mpg", s4, d1)
 }
 
 func makeGradeInfoFileABCDEFGHIJKLMNO(dir string, filename string) {

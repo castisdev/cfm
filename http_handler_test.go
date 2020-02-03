@@ -41,18 +41,19 @@ func TestAPI_TaskIndex(t *testing.T) {
 	tasks.TaskMap[t3.ID].Status = tasker.WORKING
 	tasks.TaskMap[t4.ID].Status = tasker.TIMEOUT
 
-	tasker.SrcServers.Add("127.0.0.1:8080")
-	(*tasker.SrcServers)[0].Status = tasker.OK
+	tskr := tasker.NewTasker()
+	tskr.SrcServers.Add("127.0.0.1:8080")
+	(*tskr.SrcServers)[0].Status = tasker.OK
 
-	tasker.DstServers.Add("127.0.0.1:8081")
-	tasker.DstServers.Add("127.0.0.2:8081")
-	tasker.DstServers.Add("127.0.0.3:8081")
-	tasker.DstServers.Add("127.0.0.4:8081")
+	tskr.DstServers.Add("127.0.0.1:8081")
+	tskr.DstServers.Add("127.0.0.2:8081")
+	tskr.DstServers.Add("127.0.0.3:8081")
+	tskr.DstServers.Add("127.0.0.4:8081")
 
-	(*tasker.DstServers)[0].Status = tasker.OK
-	(*tasker.DstServers)[1].Status = tasker.OK
-	(*tasker.DstServers)[2].Status = tasker.OK
-	(*tasker.DstServers)[3].Status = tasker.OK
+	(*tskr.DstServers)[0].Status = tasker.OK
+	(*tskr.DstServers)[1].Status = tasker.OK
+	(*tskr.DstServers)[2].Status = tasker.OK
+	(*tskr.DstServers)[3].Status = tasker.OK
 
 	serverAddr := "127.0.0.1:18881"
 	router := NewRouter()
@@ -138,13 +139,14 @@ func TestAPI_TaskIndex_EmptyList(t *testing.T) {
 	tasks = tasker.NewTasks()
 	defer tasks.DeleteAllTask()
 
-	tasker.SrcServers.Add("127.0.0.1:8080")
-	(*tasker.SrcServers)[0].Status = tasker.OK
+	tskr := tasker.NewTasker()
+	tskr.SrcServers.Add("127.0.0.1:8080")
+	(*tskr.SrcServers)[0].Status = tasker.OK
 
-	tasker.DstServers.Add("127.0.0.1:8081")
-	tasker.DstServers.Add("127.0.0.2:8081")
-	tasker.DstServers.Add("127.0.0.3:8081")
-	tasker.DstServers.Add("127.0.0.4:8081")
+	tskr.DstServers.Add("127.0.0.1:8081")
+	tskr.DstServers.Add("127.0.0.2:8081")
+	tskr.DstServers.Add("127.0.0.3:8081")
+	tskr.DstServers.Add("127.0.0.4:8081")
 
 	serverAddr := "127.0.0.1:18881"
 	router := NewRouter()
@@ -229,18 +231,19 @@ func TestAPI_TaskDelete(t *testing.T) {
 	tasks.TaskMap[t3.ID].Status = tasker.WORKING
 	tasks.TaskMap[t4.ID].Status = tasker.TIMEOUT
 
-	tasker.SrcServers.Add("127.0.0.1:8080")
-	(*tasker.SrcServers)[0].Status = tasker.OK
+	tskr := tasker.NewTasker()
+	tskr.SrcServers.Add("127.0.0.1:8080")
+	(*tskr.SrcServers)[0].Status = tasker.OK
 
-	tasker.DstServers.Add("127.0.0.1:8081")
-	tasker.DstServers.Add("127.0.0.2:8081")
-	tasker.DstServers.Add("127.0.0.3:8081")
-	tasker.DstServers.Add("127.0.0.4:8081")
+	tskr.DstServers.Add("127.0.0.1:8081")
+	tskr.DstServers.Add("127.0.0.2:8081")
+	tskr.DstServers.Add("127.0.0.3:8081")
+	tskr.DstServers.Add("127.0.0.4:8081")
 
-	(*tasker.DstServers)[0].Status = tasker.OK
-	(*tasker.DstServers)[1].Status = tasker.OK
-	(*tasker.DstServers)[2].Status = tasker.OK
-	(*tasker.DstServers)[3].Status = tasker.OK
+	(*tskr.DstServers)[0].Status = tasker.OK
+	(*tskr.DstServers)[1].Status = tasker.OK
+	(*tskr.DstServers)[2].Status = tasker.OK
+	(*tskr.DstServers)[3].Status = tasker.OK
 
 	serverAddr := "127.0.0.1:18881"
 	router := NewRouter()
@@ -320,18 +323,19 @@ func TestAPI_TaskUpdate(t *testing.T) {
 	tasks.TaskMap[t3.ID].Status = tasker.WORKING
 	tasks.TaskMap[t4.ID].Status = tasker.TIMEOUT
 
-	tasker.SrcServers.Add("127.0.0.1:8080")
-	(*tasker.SrcServers)[0].Status = tasker.OK
+	tskr := tasker.NewTasker()
+	tskr.SrcServers.Add("127.0.0.1:8080")
+	(*tskr.SrcServers)[0].Status = tasker.OK
 
-	tasker.DstServers.Add("127.0.0.1:8081")
-	tasker.DstServers.Add("127.0.0.2:8081")
-	tasker.DstServers.Add("127.0.0.3:8081")
-	tasker.DstServers.Add("127.0.0.4:8081")
+	tskr.DstServers.Add("127.0.0.1:8081")
+	tskr.DstServers.Add("127.0.0.2:8081")
+	tskr.DstServers.Add("127.0.0.3:8081")
+	tskr.DstServers.Add("127.0.0.4:8081")
 
-	(*tasker.DstServers)[0].Status = tasker.OK
-	(*tasker.DstServers)[1].Status = tasker.OK
-	(*tasker.DstServers)[2].Status = tasker.OK
-	(*tasker.DstServers)[3].Status = tasker.OK
+	(*tskr.DstServers)[0].Status = tasker.OK
+	(*tskr.DstServers)[1].Status = tasker.OK
+	(*tskr.DstServers)[2].Status = tasker.OK
+	(*tskr.DstServers)[3].Status = tasker.OK
 
 	serverAddr := "127.0.0.1:18881"
 	router := NewRouter()

@@ -331,8 +331,10 @@ func Test_findServersOutOfDiskSpace(t *testing.T) {
 	hosts.Add(vs2)
 	hosts.Add(vs3)
 
-	SetDiskUsageLimitPercent(55)
-	dservers := findServersOutOfDiskSpace(hosts)
+	rmr := NewRemover()
+
+	rmr.SetDiskUsageLimitPercent(55)
+	dservers := rmr.findServersOutOfDiskSpace(hosts)
 
 	assert.Equal(t, 1, len(dservers))
 
@@ -343,7 +345,7 @@ func Test_findServersOutOfDiskSpace(t *testing.T) {
 	assert.Equal(t, vs1, overuseServer.Addr)
 	assert.Equal(t, uint(60), overuseServer.Du.UsedPercent)
 
-	overUsedSize := overuseServer.Du.GetOverUsedSize(DiskUsageLimitPercent())
+	overUsedSize := overuseServer.Du.GetOverUsedSize(rmr.DiskUsageLimitPercent())
 	assert.Less(t, uint64(0), uint64(overUsedSize))
 
 	// 50 = 600(current used) - 550(limit used : 1000 * 55%)
@@ -351,9 +353,10 @@ func Test_findServersOutOfDiskSpace(t *testing.T) {
 }
 
 func TestSetDiskUsageLimitPercent(t *testing.T) {
-	assert.NotNil(t, SetDiskUsageLimitPercent(101))
-	assert.Nil(t, SetDiskUsageLimitPercent(0))
-	assert.Nil(t, SetDiskUsageLimitPercent(50))
+	rmr := NewRemover()
+	assert.NotNil(t, rmr.SetDiskUsageLimitPercent(101))
+	assert.Nil(t, rmr.SetDiskUsageLimitPercent(0))
+	assert.Nil(t, rmr.SetDiskUsageLimitPercent(50))
 }
 
 func Test_selectFileMetas(t *testing.T) {
@@ -537,7 +540,8 @@ func Test_selectFileMetasSNull(t *testing.T) {
 }
 
 func Test_getServerFileMetas(t *testing.T) {
-	Servers = common.NewHosts()
+	rmr := NewRemover()
+	rmr.Servers = common.NewHosts()
 	vs1 := "127.0.0.1:18881"
 	files1 := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg"}
 	d1 := common.DiskUsage{
@@ -552,8 +556,8 @@ func Test_getServerFileMetas(t *testing.T) {
 		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
 	}
 
-	Servers.Add(vs1)
-	Servers.Add(vs2)
+	rmr.Servers.Add(vs1)
+	rmr.Servers.Add(vs2)
 
 	cfw1 := cfw(vs1, d1, files1)
 	cfw1.Start()
@@ -564,7 +568,7 @@ func Test_getServerFileMetas(t *testing.T) {
 	defer cfw2.Close()
 
 	allfmm, _ := makeFileMetaMap()
-	ssfmm := getServerFileMetas(allfmm)
+	ssfmm := rmr.getServerFileMetas(allfmm)
 	for s, sfmm := range ssfmm {
 		t.Logf("server metas:%s -> %s", s, sfmm)
 	}
@@ -587,7 +591,8 @@ func Test_getServerFileMetas(t *testing.T) {
 }
 
 func Test_getServerFileMetasServerNull(t *testing.T) {
-	Servers = common.NewHosts()
+	rmr := NewRemover()
+	rmr.Servers = common.NewHosts()
 	vs1 := "127.0.0.1:18881"
 	files1 := []string{}
 	d1 := common.DiskUsage{
@@ -602,8 +607,8 @@ func Test_getServerFileMetasServerNull(t *testing.T) {
 		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
 	}
 
-	Servers.Add(vs1)
-	Servers.Add(vs2)
+	rmr.Servers.Add(vs1)
+	rmr.Servers.Add(vs2)
 
 	cfw1 := cfw(vs1, d1, files1)
 	cfw1.Start()
@@ -614,7 +619,7 @@ func Test_getServerFileMetasServerNull(t *testing.T) {
 	defer cfw2.Close()
 
 	allfmm, _ := makeFileMetaMap()
-	ssfmm := getServerFileMetas(allfmm)
+	ssfmm := rmr.getServerFileMetas(allfmm)
 	for s, sfmm := range ssfmm {
 		t.Logf("server metas:%s -> %s", s, sfmm)
 	}
@@ -628,7 +633,8 @@ func Test_getServerFileMetasServerNull(t *testing.T) {
 }
 
 func Test_updateFileMetasForDuplicatedFiles(t *testing.T) {
-	Servers = common.NewHosts()
+	rmr := NewRemover()
+	rmr.Servers = common.NewHosts()
 	vs1 := "127.0.0.1:18881"
 	files1 := []string{"A.mpg", "C.mpg", "D.mpg"}
 	d1 := common.DiskUsage{
@@ -641,8 +647,8 @@ func Test_updateFileMetasForDuplicatedFiles(t *testing.T) {
 		TotalSize: 1000, UsedSize: 600,
 		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
 	}
-	Servers.Add(vs1)
-	Servers.Add(vs2)
+	rmr.Servers.Add(vs1)
+	rmr.Servers.Add(vs2)
 	cfw1 := cfw(vs1, d1, files1)
 	cfw1.Start()
 	defer cfw1.Close()
@@ -652,7 +658,7 @@ func Test_updateFileMetasForDuplicatedFiles(t *testing.T) {
 
 	allfmm, dupfmm := makeFileMetaMap()
 
-	ssfmm := getServerFileMetas(allfmm)
+	ssfmm := rmr.getServerFileMetas(allfmm)
 	for s, sfmm := range ssfmm {
 		t.Logf("server metas:%s -> %s", s, sfmm)
 	}
@@ -677,7 +683,7 @@ func Test_updateFileMetasForDuplicatedFiles(t *testing.T) {
 	assert.Equal(t, 2, dupfmm["C.mpg"].ServerCount)
 
 	// updateAllFileMetasForDuplicatedFiles 호출하고 나면,
-	updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
+	rmr.updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
 
 	// Server1, Server2 의 파일 meta 정보가 반영되어
 	// B.mpg의 serverCount 값이 2에서 0로 바뀐다.
@@ -699,7 +705,8 @@ func Test_updateFileMetasForDuplicatedFiles(t *testing.T) {
 }
 
 func Test_updateFileMetasForDuplicatedFilesServerNull(t *testing.T) {
-	Servers = common.NewHosts()
+	rmr := NewRemover()
+	rmr.Servers = common.NewHosts()
 	vs1 := "127.0.0.1:18881"
 	files1 := []string{}
 	d1 := common.DiskUsage{
@@ -712,8 +719,8 @@ func Test_updateFileMetasForDuplicatedFilesServerNull(t *testing.T) {
 		TotalSize: 1000, UsedSize: 600,
 		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
 	}
-	Servers.Add(vs1)
-	Servers.Add(vs2)
+	rmr.Servers.Add(vs1)
+	rmr.Servers.Add(vs2)
 	cfw1 := cfw(vs1, d1, files1)
 	cfw1.Start()
 	defer cfw1.Close()
@@ -723,7 +730,7 @@ func Test_updateFileMetasForDuplicatedFilesServerNull(t *testing.T) {
 
 	allfmm, dupfmm := makeFileMetaMap()
 
-	ssfmm := getServerFileMetas(allfmm)
+	ssfmm := rmr.getServerFileMetas(allfmm)
 	for s, sfmm := range ssfmm {
 		t.Logf("server metas:%s -> %s", s, sfmm)
 	}
@@ -744,7 +751,7 @@ func Test_updateFileMetasForDuplicatedFilesServerNull(t *testing.T) {
 	assert.Equal(t, 2, dupfmm["C.mpg"].ServerCount)
 
 	// updateAllFileMetasForDuplicatedFiles 호출하고 나면,
-	updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
+	rmr.updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
 
 	// Server1, Server2 의 파일 meta 정보가 반영되어
 	// B.mpg의 serverCount 값이 2에서 0로 바뀐다.
@@ -773,7 +780,8 @@ func Test_updateFileMetasForDuplicatedFilesServerNull(t *testing.T) {
 // 하나는 cfm의 src directory 에 없고,
 // 하나는 서버에 존재하지 않는 경우
 func Test_requestRemoveDuplicatedFilesNotInTheSourceDir(t *testing.T) {
-	Servers = common.NewHosts()
+	rmr := NewRemover()
+	rmr.Servers = common.NewHosts()
 	vs1 := "127.0.0.1:18881"
 	files1 := []string{"A.mpg", "C.mpg", "D.mpg"}
 	d1 := common.DiskUsage{
@@ -786,8 +794,8 @@ func Test_requestRemoveDuplicatedFilesNotInTheSourceDir(t *testing.T) {
 		TotalSize: 1000, UsedSize: 600,
 		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
 	}
-	Servers.Add(vs1)
-	Servers.Add(vs2)
+	rmr.Servers.Add(vs1)
+	rmr.Servers.Add(vs2)
 	cfw1 := cfw(vs1, d1, files1)
 	cfw1.Start()
 	defer cfw1.Close()
@@ -796,7 +804,7 @@ func Test_requestRemoveDuplicatedFilesNotInTheSourceDir(t *testing.T) {
 	defer cfw2.Close()
 
 	base := "testsourcefolder"
-	SourcePath.Add(base)
+	rmr.SourcePath.Add(base)
 
 	for _, f1 := range files1 {
 		createfile(base, f1)
@@ -810,7 +818,7 @@ func Test_requestRemoveDuplicatedFilesNotInTheSourceDir(t *testing.T) {
 
 	allfmm, dupfmm := makeFileMetaMap()
 
-	ssfmm := getServerFileMetas(allfmm)
+	ssfmm := rmr.getServerFileMetas(allfmm)
 	for s, sfmm := range ssfmm {
 		t.Logf("server metas:%s -> %s", s, sfmm)
 	}
@@ -841,7 +849,7 @@ func Test_requestRemoveDuplicatedFilesNotInTheSourceDir(t *testing.T) {
 	assert.Equal(t, 1, allfmm["F.mpg"].ServerIPs["127.0.0.2"])
 
 	// updateAllFileMetasForDuplicatedFiles 호출하고 나면,
-	updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
+	rmr.updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
 
 	// Server1, Server2 의 파일 meta 정보가 반영되어
 	// B.mpg의 serverCount 값이 2에서 0로 바뀐다.
@@ -867,7 +875,7 @@ func Test_requestRemoveDuplicatedFilesNotInTheSourceDir(t *testing.T) {
 	// C.mpg 는 src directory 에 없으므로, 삭제되지 않음
 	// Server2, Server1에 B.mpg 삭제 요청을 날려야 하지만
 	// B.mpg 는 server2에 없으므로, 요청을 날리지 않음
-	requestRemoveDuplicatedFiles(dupfmm, ssfmm)
+	rmr.requestRemoveDuplicatedFiles(dupfmm, ssfmm)
 
 	// B.mpg의 server count 정보가 0이므로, B.mpg에 대해서는 요청을 하지 않는다.
 	// 값도 변함이 없다.
@@ -891,7 +899,8 @@ func Test_requestRemoveDuplicatedFilesNotInTheSourceDir(t *testing.T) {
 // 하나는 ignore prefix 로 시작하는 경우(광고 파일)
 // 파일이 하나도 없는 s3 서버도 test에 추가
 func Test_requestRemoveDuplicatedFilesIgnorePrefix(t *testing.T) {
-	Servers = common.NewHosts()
+	rmr := NewRemover()
+	rmr.Servers = common.NewHosts()
 	s1 := "127.0.0.1:18881"
 	files1 := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg"}
 	d1 := common.DiskUsage{
@@ -911,9 +920,9 @@ func Test_requestRemoveDuplicatedFilesIgnorePrefix(t *testing.T) {
 		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
 	}
 
-	Servers.Add(s1)
-	Servers.Add(s2)
-	Servers.Add(s3)
+	rmr.Servers.Add(s1)
+	rmr.Servers.Add(s2)
+	rmr.Servers.Add(s3)
 	cfw1 := cfw(s1, d1, files1)
 	cfw1.Start()
 	defer cfw1.Close()
@@ -925,7 +934,7 @@ func Test_requestRemoveDuplicatedFilesIgnorePrefix(t *testing.T) {
 	defer cfw3.Close()
 
 	base := "testsourcefolder"
-	SourcePath.Add(base)
+	rmr.SourcePath.Add(base)
 
 	for _, f1 := range files1 {
 		createfile(base, f1)
@@ -939,7 +948,7 @@ func Test_requestRemoveDuplicatedFilesIgnorePrefix(t *testing.T) {
 
 	allfmm, dupfmm := makeFileMetaMap()
 
-	ssfmm := getServerFileMetas(allfmm)
+	ssfmm := rmr.getServerFileMetas(allfmm)
 	for s, sfmm := range ssfmm {
 		t.Logf("server metas:%s -> %s", s, sfmm)
 	}
@@ -977,7 +986,7 @@ func Test_requestRemoveDuplicatedFilesIgnorePrefix(t *testing.T) {
 	assert.Equal(t, 1, allfmm["F.mpg"].ServerIPs["127.0.0.2"])
 
 	// updateAllFileMetasForDuplicatedFiles 호출하고 나면,
-	updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
+	rmr.updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
 
 	// Server1, Server2 의 파일 meta 정보가 반영되지만
 	// B, C.mpg의 serverCount 값은 그대로 2이다.
@@ -1001,9 +1010,9 @@ func Test_requestRemoveDuplicatedFilesIgnorePrefix(t *testing.T) {
 	// Server2, Server1에 B.mpg 삭제 요청을 날려야 하지만
 	// B.mpg 는 ingnore.prefix 로 시작하므로, 삭제되지 않음
 	ignores := []string{"B"}
-	SetIgnorePrefixes(ignores)
+	rmr.SetIgnorePrefixes(ignores)
 
-	requestRemoveDuplicatedFiles(dupfmm, ssfmm)
+	rmr.requestRemoveDuplicatedFiles(dupfmm, ssfmm)
 
 	// 값도 변함이 없다.
 	assert.Equal(t, 2, dupfmm["B.mpg"].ServerCount)
@@ -1018,7 +1027,8 @@ func Test_requestRemoveDuplicatedFilesIgnorePrefix(t *testing.T) {
 }
 
 func Test_checkForDeleteServerFile(t *testing.T) {
-	Servers = common.NewHosts()
+	rmr := NewRemover()
+	rmr.Servers = common.NewHosts()
 	s1 := "127.0.0.1:18881"
 	files1 := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg"}
 	d1 := common.DiskUsage{
@@ -1031,8 +1041,8 @@ func Test_checkForDeleteServerFile(t *testing.T) {
 		TotalSize: 1000, UsedSize: 600,
 		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
 	}
-	Servers.Add(s1)
-	Servers.Add(s2)
+	rmr.Servers.Add(s1)
+	rmr.Servers.Add(s2)
 	cfw1 := cfw(s1, d1, files1)
 	cfw1.Start()
 	defer cfw1.Close()
@@ -1043,14 +1053,14 @@ func Test_checkForDeleteServerFile(t *testing.T) {
 	rhfiles := []string{"F.mpg"}
 	rhitfmm := makeRisingHitFileMap(rhfiles)
 	allfmm, dupfmm := makeFileMetaMap()
-	ssfmm := getServerFileMetas(allfmm)
-	updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
+	ssfmm := rmr.getServerFileMetas(allfmm)
+	rmr.updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
 
-	SetDiskUsageLimitPercent(55)
-	servers := findServersOutOfDiskSpace(Servers)
+	rmr.SetDiskUsageLimitPercent(55)
+	servers := rmr.findServersOutOfDiskSpace(rmr.Servers)
 
 	base := "testsourcefolder"
-	SourcePath.Add(base)
+	rmr.SourcePath.Add(base)
 
 	for _, f1 := range files1 {
 		createfile(base, f1)
@@ -1063,11 +1073,11 @@ func Test_checkForDeleteServerFile(t *testing.T) {
 	defer deletefile(base, "")
 
 	ignores := []string{"E"}
-	SetIgnorePrefixes(ignores)
+	rmr.SetIgnorePrefixes(ignores)
 
 	for _, server := range servers {
 		for _, fm := range allfmm {
-			rc := checkForDelete(fm, server, rhitfmm)
+			rc := rmr.checkForDelete(fm, server, rhitfmm)
 			switch server.Addr {
 			case s1: //127.0.0.1:18881
 				switch fm.Name {
@@ -1115,7 +1125,8 @@ func Test_checkForDeleteServerFile(t *testing.T) {
 }
 
 func Test_getFileListToDeleteForFreeDiskSpace(t *testing.T) {
-	Servers = common.NewHosts()
+	rmr := NewRemover()
+	rmr.Servers = common.NewHosts()
 	s1 := "127.0.0.1:18881"
 	files1 := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg"}
 	d1 := common.DiskUsage{
@@ -1128,8 +1139,8 @@ func Test_getFileListToDeleteForFreeDiskSpace(t *testing.T) {
 		TotalSize: 1000, UsedSize: 600,
 		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
 	}
-	Servers.Add(s1)
-	Servers.Add(s2)
+	rmr.Servers.Add(s1)
+	rmr.Servers.Add(s2)
 	cfw1 := cfw(s1, d1, files1)
 	cfw1.Start()
 	defer cfw1.Close()
@@ -1140,14 +1151,14 @@ func Test_getFileListToDeleteForFreeDiskSpace(t *testing.T) {
 	rhfiles := []string{"F.mpg"}
 	rhitfmm := makeRisingHitFileMap(rhfiles)
 	allfmm, dupfmm := makeFileMetaMap()
-	ssfmm := getServerFileMetas(allfmm)
-	updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
+	ssfmm := rmr.getServerFileMetas(allfmm)
+	rmr.updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
 
-	SetDiskUsageLimitPercent(55)
-	servers := findServersOutOfDiskSpace(Servers)
+	rmr.SetDiskUsageLimitPercent(55)
+	servers := rmr.findServersOutOfDiskSpace(rmr.Servers)
 
 	base := "testsourcefolder"
-	SourcePath.Add(base)
+	rmr.SourcePath.Add(base)
 
 	for _, f1 := range files1 {
 		createfile(base, f1)
@@ -1160,7 +1171,7 @@ func Test_getFileListToDeleteForFreeDiskSpace(t *testing.T) {
 	defer deletefile(base, "")
 
 	ignores := []string{"E"}
-	SetIgnorePrefixes(ignores)
+	rmr.SetIgnorePrefixes(ignores)
 
 	D := &common.FileMeta{
 		Name:  "D.mpg",
@@ -1175,10 +1186,10 @@ func Test_getFileListToDeleteForFreeDiskSpace(t *testing.T) {
 		ServerIPs:   map[string]int{"127.0.0.1": 1, "127.0.0.2": 1}}
 
 	for _, server := range servers {
-		dels := getFileListToDeleteForFreeDiskSpace(server, ssfmm, rhitfmm)
+		dels := rmr.getFileListToDeleteForFreeDiskSpace(server, ssfmm, rhitfmm)
 		t.Logf("files to delete: %s -> %s", server, dels)
 
-		overUsedSize := server.Du.GetOverUsedSize(DiskUsageLimitPercent())
+		overUsedSize := server.Du.GetOverUsedSize(rmr.DiskUsageLimitPercent())
 		switch server.Addr {
 		// s1 의 경우,
 		// 200 만큼 over 해서 사용했으므로, file (size 100) 두 개 지워야 함
@@ -1208,7 +1219,8 @@ func Test_getFileListToDeleteForFreeDiskSpace(t *testing.T) {
 }
 
 func Test_requestRemoveFilesForFreeDiskSpace(t *testing.T) {
-	Servers = common.NewHosts()
+	rmr := NewRemover()
+	rmr.Servers = common.NewHosts()
 	s1 := "127.0.0.1:18881"
 	files1 := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg"}
 	d1 := common.DiskUsage{
@@ -1221,8 +1233,8 @@ func Test_requestRemoveFilesForFreeDiskSpace(t *testing.T) {
 		TotalSize: 1000, UsedSize: 600,
 		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
 	}
-	Servers.Add(s1)
-	Servers.Add(s2)
+	rmr.Servers.Add(s1)
+	rmr.Servers.Add(s2)
 	cfw1 := cfw(s1, d1, files1)
 	cfw1.Start()
 	defer cfw1.Close()
@@ -1233,14 +1245,14 @@ func Test_requestRemoveFilesForFreeDiskSpace(t *testing.T) {
 	rhfiles := []string{"F.mpg"}
 	rhitfmm := makeRisingHitFileMap(rhfiles)
 	allfmm, dupfmm := makeFileMetaMap()
-	ssfmm := getServerFileMetas(allfmm)
-	updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
+	ssfmm := rmr.getServerFileMetas(allfmm)
+	rmr.updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
 
-	SetDiskUsageLimitPercent(55)
-	servers := findServersOutOfDiskSpace(Servers)
+	rmr.SetDiskUsageLimitPercent(55)
+	servers := rmr.findServersOutOfDiskSpace(rmr.Servers)
 
 	base := "testsourcefolder"
-	SourcePath.Add(base)
+	rmr.SourcePath.Add(base)
 
 	for _, f1 := range files1 {
 		createfile(base, f1)
@@ -1253,7 +1265,7 @@ func Test_requestRemoveFilesForFreeDiskSpace(t *testing.T) {
 	defer deletefile(base, "")
 
 	ignores := []string{"E"}
-	SetIgnorePrefixes(ignores)
+	rmr.SetIgnorePrefixes(ignores)
 
 	// s1 의 경우,
 	// 200 만큼 over 해서 사용했으므로, file (size 100) 두 개 지워야 함
@@ -1268,7 +1280,7 @@ func Test_requestRemoveFilesForFreeDiskSpace(t *testing.T) {
 	// E.mpg 는 ignore prefix에 속하므로, C.mpg 가 지워져야 하지만,
 	// C.mpg 는 source path 에 존재하지 않으므로, B.mpg가 지워져야 함
 	// B가 지워져야 함
-	requestRemoveFilesForFreeDiskSpace(servers, ssfmm, rhitfmm)
+	rmr.requestRemoveFilesForFreeDiskSpace(servers, ssfmm, rhitfmm)
 
 	// D 는 s1 에서 지워졌으므로, count 가 하나 준다.
 	// D.ServerCount : 1 --> 0
@@ -1280,7 +1292,8 @@ func Test_requestRemoveFilesForFreeDiskSpace(t *testing.T) {
 
 // duplicate 되어서 삭제요청한 파일이 다시 disk 용량으로 삭제대상이 될 순 없는 것이 아닌지 test
 func Test_requestRemoveDuplicatedFilesAndgetFileListToDeleteForFreeDiskSpace(t *testing.T) {
-	Servers = common.NewHosts()
+	rmr := NewRemover()
+	rmr.Servers = common.NewHosts()
 	s1 := "127.0.0.1:18881"
 	files1 := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg"}
 	d1 := common.DiskUsage{
@@ -1293,8 +1306,8 @@ func Test_requestRemoveDuplicatedFilesAndgetFileListToDeleteForFreeDiskSpace(t *
 		TotalSize: 1000, UsedSize: 600,
 		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
 	}
-	Servers.Add(s1)
-	Servers.Add(s2)
+	rmr.Servers.Add(s1)
+	rmr.Servers.Add(s2)
 
 	cfw1 := cfw(s1, d1, files1)
 	cfw1.Start()
@@ -1304,7 +1317,7 @@ func Test_requestRemoveDuplicatedFilesAndgetFileListToDeleteForFreeDiskSpace(t *
 	defer cfw2.Close()
 
 	base := "testsourcefolder"
-	SourcePath.Add(base)
+	rmr.SourcePath.Add(base)
 	for _, f1 := range files1 {
 		createfile(base, f1)
 	}
@@ -1317,14 +1330,14 @@ func Test_requestRemoveDuplicatedFilesAndgetFileListToDeleteForFreeDiskSpace(t *
 	rhfiles := []string{"F.mpg"}
 	rhitfmm := makeRisingHitFileMap(rhfiles)
 	allfmm, dupfmm := makeFileMetaMap()
-	ssfmm := getServerFileMetas(allfmm)
-	updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
+	ssfmm := rmr.getServerFileMetas(allfmm)
+	rmr.updateFileMetasForDuplicatedFiles(dupfmm, ssfmm)
 
 	// B.mpg,  C.mpg가 s1, s2에 두 copy 존재함
 	// sort 순서에 따라서, s2에 B.mpg 삭제 요청을 날린다.
 	// sort 순서에 따라서, s2에 C.mpg 삭제 요청을 날린다.
 	// 그러나 C.mpg는 source path 에 없으므로 삭제 요청을 날리지 않는다.
-	requestRemoveDuplicatedFiles(dupfmm, ssfmm)
+	rmr.requestRemoveDuplicatedFiles(dupfmm, ssfmm)
 	// 요청이 성공하면, B.mpg의 serverCount 값은 1로 바뀐다.
 	assert.Equal(t, 1, allfmm["B.mpg"].ServerCount)
 	assert.Equal(t, 1, dupfmm["B.mpg"].ServerCount)
@@ -1333,11 +1346,11 @@ func Test_requestRemoveDuplicatedFilesAndgetFileListToDeleteForFreeDiskSpace(t *
 	assert.Equal(t, 2, allfmm["C.mpg"].ServerCount)
 	assert.Equal(t, 2, dupfmm["C.mpg"].ServerCount)
 
-	SetDiskUsageLimitPercent(55)
-	servers := findServersOutOfDiskSpace(Servers)
+	rmr.SetDiskUsageLimitPercent(55)
+	servers := rmr.findServersOutOfDiskSpace(rmr.Servers)
 
 	ignores := []string{"E"}
-	SetIgnorePrefixes(ignores)
+	rmr.SetIgnorePrefixes(ignores)
 
 	D := &common.FileMeta{
 		Name:  "D.mpg",
@@ -1355,10 +1368,10 @@ func Test_requestRemoveDuplicatedFilesAndgetFileListToDeleteForFreeDiskSpace(t *
 		ServerIPs:   map[string]int{"127.0.0.1": 1, "127.0.0.2": 0}}
 
 	for _, server := range servers {
-		dels := getFileListToDeleteForFreeDiskSpace(server, ssfmm, rhitfmm)
+		dels := rmr.getFileListToDeleteForFreeDiskSpace(server, ssfmm, rhitfmm)
 		t.Logf("files to delete: %s -> %s", server, dels)
 
-		overUsedSize := server.Du.GetOverUsedSize(DiskUsageLimitPercent())
+		overUsedSize := server.Du.GetOverUsedSize(rmr.DiskUsageLimitPercent())
 		switch server.Addr {
 		// s1 의 경우,
 		// 200 만큼 over 해서 사용했으므로, file (size 100) 두 개 지워야 함
@@ -1390,7 +1403,8 @@ func Test_requestRemoveDuplicatedFilesAndgetFileListToDeleteForFreeDiskSpace(t *
 }
 
 func Test_runWithInfo(t *testing.T) {
-	Servers = common.NewHosts()
+	rmr := NewRemover()
+	rmr.Servers = common.NewHosts()
 	s1 := "127.0.0.1:18881"
 	files1 := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg"}
 	d1 := common.DiskUsage{
@@ -1403,8 +1417,8 @@ func Test_runWithInfo(t *testing.T) {
 		TotalSize: 1000, UsedSize: 600,
 		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
 	}
-	Servers.Add(s1)
-	Servers.Add(s2)
+	rmr.Servers.Add(s1)
+	rmr.Servers.Add(s2)
 
 	cfw1 := cfw(s1, d1, files1)
 	cfw1.Start()
@@ -1414,7 +1428,7 @@ func Test_runWithInfo(t *testing.T) {
 	defer cfw2.Close()
 
 	base := "testsourcefolder"
-	SourcePath.Add(base)
+	rmr.SourcePath.Add(base)
 	for _, f1 := range files1 {
 		createfile(base, f1)
 	}
@@ -1425,25 +1439,25 @@ func Test_runWithInfo(t *testing.T) {
 	defer deletefile(base, "")
 
 	ignores := []string{"E"}
-	SetIgnorePrefixes(ignores)
+	rmr.SetIgnorePrefixes(ignores)
 
-	SetDiskUsageLimitPercent(55)
+	rmr.SetDiskUsageLimitPercent(55)
 
 	rhfiles := []string{"F.mpg"}
 	rhitfmm := makeRisingHitFileMap(rhfiles)
 	allfmm, dupfmm := makeFileMetaMap()
 
-	remover.Debugf("call 1st runWithInfo ---------------------------------------")
+	rmrlogger.Debugf("call 1st runWithInfo ---------------------------------------")
 
-	runWithInfo(allfmm, dupfmm, rhitfmm)
+	rmr.runWithInfo(allfmm, dupfmm, rhitfmm)
 
-	remover.Debugf("after 1st call runWithInfo ---------------------------------")
-	remover.Debugf("B: %s", allfmm["A.mpg"])
-	remover.Debugf("B: %s", allfmm["B.mpg"])
-	remover.Debugf("C: %s", allfmm["C.mpg"])
-	remover.Debugf("C: %s", allfmm["D.mpg"])
-	remover.Debugf("C: %s", allfmm["E.mpg"])
-	remover.Debugf("C: %s", allfmm["F.mpg"])
+	rmrlogger.Debugf("after 1st call runWithInfo ---------------------------------")
+	rmrlogger.Debugf("B: %s", allfmm["A.mpg"])
+	rmrlogger.Debugf("B: %s", allfmm["B.mpg"])
+	rmrlogger.Debugf("C: %s", allfmm["C.mpg"])
+	rmrlogger.Debugf("C: %s", allfmm["D.mpg"])
+	rmrlogger.Debugf("C: %s", allfmm["E.mpg"])
+	rmrlogger.Debugf("C: %s", allfmm["F.mpg"])
 
 	//A.mpg 는 S1에는 그대로 있음
 	// S2에는 원래 없었음
@@ -1477,19 +1491,19 @@ func Test_runWithInfo(t *testing.T) {
 	assert.Equal(t, 0, allfmm["E.mpg"].ServerIPs["127.0.0.1"])
 	assert.Equal(t, 1, allfmm["F.mpg"].ServerIPs["127.0.0.2"])
 
-	remover.Debugf("call 2nd runWithInfo ---------------------------------------")
+	rmrlogger.Debugf("call 2nd runWithInfo ---------------------------------------")
 
 	//dupfmm 정보는 잘못되어있지만, meta 정보는 update 되어있는 상태,
 	//만일 한 번 더 실행한다면,
-	runWithInfo(allfmm, dupfmm, rhitfmm)
+	rmr.runWithInfo(allfmm, dupfmm, rhitfmm)
 
-	remover.Debugf("after 2nd call runWithInfo ---------------------------------")
-	remover.Debugf("B: %s", allfmm["A.mpg"])
-	remover.Debugf("B: %s", allfmm["B.mpg"])
-	remover.Debugf("C: %s", allfmm["C.mpg"])
-	remover.Debugf("C: %s", allfmm["D.mpg"])
-	remover.Debugf("C: %s", allfmm["E.mpg"])
-	remover.Debugf("C: %s", allfmm["F.mpg"])
+	rmrlogger.Debugf("after 2nd call runWithInfo ---------------------------------")
+	rmrlogger.Debugf("B: %s", allfmm["A.mpg"])
+	rmrlogger.Debugf("B: %s", allfmm["B.mpg"])
+	rmrlogger.Debugf("C: %s", allfmm["C.mpg"])
+	rmrlogger.Debugf("C: %s", allfmm["D.mpg"])
+	rmrlogger.Debugf("C: %s", allfmm["E.mpg"])
+	rmrlogger.Debugf("C: %s", allfmm["F.mpg"])
 
 	//S2는 지워질 게 더 이상 없음
 	//A.mpg 만 S1 disk 용량 부족으로 S1에서 삭제
@@ -1527,17 +1541,17 @@ func Test_runWithInfo(t *testing.T) {
 	//만일 한 번 더 실행한다면,
 	// 더 이상 지워질 파일이 없음
 	// 2nd call 결과와 같음
-	remover.Debugf("call 3rd runWithInfo ---------------------------------------")
+	rmrlogger.Debugf("call 3rd runWithInfo ---------------------------------------")
 
-	runWithInfo(allfmm, dupfmm, rhitfmm)
+	rmr.runWithInfo(allfmm, dupfmm, rhitfmm)
 
-	remover.Debugf("after 3rd call runWithInfo ---------------------------------")
-	remover.Debugf("B: %s", allfmm["A.mpg"])
-	remover.Debugf("B: %s", allfmm["B.mpg"])
-	remover.Debugf("C: %s", allfmm["C.mpg"])
-	remover.Debugf("C: %s", allfmm["D.mpg"])
-	remover.Debugf("C: %s", allfmm["E.mpg"])
-	remover.Debugf("C: %s", allfmm["F.mpg"])
+	rmrlogger.Debugf("after 3rd call runWithInfo ---------------------------------")
+	rmrlogger.Debugf("B: %s", allfmm["A.mpg"])
+	rmrlogger.Debugf("B: %s", allfmm["B.mpg"])
+	rmrlogger.Debugf("C: %s", allfmm["C.mpg"])
+	rmrlogger.Debugf("C: %s", allfmm["D.mpg"])
+	rmrlogger.Debugf("C: %s", allfmm["E.mpg"])
+	rmrlogger.Debugf("C: %s", allfmm["F.mpg"])
 
 	assert.Equal(t, 0, allfmm["A.mpg"].ServerIPs["127.0.0.1"])
 	assert.Equal(t, 0, allfmm["A.mpg"].ServerIPs["127.0.0.2"])
@@ -1571,7 +1585,8 @@ func Test_runWithInfo(t *testing.T) {
 }
 
 func Test_run(t *testing.T) {
-	Servers = common.NewHosts()
+	rmr := NewRemover()
+	rmr.Servers = common.NewHosts()
 	s1 := "127.0.0.1:18881"
 	files1 := []string{"A.mpg", "B.mpg", "C.mpg", "D.mpg"}
 	d1 := common.DiskUsage{
@@ -1584,8 +1599,8 @@ func Test_run(t *testing.T) {
 		TotalSize: 1000, UsedSize: 600,
 		FreeSize: 400, AvailSize: 400, UsedPercent: 60,
 	}
-	Servers.Add(s1)
-	Servers.Add(s2)
+	rmr.Servers.Add(s1)
+	rmr.Servers.Add(s2)
 
 	cfw1 := cfw(s1, d1, files1)
 	cfw1.Start()
@@ -1595,7 +1610,7 @@ func Test_run(t *testing.T) {
 	defer cfw2.Close()
 
 	base := "testsourcefolder"
-	SourcePath.Add(base)
+	rmr.SourcePath.Add(base)
 	for _, f1 := range files1 {
 		createfile(base, f1)
 	}
@@ -1605,37 +1620,37 @@ func Test_run(t *testing.T) {
 	deletefile(base, "C.mpg")
 	defer deletefile(base, "")
 
-	SetDiskUsageLimitPercent(55)
+	rmr.SetDiskUsageLimitPercent(55)
 
 	ignores := []string{"E"}
-	SetIgnorePrefixes(ignores)
+	rmr.SetIgnorePrefixes(ignores)
 
 	gradedir := "gradeinfofolder"
 	gradefile := ".grade.info"
 	makeGradeInfoFile(gradedir, gradefile)
 	defer deletefile(gradedir, "")
 
-	SetGradeInfoFile(filepath.Join(gradedir, gradefile))
+	rmr.SetGradeInfoFile(filepath.Join(gradedir, gradefile))
 
 	hcdir := "hitcounthistoryinfofolder"
 	hcfile := ".hitcount.history"
 	makeHitcourntHistoryFile(hcdir, hcfile)
 	defer deletefile(hcdir, "")
 
-	SetHitcountHistoryFile(filepath.Join(hcdir, hcfile))
+	rmr.SetHitcountHistoryFile(filepath.Join(hcdir, hcfile))
 
 	taildir := "taildir"
 	tailip := "255.255.255.255"
 	watchmin := 10
 	hitbase := 5
 
-	Tail.SetWatchDir(taildir)
-	Tail.SetWatchIPString(tailip)
-	Tail.SetWatchTermMin(watchmin)
-	Tail.SetWatchHitBase(hitbase)
+	rmr.Tail.SetWatchDir(taildir)
+	rmr.Tail.SetWatchIPString(tailip)
+	rmr.Tail.SetWatchTermMin(watchmin)
+	rmr.Tail.SetWatchHitBase(hitbase)
 	basetm := time.Now()
 	makeRisingHitFile(taildir, tailip, "F.mpg", basetm, watchmin)
 	defer deletefile(taildir, "")
 
-	run(basetm)
+	rmr.run(basetm)
 }

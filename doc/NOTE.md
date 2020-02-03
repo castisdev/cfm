@@ -1,3 +1,7 @@
+## 2020-02-03
+- network mount가 풀렸다가 다시 연결될 때?
+- filesystem에서 notify 를 지원하지 않을 때?
+
 ## 2020-01-21
 - 메모리 누수 방지 위한 코드 추가, keep alive 설정 시에 문제 방지 코드 추가
   - // https://stackoverflow.com/questions/33229860/go-http-requests-json-reusing-connections

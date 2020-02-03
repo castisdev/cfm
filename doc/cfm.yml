@@ -75,6 +75,23 @@ tasker:
   # cfw 가 copy 할 때 사용하는 속도(bps) : 기본값 10000000
   task_copy_speed_bps: 10000000
 
+# 파일 우선순위,크기를 구하기 위해 이용하는 파일들 감시 설정
+watcher:
+  # 해당 파일의 해당 경로에 존재하면 최초 이벤트 발생하는 설정 : 기본값 : true
+  fire_initial_event: true
+  # 해당 파일에 아무런 변화도 없을 때 발생하는 timeout event 설정(초):
+  # 기본값 : 3600
+  event_timeout_sec : 10
+
+# 파일 우선순위,크기를 구하기 위해 이용하는 파일들에 변화가 있을 때
+# remover, tasker를 실행하는 모듈
+runner:
+  # 주기적으로 실행하는 설정(초): 기본값 : 60
+  periodic_run_sec : 10
+
+  # 해당 파일에 변경이 없는 동안 주기적으로 실행하는 설정(초): 기본값 : 60
+  periodic_run_between_events_sec: 10
+
 servers:
   # servers.sources, servers.destinations에 대한
   # heartbeat 타입아웃(초), 기본값: 5
