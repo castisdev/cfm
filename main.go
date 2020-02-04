@@ -14,6 +14,7 @@ import (
 	"github.com/castisdev/cfm/fmfm"
 	"github.com/castisdev/cfm/heartbeater"
 	"github.com/castisdev/cfm/remover"
+	"github.com/castisdev/cfm/tailer"
 	"github.com/castisdev/cfm/tasker"
 	"github.com/castisdev/cilog"
 	"github.com/kardianos/osext"
@@ -39,15 +40,16 @@ func main() {
 	cilog.Infof("started main process")
 	startHeartbeater(c)
 
-	//startManager(c)
+	mgr := startManager(c)
+	tasks = mgr.Tasks()
 
-	startRemover(c)
-	tskr := startTasker(c)
+	// startRemover(c)
+	//tskr := startTasker(c)
+	//tasks = tskr.Tasks()
 
 	api = common.MLogger{
 		Logger: cilog.StdLogger(),
 		Mod:    "api"}
-	tasks = tskr.GetTaskListInstance()
 
 	startHttpServer(c)
 }
@@ -118,6 +120,48 @@ func startHeartbeater(c *Config) {
 }
 
 func startRemover(c *Config) (rmr *remover.Remover) {
+	rmr = newRemover(c)
+	go rmr.RunForever()
+	return rmr
+}
+
+func startTasker(c *Config) (tskr *tasker.Tasker) {
+	tskr = newTasker(c)
+	go tskr.RunForever()
+	return tskr
+}
+
+func startManager(c *Config) (manager *fmfm.FMFManager) {
+	watcher, err := fmfm.NewFMFWatcher(
+		c.GradeInfoFile, c.HitcountHistoryFile,
+		c.Watcher.FireInitialEvent, c.Watcher.EventTimeoutSec)
+	if err != nil {
+		log.Fatalf("failed to start, error(%s)", err.Error())
+		return
+	}
+	runner := fmfm.NewFMFRunner(
+		c.GradeInfoFile, c.HitcountHistoryFile,
+		c.Runner.PeriodicRunSec, c.Runner.PeriodicRunSec,
+		newRemover(c),
+		newTasker(c),
+		newTailer(c),
+	)
+	manager = fmfm.NewFMFManager(watcher, runner)
+
+	go manager.Manage()
+	return manager
+}
+
+func newTailer(c *Config) (tlr *tailer.Tailer) {
+	tlr = tailer.NewTailer()
+	tlr.SetWatchDir(c.WatchDir)
+	tlr.SetWatchIPString(c.WatchIPString)
+	tlr.SetWatchTermMin(c.WatchTermMin)
+	tlr.SetWatchHitBase(c.WatchHitBase)
+	return tlr
+}
+
+func newRemover(c *Config) (rmr *remover.Remover) {
 	rmr = remover.NewRemover()
 	for _, s := range c.Servers.Destinations {
 		rmr.Servers.Add(s)
@@ -139,11 +183,10 @@ func startRemover(c *Config) (rmr *remover.Remover) {
 	rmr.Tail.SetWatchTermMin(c.WatchTermMin)
 	rmr.Tail.SetWatchHitBase(c.WatchHitBase)
 
-	go rmr.RunForever()
 	return rmr
 }
 
-func startTasker(c *Config) (tskr *tasker.Tasker) {
+func newTasker(c *Config) (tskr *tasker.Tasker) {
 	tskr = tasker.NewTasker()
 	for _, s := range c.Servers.Sources {
 		tskr.SrcServers.Add(s)
@@ -167,25 +210,7 @@ func startTasker(c *Config) (tskr *tasker.Tasker) {
 	}
 
 	tskr.InitTasks()
-	go tskr.RunForever()
-
 	return tskr
-}
-
-func startManager(c *Config) {
-	watcher, err := fmfm.NewFMFWatcher(
-		c.GradeInfoFile, c.HitcountHistoryFile,
-		c.Watcher.FireInitialEvent, c.Watcher.EventTimeoutSec)
-	if err != nil {
-		log.Fatalf("failed to start, error(%s)", err.Error())
-		return
-	}
-	runner := fmfm.NewFMFRunner(
-		c.GradeInfoFile, c.HitcountHistoryFile,
-		c.Runner.PeriodicRunSec, c.Runner.PeriodicRunSec)
-	manager := fmfm.NewFMFManger(watcher, runner)
-
-	go manager.Manage()
 }
 
 func startHttpServer(c *Config) {

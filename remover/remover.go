@@ -139,6 +139,13 @@ func (rmr *Remover) run(basetm time.Time) error {
 	return nil
 }
 
+func (rmr *Remover) RunWithInfo(
+	fileMetaMap FileMetaPtrMap,
+	duplicatedFileMap FileMetaPtrMap,
+	risingHitFileMap map[string]int) {
+	rmr.runWithInfo(fileMetaMap, duplicatedFileMap, risingHitFileMap)
+}
+
 // runWithInfo :
 func (rmr *Remover) runWithInfo(
 	fileMetaMap FileMetaPtrMap,

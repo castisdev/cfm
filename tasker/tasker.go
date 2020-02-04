@@ -322,8 +322,8 @@ func NewTaskerWith(
 	}
 }
 
-// GetTaskListInstance is to get global task list structure's addr
-func (tskr *Tasker) GetTaskListInstance() *Tasks {
+// Tasks is to get global task list structure's addr
+func (tskr *Tasker) Tasks() *Tasks {
 	return tskr.tasks
 }
 
@@ -429,6 +429,12 @@ func (tskr *Tasker) run(basetm time.Time) error {
 	tskr.runWithInfo(fileMetaMap, risingHitFileMap)
 
 	return nil
+}
+
+func (tskr *Tasker) RunWithInfo(
+	fileMetaMap FileMetaPtrMap,
+	risingHitFileMap map[string]int) {
+	tskr.runWithInfo(fileMetaMap, risingHitFileMap)
 }
 
 // runWithInfo :
