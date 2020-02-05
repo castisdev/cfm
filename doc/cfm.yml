@@ -82,6 +82,9 @@ watcher:
   # 해당 파일에 아무런 변화도 없을 때 발생하는 timeout event 설정(초):
   # 기본값 : 3600
   event_timeout_sec : 10
+  # inotify와 같은 filesystem notify module이 지원되지 않을 때, 사용하는 감시 주기(초)
+  # 기본값 : 60
+  polling_sec : 60
 
 # 파일 우선순위,크기를 구하기 위해 이용하는 파일들에 변화가 있을 때
 # remover, tasker를 실행하는 모듈

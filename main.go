@@ -132,13 +132,10 @@ func startTasker(c *Config) (tskr *tasker.Tasker) {
 }
 
 func startManager(c *Config) (manager *fmfm.FMFManager) {
-	watcher, err := fmfm.NewFMFWatcher(
+	watcher := fmfm.NewFMFWatcher(
 		c.GradeInfoFile, c.HitcountHistoryFile,
-		c.Watcher.FireInitialEvent, c.Watcher.EventTimeoutSec)
-	if err != nil {
-		log.Fatalf("failed to start, error(%s)", err.Error())
-		return
-	}
+		c.Watcher.FireInitialEvent, c.Watcher.EventTimeoutSec,
+		c.Watcher.PollingSec)
 	runner := fmfm.NewFMFRunner(
 		c.GradeInfoFile, c.HitcountHistoryFile,
 		c.Runner.PeriodicRunSec, c.Runner.PeriodicRunSec,
