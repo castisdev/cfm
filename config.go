@@ -35,12 +35,12 @@ type Ignore struct {
 type Watcher struct {
 	FireInitialEvent bool   `mapstructure:"fire_initial_event"`
 	EventTimeoutSec  uint32 `mapstructure:"event_timeout_sec"`
-	PollingSec       uint32 `mapstructure:"polling_sec"`
+	PollingSec       uint32 `mapstructure:"poll_interval_sec"`
 }
 
 type Runner struct {
-	PeriodicRunSec              uint32 `mapstructure:"periodic_run_sec"`
-	PeriodicRunBetweenEventsSec uint32 `mapstructure:"periodic_run_between_events_sec"`
+	PeriodicRunBetweenEventsSec uint32 `mapstructure:"periodic_run_between_events_interval_sec"`
+	PeriodicRunSec              uint32 `mapstructure:"periodic_run_interval_sec"`
 }
 
 // Config :
@@ -78,10 +78,10 @@ func ReadConfig(configFile string) (*Config, error) {
 	viper.SetDefault("remover.remover_sleep_sec", uint(30))
 	viper.SetDefault("remover.storage_usage_limit_percent", uint(90))
 	viper.SetDefault("watcher.fire_initial_event", true)
-	viper.SetDefault("watcher.event_timeout_sec", uint32(3600))
-	viper.SetDefault("watcher.polling_sec", uint32(60))
-	viper.SetDefault("runner.periodic_run_sec", uint32(60))
-	viper.SetDefault("runner.periodic_run_between_events_sec", uint32(60))
+	viper.SetDefault("watcher.event_timeout_sec", uint32(600))
+	viper.SetDefault("watcher.poll_interval_sec", uint32(60))
+	viper.SetDefault("runner.periodic_run_between_events_interval_sec", uint32(10))
+	viper.SetDefault("runner.periodic_run_interval_sec", uint32(0))
 
 	var c Config
 	viper.SetConfigFile(configFile)

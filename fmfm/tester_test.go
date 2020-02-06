@@ -6,6 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTestFsNotify(t *testing.T) {
-	assert.Equal(t, true, TestFsNotify())
+func TestTestNotify(t *testing.T) {
+	assert.Equal(t, true, TestNotify())
 }

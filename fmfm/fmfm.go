@@ -47,7 +47,7 @@ func (fm *FMFManager) Manage() {
 		go fm.watcher.Watch()
 		go fm.runner.Run(fm.watcher.NotiCh)
 		rc := fm.waitWatcher()
-		mgrlogger.Infof("[%s] watcher returned, error(%s)", rc.Error())
+		mgrlogger.Errorf("recived an error, error(%s)", rc.Error())
 		switch rc {
 		// 파일이나 directory가 지워진 경우, 파일이 생길 때까지 기다림
 		case ErrNotExist:
@@ -56,10 +56,13 @@ func (fm *FMFManager) Manage() {
 		// 더 이상 감시가 이루어지지 않음, 파일이 생길 때까지 기다림
 		case ErrDirUnmounted:
 			fm.restart()
-			// fsnotify 모듈 channel 이 닫힌 경우, poll 모드로 전환
-		case ErrFsNotifyChannelClosed:
+		// notify 모듈 channel 이 닫힌 경우, poll 모드로 전환해서 재시작
+		case ErrEventClosed:
 			fm.restartPollMode()
-		// fsnotify 모듈의 다른 종류의 error, poll 모드로 전환
+		// notify 모듈 overflow error, poll 모드로 전환해서 재시작
+		case ErrEventOverflow:
+			fm.restartPollMode()
+		// notify 모듈의 다른 종류의 error, poll 모드로 전환해서 재시작
 		default:
 			fm.restartPollMode()
 		}
@@ -91,13 +94,13 @@ func (fm *FMFManager) restartPollMode() {
 }
 
 func (fm *FMFManager) waitUntilFileExist() {
-	waiting := make(chan bool, 1)
+	waiting := make(chan struct{})
 	go func() {
+		defer close(waiting)
 		for {
 			select {
 			case <-time.After(time.Duration(fm.watcher.pollingSec) * time.Second):
 				if fm.watcher.grade.UpdateExist() && fm.watcher.hitCount.UpdateExist() {
-					waiting <- false
 					return
 				}
 			}

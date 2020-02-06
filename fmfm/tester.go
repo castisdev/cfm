@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
+	"github.com/castisdev/cfm/myinotify"
 )
 
 func createdir(dir string) {
@@ -80,22 +80,22 @@ func chtimesfile(dir, filename string) {
 	}
 }
 
-func waitFsNotify(w *fsnotify.Watcher, done chan bool, dir, filename string, op fsnotify.Op) {
+func waitNotify(w *myinotify.Watcher, done chan bool, dir, filename string, op myinotify.Op) {
 	path := filepath.Join(dir, filename)
 	for {
 		select {
 		case err, ok := <-w.Errors:
 			if !ok {
-				log.Println("fsnotify test error: channel closed")
+				log.Println("notify test error: channel closed")
 				done <- false
 				return
 			}
-			log.Println("fsnotify test error:", err)
+			log.Println("notify test error:", err)
 			done <- false
 			return
 		case e, ok := <-w.Events:
 			if !ok {
-				log.Println("fsnotify test error: channel closed")
+				log.Println("notify test error: channel closed")
 				done <- false
 				return
 			}
@@ -104,58 +104,59 @@ func waitFsNotify(w *fsnotify.Watcher, done chan bool, dir, filename string, op 
 				return
 			}
 		case <-time.After(2 * time.Second):
-			log.Println("fsnotify test error: timeout")
+			log.Println("notify test error: timeout")
 			done <- false
 			return
 		}
 	}
 }
 
-func TestFsNotify() bool {
-	dir := "fstest.tmp"
+func TestNotify() bool {
+	dir := "notifytest.tmp"
+	file := "event.file"
 	createdir(dir)
 	defer deletefile(dir, "")
 
-	w, err := fsnotify.NewWatcher()
+	w, err := myinotify.NewWatcher()
 	if err != nil {
-		log.Println("fsnotify test error:", err)
+		log.Println("notify test error:", err)
 		return false
 	}
 	defer w.Close()
 	err = w.Add(dir)
 	if err != nil {
-		log.Println("fsnotify test error:", err)
+		log.Println("notify test error:", err)
 		return false
 	}
 	var r bool
 	var rc chan bool
 	rc = make(chan bool, 1)
-	go waitFsNotify(w, rc, dir, "hello.txt", fsnotify.Create)
-	createfile(dir, "hello.txt")
+	go waitNotify(w, rc, dir, file, myinotify.Create)
+	createfile(dir, file)
 	r = <-rc
 	if !r {
 		return false
 	}
-	go waitFsNotify(w, rc, dir, "hello.txt", fsnotify.Write)
-	writefile(dir, "hello.txt")
+	go waitNotify(w, rc, dir, file, myinotify.Write)
+	writefile(dir, file)
 	r = <-rc
 	if !r {
 		return false
 	}
-	go waitFsNotify(w, rc, dir, "hello.txt", fsnotify.Chmod)
-	chmodfile(dir, "hello.txt")
+	go waitNotify(w, rc, dir, file, myinotify.Chmod)
+	chmodfile(dir, file)
 	r = <-rc
 	if !r {
 		return false
 	}
-	go waitFsNotify(w, rc, dir, "hello.txt", fsnotify.Chmod)
-	chtimesfile(dir, "hello.txt")
+	go waitNotify(w, rc, dir, file, myinotify.Chmod)
+	chtimesfile(dir, file)
 	r = <-rc
 	if !r {
 		return false
 	}
-	go waitFsNotify(w, rc, dir, "hello.txt", fsnotify.Remove)
-	deletefile(dir, "hello.txt")
+	go waitNotify(w, rc, dir, file, myinotify.Remove)
+	deletefile(dir, file)
 	r = <-rc
 	if !r {
 		return false

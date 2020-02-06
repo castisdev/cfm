@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
+	"github.com/castisdev/cfm/myinotify"
 )
 
 type FileMonitor struct {
-	fsnotify.Event
+	myinotify.Event
 	FilePath string
 	Dir      string
 	Name     string
@@ -25,7 +25,7 @@ func NewFileMonitor(path string) *FileMonitor {
 	dir, file := filepath.Split(path)
 	dir = filepath.Clean(dir)
 	return &FileMonitor{
-		fsnotify.Event{Name: path, Op: 0},
+		myinotify.Event{Name: path, Op: 0},
 		path, dir, file, newDirs(path),
 		false, false, time.Now(),
 	}
@@ -49,20 +49,20 @@ func (f *FileMonitor) String() string {
 		f.Mtime, f.Event)
 }
 
-func (f *FileMonitor) Update(op fsnotify.Op) {
+func (f *FileMonitor) Update(op myinotify.Op) {
 	f.Event.Op = op
 	f.Mtime = time.Now()
-	if op&fsnotify.Create == fsnotify.Create {
+	if op&myinotify.Create == myinotify.Create {
 		f.Exist = true
 		f.Updated = false
 		return
-	} else if op&fsnotify.Write == fsnotify.Write ||
-		op&fsnotify.Chmod == fsnotify.Chmod {
+	} else if op&myinotify.Write == myinotify.Write ||
+		op&myinotify.Chmod == myinotify.Chmod {
 		f.Exist = true
 		f.Updated = true
 		return
-	} else if op&fsnotify.Remove == fsnotify.Remove ||
-		op&fsnotify.Rename == fsnotify.Rename {
+	} else if op&myinotify.Remove == myinotify.Remove ||
+		op&myinotify.Rename == myinotify.Rename {
 		f.Exist = false
 		f.Updated = false
 		return
@@ -85,7 +85,7 @@ func (f *FileMonitor) UpdateMTime() bool {
 	if fi, err := os.Stat(f.FilePath); !os.IsNotExist(err) {
 		f.Exist = true
 		if f.Mtime != fi.ModTime() {
-			f.Event.Op = fsnotify.Chmod
+			f.Event.Op = myinotify.Chmod
 			f.Mtime = fi.ModTime()
 			f.Updated = true
 		} else {
@@ -99,12 +99,12 @@ func (f *FileMonitor) UpdateMTime() bool {
 }
 
 func (f *FileMonitor) ResetUpdate() {
-	f.Event.Op = fsnotifyUnknown
+	f.Event.Op = myinotifyUnknown
 	f.Updated = false
 }
 
 type FMFWatcher struct {
-	*fsnotify.Watcher
+	*myinotify.Watcher
 	mode        WatchMode
 	grade       *FileMonitor
 	hitCount    *FileMonitor
@@ -138,13 +138,14 @@ type FileMetaFilesEvent struct {
 }
 
 var (
-	ErrTimeout               = errors.New("timeout")
-	ErrFsNotifyChannelClosed = errors.New("fsnotify channel closed")
-	ErrNotExist              = errors.New("watching directory or file does not exist")
-	ErrDirUnmounted          = errors.New("watching directory might be unmounted")
+	ErrTimeout       = errors.New("timeout")
+	ErrEventClosed   = errors.New("event channel closed")
+	ErrEventOverflow = myinotify.ErrEventOverflow
+	ErrNotExist      = errors.New("watching directory or file does not exist")
+	ErrDirUnmounted  = errors.New("watching directory might be unmounted")
 )
 
-const fsnotifyUnknown fsnotify.Op = 0
+const myinotifyUnknown myinotify.Op = 0
 
 func (e FileMetaFilesEvent) String() string {
 	return fmt.Sprintf("grade(%s), hitCount(%s), Err(%s)", &e.Grade, &e.HitCount, e.Err.Error())
@@ -154,17 +155,17 @@ func NewFMFWatcher(gradeFilePath, hitcountFilePath string,
 	initialNoti bool, eventTimeoutSec, pollingSec uint32) *FMFWatcher {
 	var m WatchMode
 	m = NOTIFY
-	if !TestFsNotify() {
-		watcherlogger.Errorf("failed to run fsnotify module")
+	if !TestNotify() {
+		watcherlogger.Errorf("failed to run myinotify module")
 		m = POLL
 		watcherlogger.Infof("changed watchmode:%s", m)
 	}
-	var watcher *fsnotify.Watcher
+	var watcher *myinotify.Watcher
 	var err error
 	if m == NOTIFY {
-		watcher, err = fsnotify.NewWatcher()
+		watcher, err = myinotify.NewWatcher()
 		if err != nil {
-			watcherlogger.Errorf("failed to run fsnotify module, error(%s)", err.Error())
+			watcherlogger.Errorf("failed to run myinotify module, error(%s)", err.Error())
 			m = POLL
 			watcherlogger.Infof("changed watchmode:%s", m)
 		}
@@ -202,8 +203,8 @@ func (fw *FMFWatcher) WatchPoll() error {
 	fw.hitCount.UpdateExist()
 	if fw.initialNoti {
 		if fw.grade.Exist && fw.hitCount.Exist {
-			fw.grade.Update(fsnotify.Write)
-			fw.hitCount.Update(fsnotify.Write)
+			fw.grade.Update(myinotify.Write)
+			fw.hitCount.Update(myinotify.Write)
 			fme := FileMetaFilesEvent{Grade: *fw.grade, HitCount: *fw.hitCount}
 			fw.NotiCh <- fme
 			pollingtm = fw.newPollingTimer()
@@ -240,8 +241,8 @@ func (fw *FMFWatcher) WatchNotify() error {
 	timeouttm := fw.newTimeoutTimer()
 	if fw.initialNoti {
 		if fw.grade.Exist && fw.hitCount.Exist {
-			fw.grade.Update(fsnotify.Write)
-			fw.hitCount.Update(fsnotify.Write)
+			fw.grade.Update(myinotify.Write)
+			fw.hitCount.Update(myinotify.Write)
 			fme := FileMetaFilesEvent{Grade: *fw.grade, HitCount: *fw.hitCount}
 			fw.NotiCh <- fme
 			timeouttm = fw.newTimeoutTimer()
@@ -253,22 +254,19 @@ func (fw *FMFWatcher) WatchNotify() error {
 		select {
 		case event, ok := <-fw.Watcher.Events:
 			if !ok {
-				fw.ErrCh <- ErrFsNotifyChannelClosed
-				return ErrFsNotifyChannelClosed
+				fw.ErrCh <- ErrEventClosed
+				return ErrEventClosed
 			}
 			watcherlogger.Debugf("[EVENT] %s", event)
 			// https://ddcode.net/2019/05/11/some-questions-about-file-monitoring-fsnotify-in-golang/
 			if fw.isWatchingDirOrFile(event.Name) &&
-				(event.Op&fsnotify.Remove == fsnotify.Remove ||
-					event.Op&fsnotify.Rename == fsnotify.Rename) {
+				(event.Op&myinotify.Remove == myinotify.Remove ||
+					event.Op&myinotify.Rename == myinotify.Rename) {
 				fw.grade.UpdateExist()
 				fw.hitCount.UpdateExist()
-				//log.Printf("[Error:%s]  \n", ErrNotExist)
 				fw.ErrCh <- ErrNotExist
 				return ErrNotExist
-				// unmount하면 fsnotify 모듈에서 알 수 없는 event가 발생함
-			} else if fw.isWatchingDir(event.Name) && event.Op == fsnotifyUnknown {
-				//log.Printf("[unknown event: unmount?:%s]  \n", ErrDirUnmounted)
+			} else if fw.isWatchingDir(event.Name) && event.Op == myinotify.Unmount {
 				fw.grade.UpdateExist()
 				fw.hitCount.UpdateExist()
 				fw.ErrCh <- ErrDirUnmounted
@@ -290,11 +288,15 @@ func (fw *FMFWatcher) WatchNotify() error {
 			}
 		case err, ok := <-fw.Watcher.Errors:
 			if !ok {
-				fw.ErrCh <- ErrFsNotifyChannelClosed
-				return ErrFsNotifyChannelClosed
+				fw.ErrCh <- ErrEventClosed
+				return ErrEventClosed
 			}
-			fme := FileMetaFilesEvent{Grade: *fw.grade, HitCount: *fw.hitCount, Err: err}
-			fw.NotiCh <- fme
+			if err == myinotify.ErrEventOverflow {
+				fw.ErrCh <- ErrEventOverflow
+				return ErrEventOverflow
+			}
+			fw.ErrCh <- err
+			return err
 		case <-timeouttm:
 			fme := FileMetaFilesEvent{Grade: *fw.grade, HitCount: *fw.hitCount, Err: ErrTimeout}
 			fw.NotiCh <- fme
