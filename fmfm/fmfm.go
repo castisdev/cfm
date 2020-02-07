@@ -24,25 +24,25 @@ func init() {
 		Mod:    "runner"}
 }
 
-type FMFManager struct {
-	watcher *FMFWatcher
-	runner  *FMFRunner
+type Manager struct {
+	watcher *Watcher
+	runner  *Runner
 	ErrCh   chan error
 }
 
-func NewFMFManager(watcher *FMFWatcher, runner *FMFRunner) *FMFManager {
-	return &FMFManager{
+func NewManager(watcher *Watcher, runner *Runner) *Manager {
+	return &Manager{
 		watcher: watcher,
 		runner:  runner,
 		ErrCh:   make(chan error, 1),
 	}
 }
 
-func (fm *FMFManager) Tasks() *tasker.Tasks {
+func (fm *Manager) Tasks() *tasker.Tasks {
 	return fm.runner.tasker.Tasks()
 }
 
-func (fm *FMFManager) Manage() {
+func (fm *Manager) Manage() {
 	for {
 		go fm.watcher.Watch()
 		go fm.runner.Run(fm.watcher.NotiCh)
@@ -69,31 +69,31 @@ func (fm *FMFManager) Manage() {
 	}
 }
 
-func (fm *FMFManager) waitWatcher() error {
+func (fm *Manager) waitWatcher() error {
 	err := <-fm.watcher.ErrCh
 	return err
 }
 
-func (fm *FMFManager) restart() {
+func (fm *Manager) restart() {
 	fm.waitUntilFileExist()
 	fm.closeWatcherAndStopRunner()
-	newwatcher := fm.cloneFMFWatcher()
-	newrunner := fm.cloneFMFRunner()
+	newwatcher := fm.cloneWatcher()
+	newrunner := fm.cloneRunner()
 	fm.watcher = newwatcher
 	fm.runner = newrunner
 }
 
-func (fm *FMFManager) restartPollMode() {
+func (fm *Manager) restartPollMode() {
 	fm.waitUntilFileExist()
 	fm.closeWatcherAndStopRunner()
-	newwatcher := fm.cloneFMFWatcher()
+	newwatcher := fm.cloneWatcher()
 	newwatcher.mode = POLL
-	newrunner := fm.cloneFMFRunner()
+	newrunner := fm.cloneRunner()
 	fm.watcher = newwatcher
 	fm.runner = newrunner
 }
 
-func (fm *FMFManager) waitUntilFileExist() {
+func (fm *Manager) waitUntilFileExist() {
 	waiting := make(chan struct{})
 	go func() {
 		defer close(waiting)
@@ -109,14 +109,14 @@ func (fm *FMFManager) waitUntilFileExist() {
 	<-waiting
 }
 
-func (fm *FMFManager) closeWatcherAndStopRunner() {
+func (fm *Manager) closeWatcherAndStopRunner() {
 	fm.watcher.Close()
 	fm.runner.CMDCh <- STOP
 	<-fm.runner.ErrCh
 }
 
-func (fm *FMFManager) cloneFMFWatcher() *FMFWatcher {
-	return NewFMFWatcher(
+func (fm *Manager) cloneWatcher() *Watcher {
+	return NewWatcher(
 		fm.watcher.grade.FilePath,
 		fm.watcher.hitCount.FilePath,
 		fm.watcher.initialNoti,
@@ -125,10 +125,10 @@ func (fm *FMFManager) cloneFMFWatcher() *FMFWatcher {
 	)
 }
 
-func (fm *FMFManager) cloneFMFRunner() *FMFRunner {
-	return NewFMFRunner(fm.runner.grade.FilePath,
+func (fm *Manager) cloneRunner() *Runner {
+	return NewRunner(fm.runner.grade.FilePath,
 		fm.runner.hitCount.FilePath,
-		fm.runner.btwEventsPeriodicRunSec,
+		fm.runner.betweenEventsRunSec,
 		fm.runner.periodicRunSec,
 		fm.runner.remover,
 		fm.runner.tasker,

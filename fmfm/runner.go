@@ -3,6 +3,7 @@ package fmfm
 import (
 	"errors"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/castisdev/cfm/common"
@@ -14,19 +15,21 @@ import (
 // map: file name -> *common.FileMeta
 type FileMetaPtrMap map[string]*common.FileMeta
 
-type FMFRunner struct {
-	grade                   FileMonitor
-	hitCount                FileMonitor
-	fmm                     FileMetaPtrMap
-	dupFmm                  FileMetaPtrMap
-	rhm                     map[string]int
-	btwEventsPeriodicRunSec uint32 // run between a event and the next event
-	periodicRunSec          uint32 // periodic run
-	remover                 *remover.Remover
-	tasker                  *tasker.Tasker
-	tailer                  *tailer.Tailer
-	CMDCh                   chan CMD // command input
-	ErrCh                   chan error
+type Runner struct {
+	grade               FileMonitor
+	hitCount            FileMonitor
+	fmm                 FileMetaPtrMap
+	dupFmm              FileMetaPtrMap
+	rhm                 map[string]int
+	betweenEventsRunSec uint32 // run between a event and the next event
+	periodicRunSec      uint32 // periodic run
+	remover             *remover.Remover
+	tasker              *tasker.Tasker
+	tailer              *tailer.Tailer
+	CMDCh               chan CMD // command input
+	ErrCh               chan error
+	RUNFuncs            map[RUN]func(*Runner, FileMetaFilesEvent)
+	SetupRuns           SetupRuns
 }
 
 var (
@@ -47,59 +50,171 @@ func (c CMD) String() string {
 	return m[c]
 }
 
-func NewFMFRunner(
+func newRunFuns() map[RUN]func(*Runner, FileMetaFilesEvent) {
+	runFuncs := make(map[RUN]func(*Runner, FileMetaFilesEvent))
+	runFuncs[NOP] = func(r *Runner, fme FileMetaFilesEvent) {}
+	runFuncs[MakeFMM] = func(r *Runner, fme FileMetaFilesEvent) { r.makeFmm(fme) }
+	runFuncs[MakeRisingHit] = func(r *Runner, fme FileMetaFilesEvent) { r.makeRhm() }
+	runFuncs[PrintFMM] = func(r *Runner, fme FileMetaFilesEvent) { r.printFmm() }
+	runFuncs[RunRemover] = func(r *Runner, fme FileMetaFilesEvent) { r.runRemover() }
+	runFuncs[RunTasker] = func(r *Runner, fme FileMetaFilesEvent) { r.runTasker() }
+	return runFuncs
+}
+
+type SetupRuns map[RUNS][]RUN
+
+type RUNS int
+
+const (
+	_         RUNS = iota
+	EventRuns      = iota
+	EventTimeoutRuns
+	BetweenEventsRuns
+	PeriodicRuns
+)
+
+func (r RUNS) String() string {
+	m := map[RUNS]string{
+		EventRuns:         "EVENTRUNS",
+		EventTimeoutRuns:  "EVENTTIMEOUTRUNS",
+		BetweenEventsRuns: "BETWEENEVENTSRUNS",
+		PeriodicRuns:      "PERIODICRUNS",
+	}
+	return m[r]
+}
+
+func ToRuns(runs string) RUNS {
+	m := map[string]RUNS{
+		"EVENTRUNS":         EventRuns,
+		"EVENTTIMEOUTRUNS":  EventTimeoutRuns,
+		"BETWEENEVENTSRUNS": BetweenEventsRuns,
+		"PERIODICRUNS":      PeriodicRuns,
+	}
+	return m[strings.ToUpper(runs)]
+}
+
+type RUN int
+
+const (
+	_   RUN = iota
+	NOP     = iota
+	PrintFMM
+	MakeFMM
+	MakeRisingHit
+	RunRemover
+	RunTasker
+)
+
+func (r RUN) String() string {
+	m := map[RUN]string{
+		NOP:           "NOP",
+		PrintFMM:      "PRINTFMM",
+		MakeFMM:       "MAKEFMM",
+		MakeRisingHit: "MAKERISINGHIT",
+		RunRemover:    "RUNREMOVER",
+		RunTasker:     "RUNTASKER",
+	}
+	return m[r]
+}
+
+func ToRun(run string) RUN {
+	m := map[string]RUN{
+		"NOP":           NOP,
+		"PRINTFMM":      PrintFMM,
+		"MAKEFMM":       MakeFMM,
+		"MAKERISINGHIT": MakeRisingHit,
+		"RUNREMOVER":    RunRemover,
+		"RUNTASKER":     RunTasker,
+	}
+	return m[strings.ToUpper(run)]
+}
+
+func defaultSetupRuns() SetupRuns {
+	return SetupRuns{
+		EventRuns:         DefaultEventRuns,
+		EventTimeoutRuns:  DefaultEventTimeoutRuns,
+		BetweenEventsRuns: DefaultBetweenEventsRuns,
+		PeriodicRuns:      DefaultPeriodicRuns,
+	}
+}
+
+var (
+	DefaultEventRuns         = []RUN{MakeFMM, MakeRisingHit, RunRemover, RunTasker}
+	DefaultEventTimeoutRuns  = DefaultEventRuns
+	DefaultBetweenEventsRuns = []RUN{MakeRisingHit, RunRemover, RunTasker}
+	DefaultPeriodicRuns      = []RUN{}
+)
+
+func ToSetupRuns(setup map[string][]string) SetupRuns {
+	newsetup := defaultSetupRuns()
+	for nameofruns, runs := range setup {
+		if len(runs) > 0 {
+			newruns := make([]RUN, 0)
+			for _, run := range runs {
+				newruns = append(newruns, ToRun(run))
+			}
+			newsetup[ToRuns(nameofruns)] = newruns
+		}
+	}
+	return newsetup
+}
+
+func NewRunner(
 	gradeFilePath, hitcountFilePath string,
-	btwEventsPeriodicRunSec, periodicRunSec uint32,
+	betweenEventsRunSec, periodicRunSec uint32,
 	rmr *remover.Remover,
 	tskr *tasker.Tasker,
 	tlr *tailer.Tailer,
-) *FMFRunner {
-	return &FMFRunner{
-		grade:    *NewFileMonitor(gradeFilePath),
-		hitCount: *NewFileMonitor(hitcountFilePath),
-		fmm:      make(FileMetaPtrMap),
-		dupFmm:   make(FileMetaPtrMap),
-		rhm:      make(map[string]int),
-		btwEventsPeriodicRunSec: btwEventsPeriodicRunSec,
-		periodicRunSec:          periodicRunSec,
-		remover:                 rmr,
-		tasker:                  tskr,
-		tailer:                  tlr,
-		CMDCh:                   make(chan CMD, 1),
-		ErrCh:                   make(chan error, 1),
+) *Runner {
+	return &Runner{
+		grade:               *NewFileMonitor(gradeFilePath),
+		hitCount:            *NewFileMonitor(hitcountFilePath),
+		fmm:                 make(FileMetaPtrMap),
+		dupFmm:              make(FileMetaPtrMap),
+		rhm:                 make(map[string]int),
+		betweenEventsRunSec: betweenEventsRunSec,
+		periodicRunSec:      periodicRunSec,
+		remover:             rmr,
+		tasker:              tskr,
+		tailer:              tlr,
+		CMDCh:               make(chan CMD, 1),
+		ErrCh:               make(chan error, 1),
+		RUNFuncs:            newRunFuns(),
+		SetupRuns:           defaultSetupRuns(),
 	}
 }
 
 // https://dave.cheney.net/2013/04/30/curious-channels
 // https://stackoverflow.com/questions/35036653/why-doesnt-this-golang-code-to-select-among-multiple-time-after-channels-work
-func (fr *FMFRunner) Run(eventCh <-chan FileMetaFilesEvent) error {
+func (fr *Runner) Run(eventCh <-chan FileMetaFilesEvent) error {
 	runnerlogger.Infof("started runner process")
 	defer close(fr.CMDCh)
 	defer close(fr.ErrCh)
 	periodictm := fr.newPeriodicRunTimer()
-	btwperiodictm := fr.newBtwEventsPeriodicRunTimer()
+	btwperiodictm := fr.newBetweenEventsRunTimer()
 	for {
 		select {
 		case fme, open := <-eventCh:
 			if !open {
-				fr.channelClosedRun()
 				eventCh = nil
 				continue
 			}
 			if fme.Err != nil {
 				if fme.Err == ErrTimeout {
 					fr.eventTimeoutRun(fme)
-					btwperiodictm = fr.newBtwEventsPeriodicRunTimer()
+					btwperiodictm = fr.newBetweenEventsRunTimer()
 				} else {
 					fr.errorRun(fme)
 				}
 				continue
 			}
 			fr.eventRun(fme)
-			btwperiodictm = fr.newBtwEventsPeriodicRunTimer()
+			btwperiodictm = fr.newBetweenEventsRunTimer()
 		case <-btwperiodictm:
-			fr.btwEventsPeriodicRun(FileMetaFilesEvent{Grade: fr.grade, HitCount: fr.hitCount})
-			btwperiodictm = fr.newBtwEventsPeriodicRunTimer()
+			//fr.betweenEventsRun(FileMetaFilesEvent{Grade: fr.grade, HitCount: fr.hitCount})
+			fme := FileMetaFilesEvent{}
+			fr.betweenEventsRun(fme)
+			btwperiodictm = fr.newBetweenEventsRunTimer()
 		case <-periodictm:
 			fr.periodicRun(FileMetaFilesEvent{Grade: fr.grade, HitCount: fr.hitCount})
 			periodictm = fr.newPeriodicRunTimer()
@@ -114,66 +229,67 @@ func (fr *FMFRunner) Run(eventCh <-chan FileMetaFilesEvent) error {
 	}
 }
 
-func (fr *FMFRunner) newPeriodicRunTimer() <-chan time.Time {
+func (fr *Runner) newPeriodicRunTimer() <-chan time.Time {
 	if fr.periodicRunSec != 0 {
 		return time.After(time.Duration(fr.periodicRunSec) * time.Second)
 	}
 	return nil
 }
 
-func (fr *FMFRunner) newBtwEventsPeriodicRunTimer() <-chan time.Time {
-	if fr.btwEventsPeriodicRunSec != 0 {
-		return time.After(time.Duration(fr.btwEventsPeriodicRunSec) * time.Second)
+func (fr *Runner) newBetweenEventsRunTimer() <-chan time.Time {
+	if fr.betweenEventsRunSec != 0 {
+		return time.After(time.Duration(fr.betweenEventsRunSec) * time.Second)
 	}
 	return nil
 }
 
-func (fr *FMFRunner) channelClosedRun() {
+func (fr *Runner) channelClosedRun() {
 	runnerlogger.Debugf("started channel-closed run")
 	defer runnerlogElapased("ended channel-closed run", common.Start())
 }
 
-func (fr *FMFRunner) errorRun(fme FileMetaFilesEvent) {
+func (fr *Runner) eventTimeoutRun(fme FileMetaFilesEvent) {
+	runnerlogger.Debugf("started timeout run, (%s)", fme)
+	defer runnerlogElapased("ended timeout run", common.Start())
+
+	for _, r := range fr.SetupRuns[EventTimeoutRuns] {
+		fr.RUNFuncs[r](fr, fme)
+	}
+}
+
+func (fr *Runner) errorRun(fme FileMetaFilesEvent) {
 	runnerlogger.Errorf("started error run, error(%s)", fme.Err.Error())
 	defer runnerlogElapased("ended error run", common.Start())
 }
 
-func (fr *FMFRunner) eventTimeoutRun(fme FileMetaFilesEvent) {
-	runnerlogger.Debugf("started timeout run")
-	defer runnerlogElapased("ended timeout run", common.Start())
-	fr.makeFmm(fme)
-	fr.makeRhm()
-	fr.removerRun()
-	fr.taskerRun()
-}
-
-func (fr *FMFRunner) eventRun(fme FileMetaFilesEvent) {
+func (fr *Runner) eventRun(fme FileMetaFilesEvent) {
 	runnerlogger.Debugf("started event run, (%s)", fme)
 	defer runnerlogElapased("ended event run", common.Start())
-	fr.makeFmm(fme)
-	fr.makeRhm()
-	fr.removerRun()
-	fr.taskerRun()
+
+	for _, r := range fr.SetupRuns[EventRuns] {
+		fr.RUNFuncs[r](fr, fme)
+	}
 }
 
-func (fr *FMFRunner) btwEventsPeriodicRun(fme FileMetaFilesEvent) {
-	runnerlogger.Debugf("started periodic run between events")
+func (fr *Runner) betweenEventsRun(fme FileMetaFilesEvent) {
+	runnerlogger.Debugf("started periodic run between events, (%s)", fme)
 	defer runnerlogElapased("ended periodic run between events", common.Start())
-	fr.makeRhm()
-	fr.removerRun()
-	fr.taskerRun()
+
+	for _, r := range fr.SetupRuns[BetweenEventsRuns] {
+		fr.RUNFuncs[r](fr, fme)
+	}
 }
 
-func (fr *FMFRunner) periodicRun(fme FileMetaFilesEvent) {
-	runnerlogger.Debugf("started periodic run(%s)", fme)
+func (fr *Runner) periodicRun(fme FileMetaFilesEvent) {
+	runnerlogger.Debugf("started periodic run, (%s)", fme)
 	defer runnerlogElapased("ended periodic run", common.Start())
-	fr.makeFmm(fme)
-	fr.makeRhm()
-	fr.removerRun()
-	fr.taskerRun()
+
+	for _, r := range fr.SetupRuns[PeriodicRuns] {
+		fr.RUNFuncs[r](fr, fme)
+	}
 }
 
-func (fr *FMFRunner) makeFmm(fme FileMetaFilesEvent) {
+func (fr *Runner) makeFmm(fme FileMetaFilesEvent) {
 	fmm := make(FileMetaPtrMap)
 	dupfmm := make(FileMetaPtrMap)
 	IPm := make(map[string]int)
@@ -192,27 +308,26 @@ func (fr *FMFRunner) makeFmm(fme FileMetaFilesEvent) {
 		common.Elapsed(est))
 	fr.fmm = fmm
 	fr.dupFmm = dupfmm
-	fr.printFmm()
 }
 
-func (fr *FMFRunner) makeRhm() {
+func (fr *Runner) makeRhm() {
 	rhm := make(map[string]int)
 	var basetm time.Time = time.Now()
 	fr.tailer.Tail(basetm, &rhm)
 	fr.rhm = rhm
 }
 
-func (fr *FMFRunner) removerRun() {
+func (fr *Runner) runRemover() {
 	fr.remover.RunWithInfo(
 		remover.FileMetaPtrMap(fr.fmm), remover.FileMetaPtrMap(fr.dupFmm), fr.rhm)
 }
 
-func (fr *FMFRunner) taskerRun() {
+func (fr *Runner) runTasker() {
 	fr.tasker.RunWithInfo(
 		tasker.FileMetaPtrMap(fr.fmm), fr.rhm)
 }
 
-func (fr *FMFRunner) printFmm() {
+func (fr *Runner) printFmm() {
 	log.Printf("file metas ------------\n")
 	for _, fm := range fr.fmm {
 		log.Printf("\tfm:%s\n", fm)

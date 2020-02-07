@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
 
+	"github.com/castisdev/cfm/fmfm"
 	"github.com/castisdev/cilog"
 	"github.com/spf13/viper"
 )
@@ -39,8 +41,25 @@ type Watcher struct {
 }
 
 type Runner struct {
-	PeriodicRunBetweenEventsSec uint32 `mapstructure:"periodic_run_between_events_interval_sec"`
-	PeriodicRunSec              uint32 `mapstructure:"periodic_run_interval_sec"`
+	BetweenEventsRunSec uint32              `mapstructure:"between_events_run_interval_sec"`
+	PeriodicRunSec      uint32              `mapstructure:"periodic_run_interval_sec"`
+	SetupRuns           map[string][]string `mapstructure:"setup_runs"`
+}
+
+func (r *Runner) validate() error {
+	for rs, runs := range r.SetupRuns {
+		if fmfm.ToRuns(rs) == 0 {
+			return errors.New(
+				fmt.Sprintf("%s in runner.setup_runs:, invalid name of runs", rs))
+		}
+		for _, run := range runs {
+			if fmfm.ToRun(run) == 0 {
+				return errors.New(
+					fmt.Sprintf("%s in runner.setup_runs.%s:, invalid run description", run, rs))
+			}
+		}
+	}
+	return nil
 }
 
 // Config :
@@ -114,6 +133,11 @@ func ValidationConfig(c Config) {
 
 	if _, _, err := net.SplitHostPort(c.ListenAddr); err != nil {
 		fmt.Printf("invalid listen_addr : error(%s)", err)
+		os.Exit(-1)
+	}
+
+	if err := c.Runner.validate(); err != nil {
+		fmt.Printf("failed to read runner config : error(%s)", err)
 		os.Exit(-1)
 	}
 }

@@ -43,10 +43,6 @@ func main() {
 	mgr := startManager(c)
 	tasks = mgr.Tasks()
 
-	// startRemover(c)
-	//tskr := startTasker(c)
-	//tasks = tskr.Tasks()
-
 	api = common.MLogger{
 		Logger: cilog.StdLogger(),
 		Mod:    "api"}
@@ -131,19 +127,21 @@ func startTasker(c *Config) (tskr *tasker.Tasker) {
 	return tskr
 }
 
-func startManager(c *Config) (manager *fmfm.FMFManager) {
-	watcher := fmfm.NewFMFWatcher(
+func startManager(c *Config) (manager *fmfm.Manager) {
+	watcher := fmfm.NewWatcher(
 		c.GradeInfoFile, c.HitcountHistoryFile,
 		c.Watcher.FireInitialEvent, c.Watcher.EventTimeoutSec,
 		c.Watcher.PollingSec)
-	runner := fmfm.NewFMFRunner(
+	runner := fmfm.NewRunner(
 		c.GradeInfoFile, c.HitcountHistoryFile,
-		c.Runner.PeriodicRunSec, c.Runner.PeriodicRunSec,
+		c.Runner.BetweenEventsRunSec, c.Runner.PeriodicRunSec,
 		newRemover(c),
 		newTasker(c),
 		newTailer(c),
 	)
-	manager = fmfm.NewFMFManager(watcher, runner)
+	runner.SetupRuns = fmfm.ToSetupRuns(c.Runner.SetupRuns)
+
+	manager = fmfm.NewManager(watcher, runner)
 
 	go manager.Manage()
 	return manager

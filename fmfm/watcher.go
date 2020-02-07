@@ -103,7 +103,7 @@ func (f *FileMonitor) ResetUpdate() {
 	f.Updated = false
 }
 
-type FMFWatcher struct {
+type Watcher struct {
 	*myinotify.Watcher
 	mode        WatchMode
 	grade       *FileMonitor
@@ -148,11 +148,14 @@ var (
 const myinotifyUnknown myinotify.Op = 0
 
 func (e FileMetaFilesEvent) String() string {
-	return fmt.Sprintf("grade(%s), hitCount(%s), Err(%s)", &e.Grade, &e.HitCount, e.Err.Error())
+	if e.Err != nil {
+		return fmt.Sprintf("err(%s), grade(%s), hitCount(%s)", e.Err.Error(), &e.Grade, &e.HitCount)
+	}
+	return fmt.Sprintf("grade(%s), hitCount(%s)", &e.Grade, &e.HitCount)
 }
 
-func NewFMFWatcher(gradeFilePath, hitcountFilePath string,
-	initialNoti bool, eventTimeoutSec, pollingSec uint32) *FMFWatcher {
+func NewWatcher(gradeFilePath, hitcountFilePath string,
+	initialNoti bool, eventTimeoutSec, pollingSec uint32) *Watcher {
 	var m WatchMode
 	m = NOTIFY
 	if !TestNotify() {
@@ -170,7 +173,7 @@ func NewFMFWatcher(gradeFilePath, hitcountFilePath string,
 			watcherlogger.Infof("changed watchmode:%s", m)
 		}
 	}
-	return &FMFWatcher{
+	return &Watcher{
 		Watcher:     watcher,
 		mode:        m,
 		grade:       NewFileMonitor(gradeFilePath),
@@ -183,7 +186,7 @@ func NewFMFWatcher(gradeFilePath, hitcountFilePath string,
 	}
 }
 
-func (fw *FMFWatcher) Watch() (err error) {
+func (fw *Watcher) Watch() (err error) {
 	watcherlogger.Infof("started watcher process, mode:%s", fw.mode)
 	defer close(fw.NotiCh)
 	defer close(fw.ErrCh)
@@ -196,7 +199,7 @@ func (fw *FMFWatcher) Watch() (err error) {
 	return err
 }
 
-func (fw *FMFWatcher) WatchPoll() error {
+func (fw *Watcher) WatchPoll() error {
 	pollingtm := fw.newPollingTimer()
 	timeouttm := fw.newTimeoutTimer()
 	fw.grade.UpdateExist()
@@ -233,7 +236,7 @@ func (fw *FMFWatcher) WatchPoll() error {
 	}
 }
 
-func (fw *FMFWatcher) WatchNotify() error {
+func (fw *Watcher) WatchNotify() error {
 	if err := fw.AddWatchingDirsAndFiles(); err != nil {
 		fw.ErrCh <- err
 		return err
@@ -305,7 +308,7 @@ func (fw *FMFWatcher) WatchNotify() error {
 	}
 }
 
-func (fw *FMFWatcher) AddWatchingDirsAndFiles() (err error) {
+func (fw *Watcher) AddWatchingDirsAndFiles() (err error) {
 	if !fw.grade.UpdateExist() ||
 		!fw.hitCount.UpdateExist() {
 		return ErrNotExist
@@ -331,7 +334,7 @@ func (fw *FMFWatcher) AddWatchingDirsAndFiles() (err error) {
 	return nil
 }
 
-func (fw *FMFWatcher) isWatchingDirOrFile(name string) bool {
+func (fw *Watcher) isWatchingDirOrFile(name string) bool {
 	for _, dir := range fw.grade.Dirs {
 		if name == dir {
 			return true
@@ -348,7 +351,7 @@ func (fw *FMFWatcher) isWatchingDirOrFile(name string) bool {
 	return false
 }
 
-func (fw *FMFWatcher) isWatchingDir(name string) bool {
+func (fw *Watcher) isWatchingDir(name string) bool {
 	for _, dir := range fw.grade.Dirs {
 		if name == dir {
 			return true
@@ -362,14 +365,14 @@ func (fw *FMFWatcher) isWatchingDir(name string) bool {
 	return false
 }
 
-func (fw *FMFWatcher) newTimeoutTimer() <-chan time.Time {
+func (fw *Watcher) newTimeoutTimer() <-chan time.Time {
 	if fw.timeoutSec != 0 {
 		return time.After(time.Duration(fw.timeoutSec) * time.Second)
 	}
 	return nil
 }
 
-func (fw *FMFWatcher) newPollingTimer() <-chan time.Time {
+func (fw *Watcher) newPollingTimer() <-chan time.Time {
 	if fw.pollingSec != 0 {
 		return time.After(time.Duration(fw.pollingSec) * time.Second)
 	}

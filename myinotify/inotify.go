@@ -30,7 +30,8 @@
 // https://github.com/fsnotify/fsnotify
 // https://github.com/fsnotify/fsnotify/blob/master/LICENSE
 //
-// inotify의 unmount event를 받기 위해서 원래 소스의 일부를 수정함
+// inotify의 unmount event를 받기 위해서
+// fsnotify.go 와 inotify.go 의 소스를 합치고, 소스의 일부를 수정함
 package myinotify
 
 import (
