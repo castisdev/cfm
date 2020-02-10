@@ -1,3 +1,47 @@
+v1.0.0.qr3 / 2020-02-
+===================
+### cfm
+
+- cfm 구조 변경
+  - remover, tasker thread 하나로 합침
+  - .hicount.history, .grade.info 파일 감시 모듈 추가
+
+##### AS-IS:
+![AS-IS_cfm_v1.0.0.qr2.png](AS-IS_cfm_v1.0.0.qr2.png)
+
+##### TO-BE:
+![TO-BE_cfm_v1.0.0.qr3.png](TO-BE_cfm_v1.0.0.qr3.png)
+
+
+### cfm, cfw, DFS
+
+- cfm 구조 변경
+  - remover, tasker thread 하나로 합침
+  - .hicount.history, .grade.info 파일 감시 모듈 추가
+
+![cfm_cfw_DFS_Sequence_v1.0.0.qr3.png](cfm_cfw_DFS_Sequence_v1.0.0.qr3.png)
+
+### manager
+
+- watcher, runner 관리 모듈
+- 파일 시스템의 notify 기능을 test 해보고 지원하는 경우,
+  watcher를 notify 모드로, 그렇지 않은 경우 poll 모드로 실행
+- watcher에서 알 수 없는 error가 난 경우, poll 모드로 실행
+  - watcher poll 모드에서는 error 응답을 하지 않음
+
+![cfm_v1.0.0.qr3_manager_state.png](cfm_v1.0.0.qr3_manager_state.png)
+
+![cfm_v1.0.0.qr3_watcher_poll_state.png](cfm_v1.0.0.qr3_watcher_poll_state.png)
+
+![cfm_v1.0.0.qr3_watcher_notify_state.png](cfm_v1.0.0.qr3_watcher_notify_state.png)
+
+### runner
+
+- remove, tasker 작업 실행 모듈
+
+![cfm_v1.0.0.qr3_runner_state.png](cfm_v1.0.0.qr3_runner_state.png)
+
+
 v1.0.0.qr2 / 2020-01-23
 ===================
 

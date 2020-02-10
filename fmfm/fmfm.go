@@ -84,7 +84,6 @@ func (fm *Manager) restart() {
 }
 
 func (fm *Manager) restartPollMode() {
-	fm.waitUntilFileExist()
 	fm.closeWatcherAndStopRunner()
 	newwatcher := fm.cloneWatcher()
 	newwatcher.mode = POLL

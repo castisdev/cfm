@@ -303,6 +303,7 @@ func (fr *Runner) makeFmm(fme FileMetaFilesEvent) {
 		fmm, IPm, dupfmm)
 	if err != nil {
 		runnerlogger.Errorf("failed to make file metas, error(%s)", err.Error())
+		return
 	}
 	runnerlogger.Infof("made file metas(name, grade, size, servers), time(%s)",
 		common.Elapsed(est))

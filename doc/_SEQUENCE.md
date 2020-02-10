@@ -1,3 +1,529 @@
+v1.0.0.qr3 / 2020-02-
+===================
+
+- cfm 구조 변경
+  - remover, tasker thread 하나로 합침
+  - .hicount.history, .grade.info 파일 감시 모듈 추가
+
+```plantuml
+title AS-IS_cfm_v1.0.0.qr2
+box "ADC/LSM"
+participant cfm
+end box
+
+box "VOD"
+participant cfw as "cfw"
+end box
+
+group file-remover-thread
+loop endless
+autonumber 1 "<b>[0]"
+cfm->cfm: file meta 정보 생성
+    note right
+        - .hitcount.history 에서 file size 추출
+        - .grade.info 에서 file 순위 추출
+        - lb log에서 hit수 급상승 file 추출
+    end note
+cfm->cfw: 여러 vod 서버에 있는 file 삭제 처리
+    note right
+        - .hitcount.history 에서 vod 서버 위치 추출
+        - 여러 서버에 있는 file 삭제 요청
+    end note
+cfm->cfw: VOD disk 용량이 모자른 경우 file 삭제 처리
+    note right
+        - hit수 급상승 file은 삭제 요청에서 제외
+        - disk 용량이 확보될 때까지 file 순위가 낮은 파일 삭제 요청
+    end note
+end
+end
+
+group task-manager-thread
+loop endless
+autonumber 1 "<b>[0]"
+cfm->cfm: file meta 정보 생성
+    note right
+        - .hitcount.history 에서 file size 추출
+        - .grade.info 에서 file 순위 추출
+        - lb log에서 hit 수 급상승 file 추출
+    end note
+cfm->cfm: create tasks
+    note right
+        배포 task 생성
+        - hit수 급상승 file 의 hit수 높은 순서로,
+        - file 순위가 높은 순서로 생성
+        - 모든 src 가 선택될 때까지 생성
+    end note
+end
+end
+```
+
+```plantuml
+title TO-BE_cfm_v1.0.0.qr3
+box "ADC/LSM"
+participant cfm
+
+end box
+
+box "VOD"
+participant cfw as "cfw"
+end box
+
+group file-watcher-thread
+loop endless
+autonumber 1 "<b>[0]"
+cfm->cfm: file meta 정보 감시
+    note right
+        - .hitcount.history file 감시
+        - .grade.info file 감시
+    end note
+end
+end
+
+group remover-tasker-runner-thread
+loop endless
+autonumber 1 "<b>[0]"
+cfm->cfm: file meta 정보 생성
+    note right
+        - .hitcount.history 에서 file size 추출
+        - .grade.info 에서 file 순위 추출
+        - lb log에서 hit 수 급상승 file 추출
+    end note
+
+  group remover-run
+  cfm->cfw: 여러 vod 서버에 있는 file 삭제 처리
+      note right
+          - .hitcount.history 에서 vod 서버 위치 추출
+          - 여러 서버에 있는 file 삭제 요청
+      end note
+  cfm->cfw: VOD disk 용량이 모자른 경우 file 삭제 처리
+      note right
+          - hit수 급상승 file은 삭제 요청에서 제외
+          - disk 용량이 확보될 때까지 file 순위가 낮은 파일 삭제 요청
+      end note
+  end
+  group takser-run
+  cfm->cfm: create tasks
+      note right
+          배포 task 생성
+          - hit수 급상승 file 의 hit수 높은 순서로,
+          - file 순위가 높은 순서로 생성
+          - 모든 src 가 선택될 때까지 생성
+      end note
+  end
+end
+end
+```
+
+```plantuml
+title cfm_cfw_DFS_Sequence_v1.0.0.qr3
+
+box "ADC/LSM"
+participant cfm
+
+end box
+
+box "VOD"
+participant cfw as "cfw"
+end box
+
+box "VOD(source)"
+participant cfw2 as "cfw"
+participant dfs as "DFS"
+end box
+
+
+group heartbeat-thread
+loop endless
+autonumber 1 "<b>[0]"
+cfm->cfw: heartbeat 확인
+    note right
+      서버별 heartbeat 성공 여부 정보 생성
+    end note
+cfm->cfw2: heartbeat 확인
+end
+end
+
+group file-watcher-thread
+loop endless
+autonumber 1 "<b>[0]"
+cfm->cfm: file meta 정보 감시
+    note right
+        - .hitcount.history file 감시
+        - .grade.info file 감시
+    end note
+end
+end
+
+group remover-tasker-runner-thread
+loop endless
+autonumber 1 "<b>[0]"
+cfm->cfm: file meta 정보 생성
+    note right
+        - .hitcount.history 에서 file size 추출
+        - .grade.info 에서 file 순위 추출
+        - lb log에서 hit 수 급상승 file 추출
+    end note
+
+  group remover-run
+  cfm->cfw: GET /files
+      note right
+          서버별 file list 확인
+      end note
+  cfm->cfw2: GET /files
+  cfm->cfm: file meta 에서 여러 서버에 존재하는(배포된) file list 추출
+  cfm->cfw: DELETE /files/c.mpg
+      note right
+          여러 서버에 존재하는 file 삭제
+      end note
+
+  cfm->cfw: GET /df
+      note right
+          디스크 사용량 체크
+      end note
+  cfm->cfw2: GET /df
+  cfm->cfw: DELETE /files/a.mpg
+      note right
+          디스크 사용량이 정해진 한계 사용량을 넘었을 때
+          hit수 급상승 file은 제외
+          file 순위가 낮은 순으로 file 삭제
+      end note
+  cfm->cfw2: DELETE /files/b.mpg
+  end
+
+  group tasker-run
+  cfm->cfm: check task queue
+      note right
+          배포 schedule 조회
+      end note
+  cfm->cfm: clean task queue
+      note right
+          schedule 삭제
+          - 완료되었거나 (status = done)
+          - timeout ( mtime + 30분 =< current time )
+          - heartbeat 성공 하지 않았거나
+      end note
+  cfm->cfw: GET /files
+      note right
+          서버별 file list 확인
+      end note
+  cfm->cfw2: GET /files
+  cfm->cfm: create tasks
+      note right
+          배포 schedule 생성
+          - hit수 급상승 file부터
+          - 순위가 높은 순서부터 조건 확인
+          - task queue 에 없고
+          - VOD 서버에 없고
+          - SAN 에 존재하는 파일인 경우 선택
+          - 모든 src 가 선택될 때까지 생성
+      end note
+  end
+end
+end
+
+group cfw
+loop endless
+autonumber 1 "<b>[0]"
+cfw->cfw: 디스크 사용량 체크
+cfw->cfm: GET /tasks
+    note left
+        디스크가 충분한 경우
+        배포 schedule 조회
+        자신의 배포 schedule 선택
+    end note
+cfw->cfm: PATCH /tasks/${task_id}
+    note left
+        file 다운로드 시작 전 schedule 상태 변경
+        - status:ready -> status:working
+    end note
+cfw->dfs: file 다운로드 요청
+cfw->cfm: PATCH /tasks/${task_id}
+    note left
+        file 다운로드 완료 후 schedule 상태 변경
+        - status:working -> status:done
+    end note
+end
+end
+```
+
+### manager
+
+- watcher, runner 관리 모듈
+- 파일 시스템의 notify 기능을 test 해보고 지원하는 경우,
+  watcher를 notify 모드로, 그렇지 않은 경우 poll 모드로 실행
+- watcher에서 알 수 없는 error가 난 경우, poll 모드로 실행
+  - watcher poll 모드에서는 error 응답을 하지 않음
+
+```plantuml
+title cfm_v1.0.0.qr3_manager_state
+hide empty description
+
+M0 : 메인 모듈
+M1 : watcher notify test
+S0 : 무한 반복
+S1 : watcher 실행
+S2 : runner 실행
+S3 : watcher의 error 응답 기다림
+S4 : 파일 존재 검사
+S5 : watcher, runner 중지
+S7 : watcher, runner 중지
+
+[*] -> M0
+M0 --> M1
+note right
+  성공 : watcher notify 모드 setting
+  실패 : watcher poll 모드 setting
+end note
+M1 --> S0 : manager 실행
+S0 --> S1
+S1 --> S2
+S2 --> S3
+S3 --> S4 : 감시하던 파일이 없어진 경우
+S3 --> S4 : 감시하던 파일의 direcotry가\nunmount 된 경우
+S3 --> S7 : watcher 모듈에서 error가 난 경우
+note left
+watcher poll 모드 setting해서
+재시작
+end note
+S4 -> S4 : 없는 경우 계속 검사
+S4 -> S5 : 파일이 다시 생긴 경우
+S5 -> S0 : 재시작
+S7 -> S0 : 재시작
+```
+
+### watcher
+
+- 파일 감시 모듈
+  - .hitcount.history 파일과 .grade.info 파일 감시
+    - notify 모드인 경우, .hitcount.history 파일과 .grade.info 파일의       상위 directory들도 감시
+  - 두 파일이 모두 존재하고, 두 파일 중 하나에 변화가 있는 경우 event 발생
+  - notify 모든에서 상위 directory 중 하나가 삭제, 이름 변경, unmount된 경우, event 발생
+  - 특정 시간동안 아무런 변화가 없는 경우, timeout event 발생
+  - error가 있는 경우, error event 발생
+
+```plantuml
+title cfm_v1.0.0.qr3_watcher_state
+hide empty description
+W0 : 모드 검사
+PollMode : poll 모드 실행
+NotifyMode : notify 모드 실행
+
+[*] -> W0
+W0 -> PollMode : poll 모드인 경우
+W0 -> NotifyMode : notify 모드인 경우
+```
+
+```plantuml
+title cfm_v1.0.0.qr3_watcher_poll_state
+hide empty description
+
+state PollMode{
+P1 : .hitcount.history 파일 존재 확인\n.grade.info 파일 존재 검사
+P2 : 무한 반복
+P3 : 두 파일에 변화가 있는지 검사
+P4 : 두 파일에 변화가 특정시간동안 없었는지 검사
+EventChannel :
+
+[*] -> P1
+P1 -[dashed]-> EventChannel : 두 파일이 모두 있으면\nevent 발생
+P1 ---> P2
+P2 --> P3
+P3 -[dashed]-> EventChannel : 두 파일 중 하나라도\n변화가 있으면\nevent 발생
+P3 -> P4
+P4 -[dashed]-> EventChannel : 특정 시간동안\n변화가 없으면\ntimeout event 발생
+P4 --> P2
+}
+```
+
+```plantuml
+title cfm_v1.0.0.qr3_watcher_notify_state
+hide empty description
+
+state NotifyMode{
+N1 : .hitcount.history 파일 존재 확인\n.grade.info 파일 존재 검사
+N2 : 파일 event 감시
+N3 : 두 파일에 변화가 있는지 검사
+N4 : directory 가 없어졌는지 검사
+N5 : directory 가 unmount 되었는 지 검사
+N6 : 두 파일에 변화가 특정시간동안 없었는지 검사
+N7 : 에러가 있었는 지 검사
+
+EventChannel :
+ErrorChannel :
+
+[*] --> N1
+N1 -[dashed]> EventChannel : 두 파일이 모두 있으면\nevent 발생
+N1 --> N2
+N2 --> N3
+N3 -[dashed]> EventChannel : 두 파일 중 하나라도 \n변화가 있으면 event 발생
+N3 -> N4
+N4 -[dashed]> EventChannel : directory가 없어진 경우\nevent 발생
+N4 -> N5
+N5 -[dashed]> EventChannel : directory가 unmount된 경우\nevent 발생
+N5 -> N6
+N6 -[dashed]-> EventChannel : 특정 시간동안 변화가 없으면\ntime event 발생
+N6 -> N7
+N7 -[dashed]> ErrorChannel : 에러가 발생한 경우\nevent 발생
+N7 --> N2 : 에러가 없는 경우
+N7 --> [*] : 에러가 발생한 경우
+}
+```
+
+### runner
+
+- remove, tasker 작업 실행 모듈
+
+```plantuml
+title cfm_v1.0.0.qr3_runner_state
+hide empty description
+
+EventChannel:
+R0 : event 검사
+R1 : timeout 검사
+R2 : 파일 event 검사
+R3 : event 발생 후\n특정시간이 흘렀는지 검사
+R4 : 중지 요청이 있는 지 검사
+
+R10 : grade info, hitcount history 파일로부터\n파일 등급, 크기, 서버 위치 정보가 들어있는 파일 meta 목록 생성\n여러 server에 존재하는 파일 meta 목록 생성
+note left
+	파일 등급 : grade info 파일에서 구함
+	파일 크기 : hitcount history 파일에서 구함
+	서버 위치 : 서버가 존재하는 서버 ip 목록,
+                     hitcount history 파일에서 구함
+	서버 위치 정보를 이용하여 여러 server에
+  존재하는 파일 목록 생성
+end note
+R11 : 급hit 상승 파일 목록 구함
+R12 : remover process 실행
+R13 : tasker process 실행
+
+[*] --> R0
+EventChannel -[dashed]-> R0
+R0 --> R1
+R1 -> R2
+R2 -> R3
+R3 -> R4
+
+R1 -> R10 : timout event\n발생한 경우
+R10 -> R11
+R11 -> R12
+R12 -> R13
+R13 -> R0
+
+R2 --> R10 : event가 발생한 경우
+
+R3 --> R11 : event 발생 후\n특정시간이 지난 경우
+
+R4 -> [*] : 중지 요청 시
+R4 --> R0 : 중지 요청이\n없는 경우
+
+R12 ----> RemoverProcess
+R13 ----> TaskerProcess
+
+state TaskerProcess {
+  T3 : source, dest 서버의 heartbeat 결과 얻음
+  T4: task 정리
+  note right
+    DONE task 정리
+    TIMEOUT 계산해서 TIMEOUT된 task 정리
+    Src 또는 Dest의 heartbeat 답을 구하지 못한 task 정리
+  end note
+  T5 : 배포에 사용 가능한\nsource 서버가 있는 지 체크
+  T6 : 배포에 사용 가능한\ndest 서버가 있는 지 체크
+  T7 : 모든 dest 서버의 파일 목록 수집
+  T8 : grade info, hitcount history로 만든\n파일 meta 목록에 급 hits 반영
+  T9 : 파일 meta 목록을\n급 hits 높은 순으로 정렬\n등급값 낮은 순으로 정렬하여\n배포 대상 파일 목록 만들기
+  T10 : 배포 대상 파일 목록에 대해서\n배포 task 만들기
+  T11: dest 서버에 이미 있는 파일이면 제외
+  T12: source path에 없는 파일이면 제외 (SAN에 는 파일이면 제외)
+  T13: 특정 prefix로 시작하는 파일이면 제외 (광고 파일 제외)
+  T14: 배포에 사용 중인 파일이면 제외 (광고 파일 제외)
+  T15 : src 서버 선택
+  T16 : dest 서버 선택
+  note right
+  dest 서버는 같은 서버가
+  여러 번 선택될 수 있음
+  end note
+  T17 : 배포 task 생성
+
+  [*] -> T3
+  T3 --> T4
+  T4 --> T5
+  T5 --> [*] : 사용 가능한 source 서버가\n없는 경우
+  T5 --> T6
+  T6 --> [*] : 사용 가능한 dest 서버가\n없는 경우
+  T6 --> T7
+  T7 --> T8
+  T8 --> T9
+  T9 --> T10
+  T10 -> T11
+  T11 --> T12
+  T12 --> T13
+  T13 --> T14
+  T14 --> T15
+  T15 --> [*] : 사용 가능한 source 서버가\n없는 경우
+  T15 --> T16
+  T16 --> T17
+  T17 --> T10 : 배포할 파일이 남은 경우
+  T17 --> [*] : 더 이상 배포할 피일이 없는 경우
+}
+
+state RemoverProcess {
+  RM3 : server별로 존재하는 파일 meta 목록 구함
+
+  RM5 : disk 사용량 limit를 넘은 server 조사
+
+  RM3 --> RM4
+  RM4 -> RM5
+  RM5 --> RM6
+  RM6 --> [*]
+
+  state RM4 {
+    RM4 : 여러 server에 존재하는 파일에 대한 삭제 요청
+    RM40 : 여러 server에 존재하는 파일 meta 목록 update
+    note right
+      server별로 존재하는 파일 meta 목록을 가지고
+      cross check하여 update
+    end note
+    RM41 : 여러 server에 존재하는 파일이\n하나의 서버에만 존재할 때까지 삭제 요청 수행
+    RM42 : 특정 prefix로 시작하는 파일일 때는 제외 (광고 파일 제외)
+    RM43 : source path 에 없는 파일일 때는 제외 (SAN에 없는 파일 제외)
+    RM43 : 삭제 요청
+
+    [*] -> RM40
+    RM40 --> RM41
+    RM41 --> RM42
+    RM42 --> RM43
+    RM43 --> RM44
+    RM44 --> RM41 : 처리할 파일이 남은 경우
+    RM44 --> [*] : 처리할 파일이 없는 경우
+  }
+
+  state RM6 {
+    RM6 : disk 사용량 limit를 넘은 server에 대해서 disk 삭제 요청
+
+    RM60 : server 별로 지워야 할 파일 목록 만들기
+    RM61 : server 파일 목록을 등급이 큰 순서로 정렬
+    RM62 : disk 여유 사용량이 확보될 때까지\n지워야할 파일 목록 만들기
+    RM63: 특정 prefix로 시작하는 파일일 때는 제외 (광고 파일 제외)
+    RM64 : source path 에 없는 파일일 때는 제외 (SAN에 없는 파일 제외)
+    RM65 : 급 hit 상승 파일일 때는 제외
+    RM66 : 지워야 할 파일에 대해서\n 서버에 삭제 요청
+
+    [*] -> RM60
+    RM60 --> RM61
+    RM61 --> RM62
+    RM62 --> RM63
+    RM63 --> RM64
+    RM64 --> RM65
+    RM65 --> RM66 : disk 여유 용량 확보 될 만큼\n지울 파일을 확보했거나,\n서버 파일이 없는 경우
+    RM65 --> RM62 : disk 여유 용량\n확보 안되고,\n서버 파일이 남은 경우
+    RM66 --> RM60 : 처리할 server가 남은 경우
+    RM66 --> [*] : 처리할 server가 없는 경우
+  }
+}
+```
+
 v1.0.0.qr2 / 2020-01-22
 ===================
 
@@ -8,7 +534,7 @@ v1.0.0.qr2 / 2020-01-22
 - 여러 서버에 배포된 파일을 한 서버에만 남기고 나머지에서는 제거하는 기능 추가
 
 ```plantuml
-
+title cfm_cfw_DFS_Sequence_v1.0.0.qr2
 box "ADC/LSM"
 participant cfm
 end box
@@ -40,6 +566,7 @@ cfm->cfm: file meta 정보 생성
     note right
         - .hitcount.history 에서 file size 추출
         - .grade.info 에서 file 순위 추출
+        - lb log에서 hit수 급상승 file 추출
     end note
 cfm->cfw: GET /files
     note right
@@ -60,6 +587,7 @@ cfm->cfw2: GET /df
 cfm->cfw: DELETE /files/a.mpg
     note right
         디스크 사용량이 정해진 한계 사용량을 넘었을 때
+        hit수 급상승 file은 제외
         file 순위가 낮은 순으로 file 삭제
     end note
 cfm->cfw2: DELETE /files/b.mpg
@@ -73,6 +601,7 @@ cfm->cfm: file meta 정보 생성
     note right
         - .hitcount.history 에서 file size 추출
         - .grade.info 에서 file 순위 추출
+        - lb log에서 hit수 급상승 file 추출
     end note
 cfm->cfm: check task queue
     note right
@@ -93,6 +622,7 @@ cfm->cfw2: GET /files
 cfm->cfm: create tasks
     note right
         배포 schedule 생성
+        - hit수 급상승 file부터
         - 순위가 높은 순서부터 조건 확인
         - task queue 에 없고
         - VOD 서버에 없고
@@ -142,7 +672,6 @@ note right
 	파일 크기 : hitcount history 파일에서 구함
 	서버 위치 : 서버가 존재하는 서버 ip 목록,
                      hitcount history 파일에서 구함
-
 	서버 위치 정보를 이용하여 여러 server에
   존재하는 파일 목록 생성
 end note
