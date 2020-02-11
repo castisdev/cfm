@@ -16,7 +16,7 @@ type Server struct {
 	Sources             []string `mapstructure:"sources"`
 	Destinations        []string `mapstructure:"destinations"`
 	HeartbeatTimeoutSec uint     `mapstructure:"heartbeat_timeout_sec"`
-	HeartbeatSleepSec   uint     `mapstructure:"heartbeat_sleep_sec"`
+	HeartbeatSec        uint     `mapstructure:"heartbeat_interval_sec"`
 }
 
 type Remover struct {
@@ -87,19 +87,19 @@ type Config struct {
 func ReadConfig(configFile string) (*Config, error) {
 	viper.SetDefault("log_dir", "log")
 	viper.SetDefault("log_level", "info")
-	viper.SetDefault("enable_coredump", true)
-	viper.SetDefault("tasker.task_timeout_sec", 3600)
-	viper.SetDefault("tasker.task_copy_speed_bps", 10000000)
-	viper.SetDefault("tasker.tasker_sleep_sec", 60)
-	viper.SetDefault("listen_addr", "127.0.0.1:8080")
 	viper.SetDefault("servers.heartbeat_timeout_sec", uint(5))
-	viper.SetDefault("servers.heartbeat_sleep_sec", uint(30))
+	viper.SetDefault("servers.heartbeat_interval_sec", uint(30))
+	viper.SetDefault("enable_coredump", true)
+	viper.SetDefault("listen_addr", "127.0.0.1:8080")
 	viper.SetDefault("remover.remover_sleep_sec", uint(30))
 	viper.SetDefault("remover.storage_usage_limit_percent", uint(90))
+	viper.SetDefault("tasker.tasker_sleep_sec", 60)
+	viper.SetDefault("tasker.task_timeout_sec", 3600)
+	viper.SetDefault("tasker.task_copy_speed_bps", "10000000")
 	viper.SetDefault("watcher.fire_initial_event", true)
 	viper.SetDefault("watcher.event_timeout_sec", uint32(600))
 	viper.SetDefault("watcher.poll_interval_sec", uint32(60))
-	viper.SetDefault("runner.periodic_run_between_events_interval_sec", uint32(10))
+	viper.SetDefault("runner.between_events_run_interval_sec", uint32(10))
 	viper.SetDefault("runner.periodic_run_interval_sec", uint32(0))
 
 	var c Config
@@ -117,27 +117,26 @@ func ReadConfig(configFile string) (*Config, error) {
 }
 
 // ValidationConfig :
-func ValidationConfig(c Config) {
+func ValidationConfig(c Config) error {
 
 	// Source 경로가 존재하지 않을 경우 프로세스 중지
 	for _, sdir := range c.SourceDirs {
 		if _, err := os.Stat(sdir); os.IsNotExist(err) {
-			fmt.Printf("not exist source dir (%s)\n", err)
-			os.Exit(-1)
+			return errors.New(fmt.Sprintf("invalid source_dirs : error(%s)", err))
 		}
 	}
 
 	if _, err := cilog.LevelFromString(c.LogLevel); err != nil {
-		fmt.Printf("invalid log level : error(%s)", err)
+		return errors.New(fmt.Sprintf("invalid log_level : error(%s)", err))
 	}
 
 	if _, _, err := net.SplitHostPort(c.ListenAddr); err != nil {
-		fmt.Printf("invalid listen_addr : error(%s)", err)
-		os.Exit(-1)
+		return errors.New(fmt.Sprintf("invalid listen_addr : error(%s)", err))
 	}
 
 	if err := c.Runner.validate(); err != nil {
-		fmt.Printf("failed to read runner config : error(%s)", err)
-		os.Exit(-1)
+		return errors.New(fmt.Sprintf("invalid runner : error(%s)", err))
 	}
+
+	return nil
 }

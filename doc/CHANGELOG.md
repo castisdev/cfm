@@ -1,3 +1,17 @@
+v1.0.0.qr3 / 2020-02
+===================
+[형상변경]
+  * 설정 변경
+  - 설정 설명, 디폴트값에 대한 셜명은 doc 폴더의 cfm.yml에 있음
+    - [servers]-[heartbeat_sleep_sec] -> [servers]-[heartbeat_interval_sec]
+  * 설정 추가
+    - [watcher]
+    - [runner]
+  * 설정 삭제
+    - [remover]-[remover_sleep_sec]
+    - [tasker]-[task_timeout_sec]
+  * 일부 로그 변경,추가
+
 v1.0.0.qr2 / 2020-01-23
 ===================
 

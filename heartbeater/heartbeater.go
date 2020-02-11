@@ -47,14 +47,14 @@ func (h HBHost) String() string {
 
 var hosts map[string]*HBHost
 var timeoutSec uint
-var sleepSec uint
+var heartbeatSec uint
 var rwlock *sync.RWMutex
 var hber common.MLogger
 
 func init() {
 	hosts = make(map[string]*HBHost, 0)
 	timeoutSec = uint(5)
-	sleepSec = uint(10)
+	heartbeatSec = uint(10)
 	rwlock = &sync.RWMutex{}
 
 	hber = common.MLogger{
@@ -74,9 +74,9 @@ func SetTimoutSec(s uint) {
 	timeoutSec = s
 }
 
-func SetSleepSec(s uint) {
-	hber.Infof("set sleepSec(%d)", s)
-	sleepSec = s
+func SetHeartbeatSec(s uint) {
+	hber.Infof("set heartbeatSec(%d)", s)
+	heartbeatSec = s
 }
 
 // Add :
@@ -204,6 +204,6 @@ func Heartbeat() {
 func RunForever() {
 	for {
 		Heartbeat()
-		time.Sleep(time.Second * time.Duration(sleepSec))
+		time.Sleep(time.Second * time.Duration(heartbeatSec))
 	}
 }

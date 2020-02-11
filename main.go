@@ -75,7 +75,10 @@ func newConfig() *Config {
 	if err != nil {
 		log.Fatalf("failed to read config, error(%s)", err.Error())
 	}
-	ValidationConfig(*c)
+	err = ValidationConfig(*c)
+	if err != nil {
+		log.Fatalf("failed to read config, error(%s)", err.Error())
+	}
 	return c
 }
 
@@ -107,7 +110,7 @@ func startHeartbeater(c *Config) {
 		heartbeater.Add(s)
 	}
 	heartbeater.SetTimoutSec(c.Servers.HeartbeatTimeoutSec)
-	heartbeater.SetSleepSec(c.Servers.HeartbeatSleepSec)
+	heartbeater.SetHeartbeatSec(c.Servers.HeartbeatSec)
 
 	// tasker가 heartbeater의 결과를 사용하기 때문에,
 	// heartbeater가 한 번 실행하고, tasker 가 실행될 수 있도록 한 번 실행시킴

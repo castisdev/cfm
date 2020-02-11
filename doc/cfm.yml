@@ -55,17 +55,19 @@ remover:
   # storage_usage_limit_percent: 90
   storage_usage_limit_percent: 99
 
+  # deprecated
   # remover 쉬는 시간(초), 기본값 : 30
   # 이 값이 30인 경우, 검사하고 30초 쉬고, 검사하고 30초 쉬는 방식으로 동작
-  remover_sleep_sec : 3
+  # remover_sleep_sec : 3
 
 # tasker:
 # 배포 task를 만드는 모듈,
 # 한 번에 소스 갯수만큼의 배포 task가 만들어짐
 tasker:
+  # deprecated
   # 소스 개수 만큼 배포 task 만들고 나서 쉬는 시간(초), 기본값 : 60
   # 이 값이 60초라면 배포 task 만들고, 60초 쉬고, 만들고 60초 쉬는 방식으로 동작
-  tasker_sleep_sec: 60
+  # tasker_sleep_sec: 60
 
   # cfw 가 배포 스케줄을 시작해놓고 비정상 종료해버리거나
   # cfw 가 아예 구동이 안되는 등의 예외 상황이 생길 경우
@@ -102,9 +104,9 @@ servers:
   heartbeat_timeout_sec : 5
 
   # servers.sources, servers.destinations에 대한
-  # heartbeat 검사 쉬는 시간(초), 기본값: 30
+  # heartbeat 검사 간격 시간(초), 기본값: 30
   # 이 값이 30인 경우, 검사하고 30초 쉬고, 다시 검사하고 30초 쉬는 방식으로 동작
-  heartbeat_sleep_sec : 5
+  heartbeat_interval_sec : 5
 
   sources: # 배포 시 source 로 선택할 서버
     - 172.18.0.101:8888

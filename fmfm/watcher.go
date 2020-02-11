@@ -31,6 +31,8 @@ func NewFileMonitor(path string) *FileMonitor {
 	}
 }
 
+// 에러처리 안됨
+// .../dir/file.txt 같은 path를 에러처리 하지 않음
 func newDirs(path string) []string {
 	dirs := make([]string, 0)
 	dir := path
@@ -81,7 +83,7 @@ func (f *FileMonitor) UpdateExist() bool {
 	return f.Exist
 }
 
-func (f *FileMonitor) UpdateMTime() bool {
+func (f *FileMonitor) UpdateMtime() bool {
 	if fi, err := os.Stat(f.FilePath); !os.IsNotExist(err) {
 		f.Exist = true
 		if f.Mtime != fi.ModTime() {
@@ -154,23 +156,28 @@ func (e FileMetaFilesEvent) String() string {
 	return fmt.Sprintf("grade(%s), hitCount(%s)", &e.Grade, &e.HitCount)
 }
 
+var (
+	TestInotifyFunc func() bool                        = TestNotify
+	NewWatcherFunc  func() (*myinotify.Watcher, error) = myinotify.NewWatcher
+)
+
 func NewWatcher(gradeFilePath, hitcountFilePath string,
 	initialNoti bool, eventTimeoutSec, pollingSec uint32) *Watcher {
 	var m WatchMode
 	m = NOTIFY
-	if !TestNotify() {
-		watcherlogger.Errorf("failed to run myinotify module")
+	if !TestInotifyFunc() {
+		watcherlogger.Infof("failed to run inotify module")
 		m = POLL
-		watcherlogger.Infof("changed watchmode:%s", m)
+		watcherlogger.Infof("changed mode:%s", m)
 	}
 	var watcher *myinotify.Watcher
 	var err error
 	if m == NOTIFY {
-		watcher, err = myinotify.NewWatcher()
+		watcher, err = NewWatcherFunc()
 		if err != nil {
-			watcherlogger.Errorf("failed to run myinotify module, error(%s)", err.Error())
+			watcherlogger.Infof("failed to run inotify module, error(%s)", err.Error())
 			m = POLL
-			watcherlogger.Infof("changed watchmode:%s", m)
+			watcherlogger.Infof("changed mode:%s", m)
 		}
 	}
 	return &Watcher{
@@ -199,6 +206,13 @@ func (fw *Watcher) Watch() (err error) {
 	return err
 }
 
+// WatchPoll :
+//
+// 초기, 두 파일이 모두 있는 경우 event 발생
+//
+// 이후, 두 파일 중 하나라도 modify time이 변경된 경우 event 발생
+//
+// 특정 시간동안 event가 발생하지 않으면 timeout err event 발생
 func (fw *Watcher) WatchPoll() error {
 	pollingtm := fw.newPollingTimer()
 	timeouttm := fw.newTimeoutTimer()
@@ -206,8 +220,8 @@ func (fw *Watcher) WatchPoll() error {
 	fw.hitCount.UpdateExist()
 	if fw.initialNoti {
 		if fw.grade.Exist && fw.hitCount.Exist {
-			fw.grade.Update(myinotify.Write)
-			fw.hitCount.Update(myinotify.Write)
+			fw.grade.UpdateMtime()
+			fw.hitCount.UpdateMtime()
 			fme := FileMetaFilesEvent{Grade: *fw.grade, HitCount: *fw.hitCount}
 			fw.NotiCh <- fme
 			pollingtm = fw.newPollingTimer()
@@ -218,8 +232,8 @@ func (fw *Watcher) WatchPoll() error {
 		select {
 		case <-pollingtm:
 			watcherlogger.Debugf("[POLL] %s, %s\n", fw.grade.FilePath, fw.hitCount.FilePath)
-			fw.grade.UpdateMTime()
-			fw.hitCount.UpdateMTime()
+			fw.grade.UpdateMtime()
+			fw.hitCount.UpdateMtime()
 			if fw.grade.Exist && fw.hitCount.Updated ||
 				fw.grade.Updated && fw.hitCount.Exist ||
 				fw.grade.Updated && fw.hitCount.Updated {
@@ -236,6 +250,10 @@ func (fw *Watcher) WatchPoll() error {
 	}
 }
 
+// WatchNotify :
+//
+// 초기, 두 피일 중 하나라도 없을 때 errCh에 error를 넘기면서 끝남
+//
 func (fw *Watcher) WatchNotify() error {
 	if err := fw.AddWatchingDirsAndFiles(); err != nil {
 		fw.ErrCh <- err

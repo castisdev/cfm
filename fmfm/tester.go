@@ -73,8 +73,8 @@ func chmodfile(dir, filename string) {
 
 func chtimesfile(dir, filename string) {
 	fp := filepath.Join(dir, filename)
-	mtime := time.Date(2006, time.February, 1, 3, 4, 5, 0, time.UTC)
-	atime := time.Date(2007, time.March, 2, 4, 5, 6, 0, time.UTC)
+	mtime := time.Now()
+	atime := time.Date(2020, time.February, 11, 18, 7, 7, 0, time.UTC)
 	if err := os.Chtimes(fp, atime, mtime); err != nil {
 		log.Fatal(err)
 	}
