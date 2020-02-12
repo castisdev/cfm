@@ -141,50 +141,47 @@ func TestFileMonitorUpdateMtimeAndResetUpadte(t *testing.T) {
 
 func TestNewWatcherMode(t *testing.T) {
 	TestInotifyFunc = func() bool { return false }
-	watcher := NewWatcher("grade", "hicount", true, 0, 0)
+	watcher := NewWatcher("grade", "hictount", true, 0, 0)
 	assert.Equal(t, POLL, watcher.mode)
 
 	TestInotifyFunc = func() bool { return true }
-	watcher = NewWatcher("grade", "hicount", true, 0, 0)
+	watcher = NewWatcher("grade", "hitcount", true, 0, 0)
 	assert.Equal(t, NOTIFY, watcher.mode)
 
 	TestInotifyFunc = func() bool { return true }
 	NewWatcherFunc = func() (*myinotify.Watcher, error) { return nil, errors.New("test:failed to create") }
-	watcher = NewWatcher("grade", "hicount", true, 0, 0)
+	watcher = NewWatcher("grade", "hitcount", true, 0, 0)
 	assert.Equal(t, POLL, watcher.mode)
 }
 
 // 파일 둘 다 없는 경우 timeout이 남
 func TestWatchPollTimout(t *testing.T) {
 	to := uint32(1)
-	watcher := NewWatcher("grade", "hicount", true, to, 1)
+	TestInotifyFunc = func() bool { return false }
+	watcher := NewWatcher("grade", "hitcount", true, to, 1)
 	watcher.mode = POLL
 
-	timeout := FileMetaFilesEvent{Err: ErrTimeout}
 	go watcher.Watch()
-
 	s := common.Start()
-	noti := <-watcher.NotiCh
-	assert.Equal(t, timeout.Err, noti.Err)
-	log.Println("diff:", common.Elapsed(s)-time.Second*time.Duration(to))
-	assert.True(t, common.Elapsed(s)-time.Second*time.Duration(to) < time.Duration(1)*time.Millisecond)
+
+	waitWatcherTimeout(t, watcher, s, to)
+	waitWatcherClose(watcher)
 }
 
 // 파일 둘 중에 하나만 있는 경우에도 timeout이 남
 func TestWatchPollTimoutOneExistTheOtherNotExist(t *testing.T) {
 	createfile("testwatcher", "grade")
+	defer deletefile("testwatcher", "")
 	to := uint32(1)
-	watcher := NewWatcher("testwatcher/grade", "testwatcher/hicount", true, to, 1)
+	TestInotifyFunc = func() bool { return false }
+	watcher := NewWatcher("testwatcher/grade", "testwatcher/hitcount", true, to, 1)
 	watcher.mode = POLL
 
-	timeout := FileMetaFilesEvent{Err: ErrTimeout}
 	go watcher.Watch()
-
 	s := common.Start()
-	noti := <-watcher.NotiCh
-	assert.Equal(t, timeout.Err, noti.Err)
-	log.Println("diff:", common.Elapsed(s)-time.Second*time.Duration(to))
-	assert.True(t, common.Elapsed(s)-time.Second*time.Duration(to) < time.Duration(1)*time.Millisecond)
+
+	waitWatcherTimeout(t, watcher, s, to)
+	waitWatcherClose(watcher)
 }
 
 // poll 모드는
@@ -193,39 +190,29 @@ func TestWatchPollTimoutOneExistTheOtherNotExist(t *testing.T) {
 // event 발생
 // poll 주기 사이에 modify time이 변했다고 해도
 // timeout event 가 발생할 수 있음
-func TestWatchPollTOEventAndFileEventWtithModTimeChanged(t *testing.T) {
+func TestWatchPollTOEventAndFileEventWithModTimeChanged(t *testing.T) {
 	createfile("testwatcher", "grade")
-	createfile("testwatcher", "hicount")
+	createfile("testwatcher", "hitcount")
 	defer deletefile("testwatcher", "")
 
-	to := uint32(3)
+	to := uint32(1)
 	poll := uint32(to*2 + 1)
-	watcher := NewWatcher("testwatcher/grade", "testwatcher/hicount", true, to, poll)
+	TestInotifyFunc = func() bool { return false }
+	watcher := NewWatcher("testwatcher/grade", "testwatcher/hitcount", true, to, poll)
 	watcher.mode = POLL
-
-	timeout := FileMetaFilesEvent{Err: ErrTimeout}
 
 	go watcher.Watch()
 	polls := common.Start()
 
-	noti := <-watcher.NotiCh
 	// 초기 event
-	assert.Equal(t, nil, noti.Err)
-	diff := common.Elapsed(polls) - time.Second*time.Duration(poll)
-	log.Println("poll:", diff)
-	assert.True(t, diff < time.Duration(1)*time.Millisecond)
 	// 초기 event 후에 polling 주기가 시작됨
-	polls = common.Start()
-
+	polls = waitWatcherEvent(t, watcher, polls, poll)
 	// 초기 event 후에 timeout 주기 시작
 	tos := common.Start()
-	noti = <-watcher.NotiCh
-	assert.Equal(t, timeout.Err, noti.Err)
-	todiff := common.Elapsed(tos) - time.Second*time.Duration(to)
-	log.Println("timeout:", todiff)
-	assert.True(t, todiff < time.Duration(1)*time.Millisecond)
+
+	// timeout 발생
 	// timeout 후에 timeout 주기 시작
-	tos = common.Start()
+	tos = waitWatcherTimeout(t, watcher, tos, to)
 
 	// 시간 변경으로 event 발생 시킴
 	// 다음 poll 주기에 발견됨
@@ -233,142 +220,116 @@ func TestWatchPollTOEventAndFileEventWtithModTimeChanged(t *testing.T) {
 	chtimesfile("testwatcher", "grade")
 
 	// 다음 poll 주기 전에 timeout event 발생
-	noti = <-watcher.NotiCh
-	assert.Equal(t, timeout.Err, noti.Err)
-	todiff = common.Elapsed(tos) - time.Second*time.Duration(to)
-	log.Println("timeout:", todiff)
-	assert.True(t, todiff < time.Duration(1)*time.Millisecond)
+	tos = waitWatcherTimeout(t, watcher, tos, to)
 
 	// 드디어, modify time 이 변경된 것을 발견함
-	noti = <-watcher.NotiCh
-	assert.Equal(t, nil, noti.Err)
-	diff = common.Elapsed(polls) - time.Second*time.Duration(poll)
-	log.Println("poll:", diff)
-	assert.True(t, diff < time.Duration(1)*time.Millisecond)
+	polls = waitWatcherEvent(t, watcher, polls, poll)
+	waitWatcherClose(watcher)
 }
 
-func TestWatchPollTOEventAndFileEventWtithRecreated(t *testing.T) {
+// poll 주기가 짧을 때
+func TestWatchPollTOEventAndFileEventWithRecreated(t *testing.T) {
 	createfile("testwatcher", "grade")
-	createfile("testwatcher", "hicount")
+	createfile("testwatcher", "hitcount")
 	defer deletefile("testwatcher", "")
 
-	to := uint32(3)
-	poll := uint32(to*2 + 1)
-	watcher := NewWatcher("testwatcher/grade", "testwatcher/hicount", true, to, poll)
+	to := uint32(2)
+	poll := uint32(1)
+	TestInotifyFunc = func() bool { return false }
+	watcher := NewWatcher("testwatcher/grade", "testwatcher/hitcount", true, to, poll)
 	watcher.mode = POLL
-
-	timeout := FileMetaFilesEvent{Err: ErrTimeout}
 
 	go watcher.Watch()
 	polls := common.Start()
 
-	noti := <-watcher.NotiCh
 	// 초기 event
-	assert.Equal(t, nil, noti.Err)
-	diff := common.Elapsed(polls) - time.Second*time.Duration(poll)
-	log.Println("poll:", diff)
-	assert.True(t, diff < time.Duration(1)*time.Millisecond)
 	// 초기 event 후에 polling 주기가 시작됨
-	polls = common.Start()
-
+	polls = waitWatcherEvent(t, watcher, polls, poll)
 	// 초기 event 후에 timeout 주기 시작
 	tos := common.Start()
-	noti = <-watcher.NotiCh
-	assert.Equal(t, timeout.Err, noti.Err)
-	todiff := common.Elapsed(tos) - time.Second*time.Duration(to)
-	log.Println("timeout:", todiff)
-	assert.True(t, todiff < time.Duration(1)*time.Millisecond)
-	// timeout 후에 timeout 주기 시작
-	tos = common.Start()
 
-	noti = <-watcher.NotiCh
-	assert.Equal(t, timeout.Err, noti.Err)
-	todiff = common.Elapsed(tos) - time.Second*time.Duration(to)
-	log.Println("timeout:", todiff)
-	assert.True(t, todiff < time.Duration(1)*time.Millisecond)
+	// timeout 발생
+	// timeout 후에 timeout 주기 시작
+	tos = waitWatcherTimeout(t, watcher, tos, to)
 
 	// 지웠다가, 다시 create해서 event 발생 시킴
-	// 이렇게 해도 ModTime이 변하는 효과가 생김
-	deletefile("testwatcher", "hicount")
-	createfile("testwatcher", "hicount")
+	// poll 주기 후에 발견됨
+	polls = common.Start()
+	deletefile("testwatcher", "hitcount")
+	createfile("testwatcher", "hitcount")
 
-	noti = <-watcher.NotiCh
-	assert.Equal(t, nil, noti.Err)
-	diff = common.Elapsed(polls) - time.Second*time.Duration(poll)
-	log.Println("poll:", diff)
-	assert.True(t, diff < time.Duration(1)*time.Millisecond)
+	// 드디어, modify time 이 변경된 것을 발견함
+	polls = waitWatcherEvent(t, watcher, polls, poll)
+	waitWatcherClose(watcher)
 }
 
-func TestWatchPollFileEventOnlyWtithModTimeChanged(t *testing.T) {
+func TestWatchPollFileEventOnlyWithModTimeChanged(t *testing.T) {
 	createfile("testwatcher", "grade")
-	createfile("testwatcher", "hicount")
+	createfile("testwatcher", "hitcount")
 	defer deletefile("testwatcher", "")
 
 	to := uint32(0)
-	poll := uint32(2)
-	watcher := NewWatcher("testwatcher/grade", "testwatcher/hicount", true, to, poll)
+	poll := uint32(1)
+	TestInotifyFunc = func() bool { return false }
+	watcher := NewWatcher("testwatcher/grade", "testwatcher/hitcount", true, to, poll)
 	watcher.mode = POLL
 
 	go watcher.Watch()
 	polls := common.Start()
 
-	noti := <-watcher.NotiCh
 	// 초기 event
-	assert.Equal(t, nil, noti.Err)
-	diff := common.Elapsed(polls) - time.Second*time.Duration(poll)
-	log.Println("poll:", diff)
-	assert.True(t, diff < time.Duration(1)*time.Millisecond)
-	// 초기 event 후에 polling 주기가 시작됨
-	polls = common.Start()
+	polls = waitWatcherEvent(t, watcher, polls, poll)
 
 	// 시간 변경으로 event 발생 시킴
 	chtimesfile("testwatcher", "grade")
-	noti = <-watcher.NotiCh
-	assert.Equal(t, nil, noti.Err)
-	diff = common.Elapsed(polls) - time.Second*time.Duration(poll)
-	log.Println("poll:", diff)
-	assert.True(t, diff < time.Duration(1)*time.Millisecond)
+
 	// event 후에 polling 주기가 시작됨
-	polls = common.Start()
+	polls = waitWatcherEvent(t, watcher, polls, poll)
 
 	// 시간 변경으로 event 발생 시킴
 	chtimesfile("testwatcher", "grade")
-	noti = <-watcher.NotiCh
-	assert.Equal(t, nil, noti.Err)
-	diff = common.Elapsed(polls) - time.Second*time.Duration(poll)
-	log.Println("poll:", diff)
-	assert.True(t, diff < time.Duration(1)*time.Millisecond)
 	// event 후에 polling 주기가 시작됨
-	polls = common.Start()
+	polls = waitWatcherEvent(t, watcher, polls, poll)
 
-	// 시간 변경으로 event 발생 시킴
-	chtimesfile("testwatcher", "grade")
-	noti = <-watcher.NotiCh
-	assert.Equal(t, nil, noti.Err)
-	diff = common.Elapsed(polls) - time.Second*time.Duration(poll)
-	log.Println("poll:", diff)
-	assert.True(t, diff < time.Duration(1)*time.Millisecond)
+	waitWatcherClose(watcher)
 }
 
-// notify 모드에서는 두 피일 중 하나라도 없을 때 return 됨
-// return 되면서, notiCh은 닫히고
-// errCh 에는 error를 넘기고 error를 받으면 errCh은 닫힘
-func TestWatchNotifyErrorTwoFileNotExist(t *testing.T) {
-	to := uint32(2)
-	watcher := NewWatcher("grade", "hicount", true, to, 0)
-	watcher.mode = NOTIFY
+func waitWatcherEvent(t *testing.T, w *Watcher, start time.Time, duSec uint32) time.Time {
+	noti := <-w.NotiCh
+	assert.Equal(t, nil, noti.Err)
+	diff := common.Elapsed(start) - time.Second*time.Duration(duSec)
+	log.Println("event duration:", diff)
+	assert.True(t, diff < time.Duration(1)*time.Millisecond)
 
-	go watcher.Watch()
+	return common.Start()
+}
 
-	_, opennotich := <-watcher.NotiCh
+func waitWatcherTimeout(t *testing.T, w *Watcher, start time.Time, duSec uint32) time.Time {
+	noti := <-w.NotiCh
+	assert.Equal(t, ErrTimeout, noti.Err)
+	diff := common.Elapsed(start) - time.Second*time.Duration(duSec)
+	log.Println("timeout duration:", diff)
+	assert.True(t, diff < time.Duration(1)*time.Millisecond)
+
+	return common.Start()
+}
+
+func waitWatcherCloseErrNotExist(t *testing.T, w *Watcher) {
+	_, opennotich := <-w.NotiCh
 	assert.Equal(t, false, opennotich)
 
-	err, openerrch := <-watcher.ErrCh
+	err, openerrch := <-w.ErrCh
 	assert.Equal(t, true, openerrch)
 	assert.NotEqual(t, nil, err)
-	assert.Equal(t, "watching directory or file does not exist", err.Error())
+	assert.Equal(t, ErrNotExist.Error(), err.Error())
 	log.Println(err)
-
-	_, openerrch = <-watcher.ErrCh
+	_, openerrch = <-w.ErrCh
 	assert.Equal(t, false, openerrch)
+}
+
+func waitWatcherClose(w *Watcher) {
+	if !w.isClosed() {
+		close(w.doneCh)
+	}
+	<-w.doneCh
 }

@@ -26,6 +26,9 @@ func createfile(dir string, filename string) {
 			log.Fatal(err)
 		}
 	}
+	if filename == "" {
+		return
+	}
 	f, err := os.OpenFile(fp, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatal(err)
@@ -67,6 +70,22 @@ func deletefile(dir string, filename string) {
 func chmodfile(dir, filename string) {
 	fp := filepath.Join(dir, filename)
 	if err := os.Chmod(fp, 0644); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func renamefile(dir, file, newfile string) {
+	oldname := filepath.Join(dir, file)
+	newname := filepath.Join(dir, newfile)
+	if err := os.Rename(oldname, newname); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func renamedir(dir, newdir string) {
+	oldname := dir
+	newname := newdir
+	if err := os.Rename(oldname, newname); err != nil {
 		log.Fatal(err)
 	}
 }

@@ -115,6 +115,7 @@ type Watcher struct {
 	pollingSec  uint32
 	NotiCh      chan FileMetaFilesEvent
 	ErrCh       chan error
+	doneCh      chan struct{}
 }
 
 type WatchMode int
@@ -190,6 +191,16 @@ func NewWatcher(gradeFilePath, hitcountFilePath string,
 		pollingSec:  pollingSec,
 		NotiCh:      make(chan FileMetaFilesEvent),
 		ErrCh:       make(chan error, 1),
+		doneCh:      make(chan struct{}),
+	}
+}
+
+func (fw *Watcher) isClosed() bool {
+	select {
+	case <-fw.doneCh:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -197,6 +208,11 @@ func (fw *Watcher) Watch() (err error) {
 	watcherlogger.Infof("started watcher process, mode:%s", fw.mode)
 	defer close(fw.NotiCh)
 	defer close(fw.ErrCh)
+	defer func() {
+		if !fw.isClosed() {
+			close(fw.doneCh)
+		}
+	}()
 	switch fw.mode {
 	case NOTIFY:
 		err = fw.WatchNotify()
@@ -213,6 +229,8 @@ func (fw *Watcher) Watch() (err error) {
 // 이후, 두 파일 중 하나라도 modify time이 변경된 경우 event 발생
 //
 // 특정 시간동안 event가 발생하지 않으면 timeout err event 발생
+//
+// CMDCh 이 닫히면 return
 func (fw *Watcher) WatchPoll() error {
 	pollingtm := fw.newPollingTimer()
 	timeouttm := fw.newTimeoutTimer()
@@ -246,14 +264,29 @@ func (fw *Watcher) WatchPoll() error {
 			fme := FileMetaFilesEvent{Grade: *fw.grade, HitCount: *fw.hitCount, Err: ErrTimeout}
 			fw.NotiCh <- fme
 			timeouttm = fw.newTimeoutTimer()
+		case _, open := <-fw.doneCh:
+			if !open {
+				watcherlogger.Debugf("command channel closed")
+				fw.ErrCh <- ErrStopped
+				return ErrStopped
+			}
 		}
 	}
 }
 
 // WatchNotify :
 //
-// 초기, 두 피일 중 하나라도 없을 때 errCh에 error를 넘기면서 끝남
+// 초기, 두 피일 중 하나라도 없을 때 errCh에 error 넘기면서 끝남
 //
+// 이후에는,
+//
+// 두 파일 중 하나라도 변경이 있을 때, notiCh에 event를 발생
+//
+// 특정 시간동안 event가 발생하지 않으면 timeout err event 발생
+//
+// 두 파일 중 하나라도 삭제되거나, rename이 될 때 errCh에 error 넘기면서 끝남
+//
+// 두 파일 중 하나의 상위 directory가 삭제되거나 rename, unmount 될 때  errCh에 error 넘기면서 끝남
 func (fw *Watcher) WatchNotify() error {
 	if err := fw.AddWatchingDirsAndFiles(); err != nil {
 		fw.ErrCh <- err
@@ -322,6 +355,12 @@ func (fw *Watcher) WatchNotify() error {
 			fme := FileMetaFilesEvent{Grade: *fw.grade, HitCount: *fw.hitCount, Err: ErrTimeout}
 			fw.NotiCh <- fme
 			timeouttm = fw.newTimeoutTimer()
+		case _, open := <-fw.doneCh:
+			if !open {
+				watcherlogger.Debugf("command channel closed")
+				fw.ErrCh <- ErrStopped
+				return ErrStopped
+			}
 		}
 	}
 }

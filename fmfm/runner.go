@@ -219,7 +219,7 @@ func (fr *Runner) Run(eventCh <-chan FileMetaFilesEvent) error {
 			fr.periodicRun(FileMetaFilesEvent{Grade: fr.grade, HitCount: fr.hitCount})
 			periodictm = fr.newPeriodicRunTimer()
 		case cmd := <-fr.CMDCh:
-			runnerlogger.Infof("[%s] received command", cmd)
+			runnerlogger.Debugf("[%s] received command", cmd)
 			switch cmd {
 			case STOP:
 				fr.ErrCh <- ErrStopped
