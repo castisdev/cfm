@@ -195,7 +195,24 @@ func NewWatcher(gradeFilePath, hitcountFilePath string,
 	}
 }
 
-func (fw *Watcher) isClosed() bool {
+func (fw *Watcher) clone() *Watcher {
+	return NewWatcher(
+		fw.grade.FilePath,
+		fw.hitCount.FilePath,
+		fw.initialNoti,
+		fw.timeoutSec,
+		fw.pollingSec,
+	)
+}
+
+func (fw *Watcher) Close() {
+	// poll mode 에서는 Watcher가 nil 임
+	if fw.Watcher != nil {
+		fw.Watcher.Close()
+	}
+}
+
+func (fw *Watcher) isCloseDoneCh() bool {
 	select {
 	case <-fw.doneCh:
 		return true
@@ -207,12 +224,12 @@ func (fw *Watcher) isClosed() bool {
 func (fw *Watcher) Watch() (err error) {
 	watcherlogger.Infof("started watcher process, mode:%s", fw.mode)
 	defer close(fw.NotiCh)
-	defer close(fw.ErrCh)
 	defer func() {
-		if !fw.isClosed() {
+		if !fw.isCloseDoneCh() {
 			close(fw.doneCh)
 		}
 	}()
+	defer close(fw.ErrCh)
 	switch fw.mode {
 	case NOTIFY:
 		err = fw.WatchNotify()
@@ -236,10 +253,10 @@ func (fw *Watcher) WatchPoll() error {
 	timeouttm := fw.newTimeoutTimer()
 	fw.grade.UpdateExist()
 	fw.hitCount.UpdateExist()
-	if fw.initialNoti {
-		if fw.grade.Exist && fw.hitCount.Exist {
-			fw.grade.UpdateMtime()
-			fw.hitCount.UpdateMtime()
+	if fw.grade.Exist && fw.hitCount.Exist {
+		fw.grade.UpdateMtime()
+		fw.hitCount.UpdateMtime()
+		if fw.initialNoti {
 			fme := FileMetaFilesEvent{Grade: *fw.grade, HitCount: *fw.hitCount}
 			fw.NotiCh <- fme
 			pollingtm = fw.newPollingTimer()
@@ -266,7 +283,7 @@ func (fw *Watcher) WatchPoll() error {
 			timeouttm = fw.newTimeoutTimer()
 		case _, open := <-fw.doneCh:
 			if !open {
-				watcherlogger.Debugf("command channel closed")
+				watcherlogger.Debugf("stopped, command channel closed")
 				fw.ErrCh <- ErrStopped
 				return ErrStopped
 			}
@@ -357,7 +374,7 @@ func (fw *Watcher) WatchNotify() error {
 			timeouttm = fw.newTimeoutTimer()
 		case _, open := <-fw.doneCh:
 			if !open {
-				watcherlogger.Debugf("command channel closed")
+				watcherlogger.Debugf("stopped, command channel closed")
 				fw.ErrCh <- ErrStopped
 				return ErrStopped
 			}

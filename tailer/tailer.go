@@ -82,6 +82,7 @@ func (t *Tailer) SetWatchTermMin(minute int) {
 	if minute <= 0 {
 		tailer.Infof("invalid value, set as default watchTermMin : (%d)", 10)
 		t.watchTermMin = 10
+		return
 	}
 	tailer.Infof("set watchTermMin : (%d)", minute)
 	t.watchTermMin = minute
@@ -92,6 +93,7 @@ func (t *Tailer) SetWatchHitBase(baseHit int) {
 	if baseHit <= 0 {
 		tailer.Infof("set watchHitBase : (%d)", 3)
 		t.watchHitBase = 3
+		return
 	}
 	tailer.Infof("set watchHitBase : (%d)", baseHit)
 	t.watchHitBase = baseHit
@@ -119,7 +121,7 @@ func (t *Tailer) Tail(basetm time.Time, fileMap *map[string]int) {
 		tailer.Infof("parsed file(%s) from (%d) to (%d)", file, startOffset, readOffset)
 	}
 
-	tailer.Debugf("total hit files(%d)", len(*fileMap))
+	tailer.Debugf("total hit file count(%d)", len(*fileMap))
 	// Hit 수가 기준 미달일 경우 file list 에서 제외
 	for fileName, hitCount := range *fileMap {
 		tailer.Debugf("hit file(%s), hit(%d)", fileName, hitCount)
@@ -127,7 +129,7 @@ func (t *Tailer) Tail(basetm time.Time, fileMap *map[string]int) {
 			delete(*fileMap, fileName)
 		}
 	}
-	tailer.Debugf("total rising hit files(%d), hits > base hits(%d)",
+	tailer.Debugf("total rising hit file count(%d), hits > base hits(%d)",
 		len(*fileMap), t.watchHitBase)
 
 	return

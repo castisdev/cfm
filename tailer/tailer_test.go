@@ -4,9 +4,37 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestGetLogFileName(t *testing.T) {
+	basetm := time.Date(2020, time.February, 11, 18, 7, 7, 0, time.UTC)
+	dir := "test"
+	watchmin := 10
+	efile1 := "test/EventLog[20200211].log"
+	logFileNames := GetLogFileName(basetm, dir, watchmin)
+	t.Logf("%s", (*logFileNames)[0])
+	assert.Equal(t, efile1, (*logFileNames)[0])
+
+	basetm = time.Date(2020, time.February, 12, 0, 0, 0, 0, time.UTC)
+	dir = "test"
+	watchmin = 30
+	efile1 = "test/EventLog[20200211].log"
+	efile2 := "test/EventLog[20200212].log"
+
+	logFileNames2 := GetLogFileName(basetm, dir, watchmin)
+	if len(*logFileNames2) == 1 {
+		t.Logf("%s", (*logFileNames2)[0])
+		assert.Equal(t, efile1, (*logFileNames2)[0])
+	} else {
+		t.Logf("%s, %s", (*logFileNames)[0], (*logFileNames2)[1])
+		assert.Equal(t, efile1, (*logFileNames2)[0])
+		assert.Equal(t, efile2, (*logFileNames2)[1])
+	}
+
+}
 
 func TestTailer_parseLBEventLog(t *testing.T) {
 
@@ -14,8 +42,15 @@ func TestTailer_parseLBEventLog(t *testing.T) {
 	tailer.SetWatchDir(".")
 	tailer.SetWatchIPString("125.159.40.3")
 	tailer.SetWatchTermMin(-1)
+	assert.Equal(t, 10, tailer.watchTermMin)
+	tailer.SetWatchTermMin(10)
+	assert.Equal(t, 10, tailer.watchTermMin)
+	tailer.SetWatchHitBase(0)
+	assert.Equal(t, 3, tailer.watchHitBase)
+	tailer.SetWatchHitBase(4)
+	assert.Equal(t, 4, tailer.watchHitBase)
 
-	tmpFile := "EventLog.log"
+	tmpFile := "EventLog[20180602].log"
 
 	f, err := os.Create(tmpFile)
 	if err != nil {
@@ -77,4 +112,18 @@ func TestTailer_parseLBEventLog(t *testing.T) {
 	v, exists = fm[fileName]
 	assert.True(t, exists)
 	assert.Equal(t, 1, v)
+
+	// 1527951611 값 때문에, 어지러움
+	// 원래는 10분을 더해서 Tail 을 호출해야 맞을 듯
+	// 그래서인지 MXCI5B4LSGL1000051_K20180531174730.mpg의 count가
+	// 9 -> 10 이된다.
+	result := make(map[string]int)
+	tailer.Tail(time.Unix(int64(1527951611), 0), &result)
+
+	t.Logf("%v", result)
+	fileName = "MXCI5B4LSGL1000051_K20180531174730.mpg"
+	v, exists = result[fileName]
+	assert.Equal(t, 1, len(result))
+	assert.True(t, exists)
+	assert.Equal(t, 10, v)
 }

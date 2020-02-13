@@ -118,25 +118,12 @@ func startHeartbeater(c *Config) {
 	go heartbeater.RunForever()
 }
 
-func startRemover(c *Config) (rmr *remover.Remover) {
-	rmr = newRemover(c)
-	go rmr.RunForever()
-	return rmr
-}
-
-func startTasker(c *Config) (tskr *tasker.Tasker) {
-	tskr = newTasker(c)
-	go tskr.RunForever()
-	return tskr
-}
-
 func startManager(c *Config) (manager *fmfm.Manager) {
 	watcher := fmfm.NewWatcher(
 		c.GradeInfoFile, c.HitcountHistoryFile,
 		c.Watcher.FireInitialEvent, c.Watcher.EventTimeoutSec,
 		c.Watcher.PollingSec)
 	runner := fmfm.NewRunner(
-		c.GradeInfoFile, c.HitcountHistoryFile,
 		c.Runner.BetweenEventsRunSec, c.Runner.PeriodicRunSec,
 		newRemover(c),
 		newTasker(c),

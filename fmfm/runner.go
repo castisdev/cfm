@@ -16,8 +16,6 @@ import (
 type FileMetaPtrMap map[string]*common.FileMeta
 
 type Runner struct {
-	grade               FileMonitor
-	hitCount            FileMonitor
 	fmm                 FileMetaPtrMap
 	dupFmm              FileMetaPtrMap
 	rhm                 map[string]int
@@ -160,15 +158,12 @@ func ToSetupRuns(setup map[string][]string) SetupRuns {
 }
 
 func NewRunner(
-	gradeFilePath, hitcountFilePath string,
 	betweenEventsRunSec, periodicRunSec uint32,
 	rmr *remover.Remover,
 	tskr *tasker.Tasker,
 	tlr *tailer.Tailer,
 ) *Runner {
 	return &Runner{
-		grade:               *NewFileMonitor(gradeFilePath),
-		hitCount:            *NewFileMonitor(hitcountFilePath),
 		fmm:                 make(FileMetaPtrMap),
 		dupFmm:              make(FileMetaPtrMap),
 		rhm:                 make(map[string]int),
@@ -182,6 +177,19 @@ func NewRunner(
 		RUNFuncs:            newRunFuns(),
 		SetupRuns:           defaultSetupRuns(),
 	}
+}
+
+func (fr *Runner) clone() *Runner {
+	nr := NewRunner(
+		fr.betweenEventsRunSec,
+		fr.periodicRunSec,
+		fr.remover,
+		fr.tasker,
+		fr.tailer,
+	)
+	nr.RUNFuncs = fr.RUNFuncs
+	nr.SetupRuns = fr.SetupRuns
+	return nr
 }
 
 // https://dave.cheney.net/2013/04/30/curious-channels
@@ -211,12 +219,10 @@ func (fr *Runner) Run(eventCh <-chan FileMetaFilesEvent) error {
 			fr.eventRun(fme)
 			btwperiodictm = fr.newBetweenEventsRunTimer()
 		case <-btwperiodictm:
-			//fr.betweenEventsRun(FileMetaFilesEvent{Grade: fr.grade, HitCount: fr.hitCount})
-			fme := FileMetaFilesEvent{}
-			fr.betweenEventsRun(fme)
+			fr.betweenEventsRun(FileMetaFilesEvent{})
 			btwperiodictm = fr.newBetweenEventsRunTimer()
 		case <-periodictm:
-			fr.periodicRun(FileMetaFilesEvent{Grade: fr.grade, HitCount: fr.hitCount})
+			fr.periodicRun(FileMetaFilesEvent{})
 			periodictm = fr.newPeriodicRunTimer()
 		case cmd := <-fr.CMDCh:
 			runnerlogger.Debugf("[%s] received command", cmd)
@@ -243,13 +249,8 @@ func (fr *Runner) newBetweenEventsRunTimer() <-chan time.Time {
 	return nil
 }
 
-func (fr *Runner) channelClosedRun() {
-	runnerlogger.Debugf("started channel-closed run")
-	defer runnerlogElapased("ended channel-closed run", common.Start())
-}
-
 func (fr *Runner) eventTimeoutRun(fme FileMetaFilesEvent) {
-	runnerlogger.Debugf("started timeout run, (%s)", fme)
+	runnerlogger.Infof("started timeout run")
 	defer runnerlogElapased("ended timeout run", common.Start())
 
 	for _, r := range fr.SetupRuns[EventTimeoutRuns] {
@@ -258,12 +259,12 @@ func (fr *Runner) eventTimeoutRun(fme FileMetaFilesEvent) {
 }
 
 func (fr *Runner) errorRun(fme FileMetaFilesEvent) {
-	runnerlogger.Errorf("started error run, error(%s)", fme.Err.Error())
+	runnerlogger.Infof("started error run, error(%s)", fme.Err.Error())
 	defer runnerlogElapased("ended error run", common.Start())
 }
 
 func (fr *Runner) eventRun(fme FileMetaFilesEvent) {
-	runnerlogger.Debugf("started event run, (%s)", fme)
+	runnerlogger.Infof("started event run")
 	defer runnerlogElapased("ended event run", common.Start())
 
 	for _, r := range fr.SetupRuns[EventRuns] {
@@ -272,8 +273,8 @@ func (fr *Runner) eventRun(fme FileMetaFilesEvent) {
 }
 
 func (fr *Runner) betweenEventsRun(fme FileMetaFilesEvent) {
-	runnerlogger.Debugf("started periodic run between events, (%s)", fme)
-	defer runnerlogElapased("ended periodic run between events", common.Start())
+	runnerlogger.Infof("started between events run")
+	defer runnerlogElapased("ended between events run", common.Start())
 
 	for _, r := range fr.SetupRuns[BetweenEventsRuns] {
 		fr.RUNFuncs[r](fr, fme)
@@ -281,7 +282,7 @@ func (fr *Runner) betweenEventsRun(fme FileMetaFilesEvent) {
 }
 
 func (fr *Runner) periodicRun(fme FileMetaFilesEvent) {
-	runnerlogger.Debugf("started periodic run, (%s)", fme)
+	runnerlogger.Infof("started periodic run")
 	defer runnerlogElapased("ended periodic run", common.Start())
 
 	for _, r := range fr.SetupRuns[PeriodicRuns] {

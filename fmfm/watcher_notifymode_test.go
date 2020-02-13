@@ -7,7 +7,21 @@ import (
 	"testing"
 
 	"github.com/castisdev/cfm/common"
+	"github.com/stretchr/testify/assert"
 )
+
+func TestWatcherNofifyClone(t *testing.T) {
+	TestInotifyFunc = func() bool { return true }
+	watcher := NewWatcher("grade", "hitcount", true, 0, 0)
+	assert.Equal(t, NOTIFY, watcher.mode)
+
+	clone := watcher.clone()
+	assert.Equal(t, watcher.mode, clone.mode)
+	assert.Equal(t, watcher.grade.FilePath, clone.grade.FilePath)
+	assert.Equal(t, watcher.hitCount.FilePath, clone.hitCount.FilePath)
+	assert.Equal(t, watcher.timeoutSec, clone.timeoutSec)
+	assert.Equal(t, watcher.pollingSec, clone.pollingSec)
+}
 
 // notify 모드에서는 두 피일 중 하나라도 없을 때 return 됨
 // return 되면서, notiCh은 닫히고
@@ -18,7 +32,6 @@ func TestWatchNotifyErrorAnyFileNotExist(t *testing.T) {
 	to := uint32(1)
 	TestInotifyFunc = func() bool { return true }
 	watcher := NewWatcher("testwatcher/grade", "hitcount", true, to, 0)
-	watcher.mode = NOTIFY
 
 	go watcher.Watch()
 
@@ -31,7 +44,6 @@ func TestWatchNotifyErrorTwoFileNotExist(t *testing.T) {
 	to := uint32(1)
 	TestInotifyFunc = func() bool { return true }
 	watcher := NewWatcher("grade", "hicount", true, to, 0)
-	watcher.mode = NOTIFY
 
 	go watcher.Watch()
 
@@ -49,7 +61,6 @@ func TestWatchNotifyTOEventAndFileEventWithFileChanged(t *testing.T) {
 	notifydu := uint32(1) // notify 주기는 없지만, 1초 이내에 noti할 거라고 가정하고 정함
 	TestInotifyFunc = func() bool { return true }
 	watcher := NewWatcher("testwatcher/grade", "testwatcher/hitcount", true, to, 0)
-	watcher.mode = NOTIFY
 
 	go watcher.Watch()
 	notistart := common.Start()
@@ -59,10 +70,6 @@ func TestWatchNotifyTOEventAndFileEventWithFileChanged(t *testing.T) {
 	notistart = waitWatcherEvent(t, watcher, notistart, notifydu)
 	// 초기 event 후에 timeout 주기 시작
 	tostart := common.Start()
-
-	// 변경이 없을 때 timeout event 발생
-	// timeout 후에 timeout 주기 시작
-	tostart = waitWatcherTimeout(t, watcher, tostart, to)
 
 	// 변경이 없을 때 timeout event 발생
 	// timeout 후에 timeout 주기 시작
@@ -97,7 +104,6 @@ func TestWatchNotifyTOEventAndErrorWithFileRenamed(t *testing.T) {
 	notifydu := uint32(1) // notify 주기는 없지만, 1초 이내에 noti할 거라고 가정하고 정함
 	TestInotifyFunc = func() bool { return true }
 	watcher := NewWatcher("testwatcher/grade", "testwatcher/hitcount", true, to, 0)
-	watcher.mode = NOTIFY
 
 	go watcher.Watch()
 	notistart := common.Start()
@@ -131,7 +137,6 @@ func TestWatchNotifyTOEventAndErrorWithFileDeleted(t *testing.T) {
 	notifydu := uint32(1) // notify 주기는 없지만, 1초 이내에 noti할 거라고 가정하고 정함
 	TestInotifyFunc = func() bool { return true }
 	watcher := NewWatcher("testwatcher/grade", "testwatcher/hitcount", true, to, 0)
-	watcher.mode = NOTIFY
 
 	go watcher.Watch()
 	notistart := common.Start()
@@ -165,7 +170,6 @@ func TestWatchNotifyTOEventAndErrorWithDirectoryRenamed(t *testing.T) {
 	notifydu := uint32(1) // notify 주기는 없지만, 1초 이내에 noti할 거라고 가정하고 정함
 	TestInotifyFunc = func() bool { return true }
 	watcher := NewWatcher("testwatcher/grade", "testwatcher/hitcount", true, to, 0)
-	watcher.mode = NOTIFY
 
 	go watcher.Watch()
 	notistart := common.Start()
@@ -228,7 +232,6 @@ func TestWatchNotifyTOEventAndErrorWithDirectoryDeleted(t *testing.T) {
 	notifydu := uint32(1) // notify 주기는 없지만, 1초 이내에 noti할 거라고 가정하고 정함
 	TestInotifyFunc = func() bool { return true }
 	watcher := NewWatcher("testwatcher/grade", "testwatcher/hitcount", true, to, 0)
-	watcher.mode = NOTIFY
 
 	go watcher.Watch()
 	notistart := common.Start()
