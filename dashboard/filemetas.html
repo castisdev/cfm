@@ -12,7 +12,7 @@
         }
 
         th, td {
-            padding: 8px;
+            padding: 3px;
             text-align: left;
             border-bottom: 1px solid #ddd;
             font-size: 9pt;
@@ -23,43 +23,34 @@
 </head>
 
 <body>
-    <h2>Tasks</h2>
-    <br>
-    <hr>
+<h2>File Metas</h2>
+<div style="font-size:11pt; color:#656565;">updateTime: {{.FmmMtime}}</div>
+<div style="font-size:11pt; color:#363636;">risingHit updateTime: {{.RhmMtime}}</div>
+<hr>
     <table>
         <thead>
             <tr>
-            <th>ID</th>
-            <th>FilePath</th>
-            <th>Status</th>
-            <th>SrcAddr</th>
-            <th>DstAddr</th>
+            <th>File</th>
             <th>Grade</th>
-            <th>Ctime</th>
-            <th>Mtime</th>
+            <th>Size</th>
+            <th>RisingHit</th>
+            <th>ServerIps</th>
+            <th>SrcFilePath</th>
             </tr>
         </thead>
         <tbody>
-            {{range .}}
-                {{ if eq .Status 1 }}
+            {{range .Fmms}}
+                {{ if gt .RisingHit 0 }}
                     <tr class="table-active">
-                {{ else if eq .Status 2 }}
-                    <tr class="table-success">
-                {{ else if eq .Status 3 }}
-                    <tr class="table-primary">
-                {{ else if eq .Status 4 }}
-                    <tr class="table-danger">
                 {{ else }}
                     <tr class>
                 {{ end }}
-                    <th scope="row">{{.ID}}</th>
-                    <td>{{.FilePath}}</td>
-                    <td>{{.Status}}</td>
-                    <td>{{.SrcAddr}}</td>
-                    <td>{{.DstAddr}}</td>
+                    <th scope="row">{{.Name}}</th>
                     <td>{{.Grade}}</td>
-                    <td>{{.Ctime}}</td>
-                    <td>{{.Mtime}}</td>
+                    <td>{{.Size}}</td>
+                    <td>{{.RisingHit}}</td>
+                    <td>{{.ServerIPs}}</td>
+                    <td>{{.SrcFilePath}}</td>
                     </tr>
             {{end}}
         </tbody>

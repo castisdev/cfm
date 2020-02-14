@@ -3,6 +3,7 @@ package fmfm
 import (
 	"errors"
 	"log"
+	"sort"
 	"strings"
 	"time"
 
@@ -28,6 +29,9 @@ type Runner struct {
 	ErrCh               chan error
 	RUNFuncs            map[RUN]func(*Runner, FileMetaFilesEvent)
 	SetupRuns           SetupRuns
+	GetFileMetasCh      chan GetFileMetas // request channel
+	fmmMtime            time.Time
+	rhmMtime            time.Time
 }
 
 var (
@@ -176,6 +180,7 @@ func NewRunner(
 		ErrCh:               make(chan error, 1),
 		RUNFuncs:            newRunFuns(),
 		SetupRuns:           defaultSetupRuns(),
+		GetFileMetasCh:      make(chan GetFileMetas),
 	}
 }
 
@@ -198,6 +203,7 @@ func (fr *Runner) Run(eventCh <-chan FileMetaFilesEvent) error {
 	runnerlogger.Infof("started runner process")
 	defer close(fr.CMDCh)
 	defer close(fr.ErrCh)
+	defer close(fr.GetFileMetasCh)
 	periodictm := fr.newPeriodicRunTimer()
 	btwperiodictm := fr.newBetweenEventsRunTimer()
 	for {
@@ -231,6 +237,8 @@ func (fr *Runner) Run(eventCh <-chan FileMetaFilesEvent) error {
 				fr.ErrCh <- ErrStopped
 				return ErrStopped
 			}
+		case req := <-fr.GetFileMetasCh:
+			fr.getFileMetas(req)
 		}
 	}
 }
@@ -290,6 +298,34 @@ func (fr *Runner) periodicRun(fme FileMetaFilesEvent) {
 	}
 }
 
+// runner가 수집해서 가지고 있는 file meta + risinghit 조합
+func (fr *Runner) getFileMetas(req GetFileMetas) {
+	defer close(req.RespCh)
+	fmms := make([]common.FileMeta, 0)
+	for _, fmm := range fr.fmm {
+		fmrh := *fmm
+		hit, found := fr.rhm[fmrh.Name]
+		if found {
+			fmrh.RisingHit = hit
+		}
+		fmms = append(fmms, fmrh)
+	}
+	sort.Slice(fmms, func(i, j int) bool {
+		if fmms[i].RisingHit != fmms[j].RisingHit {
+			return fmms[i].RisingHit > fmms[j].RisingHit
+		} else {
+			return fmms[i].Grade < fmms[j].Grade
+		}
+	})
+
+	res := FileMetas{
+		FmmMtime: Mtime(fr.fmmMtime),
+		Fmms:     fmms,
+		RhmMtime: Mtime(fr.rhmMtime),
+	}
+	req.RespCh <- res
+}
+
 func (fr *Runner) makeFmm(fme FileMetaFilesEvent) {
 	fmm := make(FileMetaPtrMap)
 	dupfmm := make(FileMetaPtrMap)
@@ -308,15 +344,19 @@ func (fr *Runner) makeFmm(fme FileMetaFilesEvent) {
 	}
 	runnerlogger.Infof("made file metas(name, grade, size, servers), time(%s)",
 		common.Elapsed(est))
+
 	fr.fmm = fmm
 	fr.dupFmm = dupfmm
+	fr.fmmMtime = time.Now()
 }
 
 func (fr *Runner) makeRhm() {
 	rhm := make(map[string]int)
 	var basetm time.Time = time.Now()
 	fr.tailer.Tail(basetm, &rhm)
+
 	fr.rhm = rhm
+	fr.rhmMtime = time.Now()
 }
 
 func (fr *Runner) runRemover() {

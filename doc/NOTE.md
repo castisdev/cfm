@@ -1,3 +1,33 @@
+## 2020-02-14
+
+* 개발자용 설정
+- 실제 사용할 때는 설정할 필요없음
+
+runner:
+  # 주기적으로 실행하는 설정(초): 기본값 : 0
+  periodic_run_interval_sec : 0
+
+  # 특정 조건에서 실행할 수 있는 RUN을 설정할 수 있음
+  # 가능한 설정 :
+  # 조건 이름:
+  # [이벤트 발생,이벤트가 없을 때,이벤트와 이벤트 사이 주기, 주기]
+  # [eventRuns, eventTimeoutRuns, betweenEventsRuns, periodicRuns]
+  # 실행이름 :
+  # [아무일도 하지 않음, FileMeta만듬, 급상승 hit 파일 정보 만듬, 화면에 file meta 출력, remover 실행, tasker실행]
+  # [nop, makeFmm, makeRisingHit, printFmm, runRemover, runTasker]
+  # 기본 값 : 설정하지 않으면 아래와 같이 설정됨
+  # setup_runs:
+  #   eventRuns: [makeFmm, makeRisingHit, runRemover, runTasker]
+  #   eventTimeoutRuns: [makeFmm, makeRisingHit, runRemover, runTasker]
+  #   betweenEventsRuns: [makeRisingHit, runRemover, runTasker]
+  #   periodicRuns: [nop]
+  # 아래는 test 할 때 아무것도 실행시키지 않기 위해서 사용하는 설정
+  setup_runs:
+    eventRuns: [nop]
+    eventTimeoutRuns: [nop]
+    betweenEventsRuns: [nop]
+    periodicRuns: [nop]
+
 ## 2020-02-03
 - network mount가 풀렸다가 다시 연결될 때?
 - filesystem에서 notify 를 지원하지 않을 때?

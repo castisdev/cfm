@@ -24,19 +24,37 @@ func init() {
 		Mod:    "runner"}
 }
 
+type FileMetas struct {
+	FmmMtime Mtime
+	Fmms     []common.FileMeta
+	RhmMtime Mtime
+}
+
+type Mtime time.Time
+
+func (t Mtime) String() string {
+	return time.Time(t).Format(time.RFC3339)
+}
+
+type GetFileMetas struct {
+	RespCh chan FileMetas
+}
+
 type Manager struct {
-	watcher *Watcher
-	runner  *Runner
-	CMDCh   chan CMD
-	ErrCh   chan error
+	watcher        *Watcher
+	runner         *Runner
+	CMDCh          chan CMD
+	ErrCh          chan error
+	GetFileMetasCh chan GetFileMetas // request channel
 }
 
 func NewManager(watcher *Watcher, runner *Runner) *Manager {
 	return &Manager{
-		watcher: watcher,
-		runner:  runner,
-		CMDCh:   make(chan CMD, 1),
-		ErrCh:   make(chan error, 1),
+		watcher:        watcher,
+		runner:         runner,
+		CMDCh:          make(chan CMD, 1),
+		ErrCh:          make(chan error, 1),
+		GetFileMetasCh: make(chan GetFileMetas),
 	}
 }
 
@@ -47,6 +65,7 @@ func (fm *Manager) Tasks() *tasker.Tasks {
 func (fm *Manager) Manage() {
 	defer close(fm.CMDCh)
 	defer close(fm.ErrCh)
+	defer close(fm.GetFileMetasCh)
 	for {
 		go fm.watcher.Watch()
 		go fm.runner.Run(fm.watcher.NotiCh)
@@ -94,8 +113,19 @@ func (fm *Manager) waitWatcher() error {
 				fm.ErrCh <- ErrStopped
 				return ErrStopped
 			}
+		case req := <-fm.GetFileMetasCh:
+			fm.getFileMetas(req)
 		}
 	}
+}
+
+func (fm *Manager) getFileMetas(req GetFileMetas) {
+	defer close(req.RespCh)
+
+	reqq := GetFileMetas{RespCh: make(chan FileMetas)}
+	fm.runner.GetFileMetasCh <- reqq
+	resFromRunner := <-reqq.RespCh
+	req.RespCh <- resFromRunner
 }
 
 func (fm *Manager) restart() error {
@@ -162,6 +192,8 @@ func (fm *Manager) waitUntilFileExist() error {
 					waiting <- ErrStopped
 					return
 				}
+			case req := <-fm.GetFileMetasCh:
+				fm.getFileMetas(req)
 			}
 		}
 	}()

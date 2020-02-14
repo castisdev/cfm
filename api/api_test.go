@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"bytes"
@@ -11,20 +11,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/castisdev/cfm/common"
+	"github.com/castisdev/cfm/fmfm"
 	"github.com/castisdev/cfm/tasker"
-	"github.com/castisdev/cilog"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAPI_TaskIndex(t *testing.T) {
-	// main의 api 변수 생성
-	// main의 task 변수에 tasks 생성하고 할당
-	// http_handler 에서는 main의 tasks 변수의 값을 가지고, task 응답 처리를 한다.
-	apilogger = common.MLogger{
-		Logger: cilog.StdLogger(),
-		Mod:    "api"}
-	tasks = tasker.NewTasks()
+func TestGetTasks(t *testing.T) {
+	tskr := tasker.NewTasker()
+	tasks := tskr.Tasks()
 	defer tasks.DeleteAllTask()
 
 	t1 := tasks.CreateTask(&tasker.Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
@@ -41,7 +35,6 @@ func TestAPI_TaskIndex(t *testing.T) {
 	tasks.TaskMap[t3.ID].Status = tasker.WORKING
 	tasks.TaskMap[t4.ID].Status = tasker.TIMEOUT
 
-	tskr := tasker.NewTasker()
 	tskr.SrcServers.Add("127.0.0.1:8080")
 	(*tskr.SrcServers)[0].Status = tasker.OK
 
@@ -56,7 +49,10 @@ func TestAPI_TaskIndex(t *testing.T) {
 	(*tskr.DstServers)[3].Status = tasker.OK
 
 	serverAddr := "127.0.0.1:18881"
-	router := NewRouter()
+	r := fmfm.NewRunner(0, 0, nil, tskr, nil)
+	m := fmfm.NewManager(nil, r)
+	h := NewAPIHandler(m)
+	router := NewRouter(h)
 	s := &http.Server{
 		Addr:         serverAddr,
 		Handler:      router,
@@ -71,15 +67,6 @@ func TestAPI_TaskIndex(t *testing.T) {
 	ts1.Config = s
 	ts1.Start()
 	defer ts1.Close()
-
-	// h := http.HandlerFunc(TaskIndex)
-	// serverAddr := "127.0.0.1:18881"
-	// ts1 := httptest.NewUnstartedServer(h)
-	// l1, _ := net.Listen("tcp", serverAddr)
-	// ts1.Listener.Close()
-	// ts1.Listener = l1
-	// ts1.Start()
-	// defer ts1.Close()
 
 	url := fmt.Sprintf("http://%s/tasks", serverAddr)
 	req, err := http.NewRequest("GET", url, nil)
@@ -129,17 +116,11 @@ func TestAPI_TaskIndex(t *testing.T) {
 
 }
 
-func TestAPI_TaskIndex_EmptyList(t *testing.T) {
-	// main의 api 변수 생성
-	// main의 task 변수에 tasks 생성하고 할당
-	// http_handler 에서는 main의 tasks 변수의 값을 가지고, task 응답 처리를 한다.
-	apilogger = common.MLogger{
-		Logger: cilog.StdLogger(),
-		Mod:    "api"}
-	tasks = tasker.NewTasks()
+func TestGetTasksEmptyList(t *testing.T) {
+	tskr := tasker.NewTasker()
+	tasks := tskr.Tasks()
 	defer tasks.DeleteAllTask()
 
-	tskr := tasker.NewTasker()
 	tskr.SrcServers.Add("127.0.0.1:8080")
 	(*tskr.SrcServers)[0].Status = tasker.OK
 
@@ -149,7 +130,10 @@ func TestAPI_TaskIndex_EmptyList(t *testing.T) {
 	tskr.DstServers.Add("127.0.0.4:8081")
 
 	serverAddr := "127.0.0.1:18881"
-	router := NewRouter()
+	r := fmfm.NewRunner(0, 0, nil, tskr, nil)
+	m := fmfm.NewManager(nil, r)
+	h := NewAPIHandler(m)
+	router := NewRouter(h)
 	s := &http.Server{
 		Addr:         serverAddr,
 		Handler:      router,
@@ -208,13 +192,8 @@ func TestAPI_TaskIndex_EmptyList(t *testing.T) {
 }
 
 func TestAPI_TaskDelete(t *testing.T) {
-	// main의 api 변수 생성
-	// main의 task 변수에 tasks 생성하고 할당
-	// http_handler 에서는 main의 tasks 변수의 값을 가지고, task 응답 처리를 한다.
-	apilogger = common.MLogger{
-		Logger: cilog.StdLogger(),
-		Mod:    "api"}
-	tasks = tasker.NewTasks()
+	tskr := tasker.NewTasker()
+	tasks := tskr.Tasks()
 	defer tasks.DeleteAllTask()
 
 	t1 := tasks.CreateTask(&tasker.Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
@@ -231,7 +210,6 @@ func TestAPI_TaskDelete(t *testing.T) {
 	tasks.TaskMap[t3.ID].Status = tasker.WORKING
 	tasks.TaskMap[t4.ID].Status = tasker.TIMEOUT
 
-	tskr := tasker.NewTasker()
 	tskr.SrcServers.Add("127.0.0.1:8080")
 	(*tskr.SrcServers)[0].Status = tasker.OK
 
@@ -246,7 +224,10 @@ func TestAPI_TaskDelete(t *testing.T) {
 	(*tskr.DstServers)[3].Status = tasker.OK
 
 	serverAddr := "127.0.0.1:18881"
-	router := NewRouter()
+	r := fmfm.NewRunner(0, 0, nil, tskr, nil)
+	m := fmfm.NewManager(nil, r)
+	h := NewAPIHandler(m)
+	router := NewRouter(h)
 	s := &http.Server{
 		Addr:         serverAddr,
 		Handler:      router,
@@ -296,17 +277,11 @@ func TestAPI_TaskDelete(t *testing.T) {
 		t.Errorf("after delete, server task list(%s)", servertl)
 		t.Errorf("exptected                 list(%s)", expecttl)
 	}
-
 }
 
 func TestAPI_TaskUpdate(t *testing.T) {
-	// main의 api 변수 생성
-	// main의 task 변수에 tasks 생성하고 할당
-	// http_handler 에서는 main의 tasks 변수의 값을 가지고, task 응답 처리를 한다.
-	apilogger = common.MLogger{
-		Logger: cilog.StdLogger(),
-		Mod:    "api"}
-	tasks = tasker.NewTasks()
+	tskr := tasker.NewTasker()
+	tasks := tskr.Tasks()
 	defer tasks.DeleteAllTask()
 
 	t1 := tasks.CreateTask(&tasker.Task{SrcIP: "127.0.0.1", FilePath: "/data2/A.mpg",
@@ -323,7 +298,6 @@ func TestAPI_TaskUpdate(t *testing.T) {
 	tasks.TaskMap[t3.ID].Status = tasker.WORKING
 	tasks.TaskMap[t4.ID].Status = tasker.TIMEOUT
 
-	tskr := tasker.NewTasker()
 	tskr.SrcServers.Add("127.0.0.1:8080")
 	(*tskr.SrcServers)[0].Status = tasker.OK
 
@@ -338,7 +312,10 @@ func TestAPI_TaskUpdate(t *testing.T) {
 	(*tskr.DstServers)[3].Status = tasker.OK
 
 	serverAddr := "127.0.0.1:18881"
-	router := NewRouter()
+	r := fmfm.NewRunner(0, 0, nil, tskr, nil)
+	m := fmfm.NewManager(nil, r)
+	h := NewAPIHandler(m)
+	router := NewRouter(h)
 	s := &http.Server{
 		Addr:         serverAddr,
 		Handler:      router,
@@ -410,5 +387,4 @@ func TestAPI_TaskUpdate(t *testing.T) {
 		t.Errorf("after delete, server task list(%s)", servertl)
 		t.Errorf("exptected                 list(%s)", expecttl)
 	}
-
 }

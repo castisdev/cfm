@@ -97,9 +97,9 @@ func ReadConfig(configFile string) (*Config, error) {
 	viper.SetDefault("tasker.task_timeout_sec", 3600)
 	viper.SetDefault("tasker.task_copy_speed_bps", "10000000")
 	viper.SetDefault("watcher.fire_initial_event", true)
-	viper.SetDefault("watcher.event_timeout_sec", uint32(600))
+	viper.SetDefault("watcher.event_timeout_sec", uint32(3600))
 	viper.SetDefault("watcher.poll_interval_sec", uint32(60))
-	viper.SetDefault("runner.between_events_run_interval_sec", uint32(10))
+	viper.SetDefault("runner.between_events_run_interval_sec", uint32(60))
 	viper.SetDefault("runner.periodic_run_interval_sec", uint32(0))
 
 	var c Config

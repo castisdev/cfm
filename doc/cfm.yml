@@ -55,24 +55,15 @@ remover:
   # storage_usage_limit_percent: 90
   storage_usage_limit_percent: 99
 
-  # deprecated
-  # remover 쉬는 시간(초), 기본값 : 30
-  # 이 값이 30인 경우, 검사하고 30초 쉬고, 검사하고 30초 쉬는 방식으로 동작
-  # remover_sleep_sec : 3
-
 # tasker:
 # 배포 task를 만드는 모듈,
 # 한 번에 소스 갯수만큼의 배포 task가 만들어짐
 tasker:
-  # deprecated
-  # 소스 개수 만큼 배포 task 만들고 나서 쉬는 시간(초), 기본값 : 60
-  # 이 값이 60초라면 배포 task 만들고, 60초 쉬고, 만들고 60초 쉬는 방식으로 동작
-  # tasker_sleep_sec: 60
-
   # cfw 가 배포 스케줄을 시작해놓고 비정상 종료해버리거나
   # cfw 가 아예 구동이 안되는 등의 예외 상황이 생길 경우
   # 해당 cfw 에 대한 배포 스케줄을 취소해야 한다.
   # 이를 위해 task 마다 timeout 을 설정한다.
+  # 배포 task 타임아웃(초), 기본값: 3600
   task_timeout_sec: 3600
   # cfw 가 copy 할 때 사용하는 속도(bps) : 기본값 10000000
   task_copy_speed_bps: 10000000
@@ -82,8 +73,8 @@ watcher:
   # 해당 파일의 해당 경로에 존재하면 최초 이벤트 발생하는 설정 : 기본값 : true
   fire_initial_event: true
   # 해당 파일에 아무런 변화도 없을 때 발생하는 timeout event 설정(초):
-  # 기본값 : 600
-  event_timeout_sec : 600
+  # 기본값 : 3600
+  event_timeout_sec : 3600
   # inotify와 같은 filesystem notify module이 지원되지 않을 때, 사용하는 감시 주기(초)
   # 기본값 : 60
   poll_interval_sec : 60
@@ -91,12 +82,8 @@ watcher:
 # 파일 우선순위,크기를 구하기 위해 이용하는 파일들에 변화가 있을 때
 # remover, tasker를 실행하는 모듈
 runner:
-  # 해당 파일에 변경이 없는 동안 주기적으로 실행하는 설정(초): 기본값 : 10
-  periodic_run_between_events_interval_sec: 10
-
-  # 주기적으로 실행하는 설정(초): 기본값 : 0
-  periodic_run_interval_sec : 0
-
+  # 해당 파일에 변경이 없는 동안 주기적으로 실행하는 설정(초): 기본값 : 60
+  between_events_run_interval_sec: 60
 
 servers:
   # servers.sources, servers.destinations에 대한

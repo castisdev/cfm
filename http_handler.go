@@ -15,8 +15,8 @@ import (
 )
 
 func HostStateDashBoard(w http.ResponseWriter, r *http.Request) {
-	api.Infof("[%s] received stateDashBoard request", r.RemoteAddr)
-	defer api.Infof("[%s] responsed stateDashBoard request", r.RemoteAddr)
+	apilogger.Infof("[%s] received stateDashBoard request", r.RemoteAddr)
+	defer apilogger.Infof("[%s] responsed stateDashBoard request", r.RemoteAddr)
 
 	tpl := template.Must(template.ParseFiles("dashboard/hoststate.html"))
 	tpl.Execute(w, heartbeater.GetList())
@@ -24,8 +24,8 @@ func HostStateDashBoard(w http.ResponseWriter, r *http.Request) {
 
 // DashBoard :
 func DashBoard(w http.ResponseWriter, r *http.Request) {
-	api.Infof("[%s] received dashBoard request", r.RemoteAddr)
-	defer api.Infof("[%s] responsed dashBoard request", r.RemoteAddr)
+	apilogger.Infof("[%s] received dashBoard request", r.RemoteAddr)
+	defer apilogger.Infof("[%s] responsed dashBoard request", r.RemoteAddr)
 
 	tpl := template.Must(template.ParseFiles("dashboard/layout.html"))
 	tpl.Execute(w, tasks.GetTaskList())
@@ -33,13 +33,13 @@ func DashBoard(w http.ResponseWriter, r *http.Request) {
 
 // TaskIndex is http handler for GET /tasks route
 func TaskIndex(w http.ResponseWriter, r *http.Request) {
-	api.Infof("[%s] received getTasks request", r.RemoteAddr)
-	defer api.Infof("[%s] responsed getTasks request", r.RemoteAddr)
+	apilogger.Infof("[%s] received getTasks request", r.RemoteAddr)
+	defer apilogger.Infof("[%s] responsed getTasks request", r.RemoteAddr)
 
 	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
 	t := tasks.GetTaskList()
 	if err := json.NewEncoder(w).Encode(t); err != nil {
-		api.Errorf("decode json fail : %s", err)
+		apilogger.Errorf("decode json fail : %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -47,8 +47,8 @@ func TaskIndex(w http.ResponseWriter, r *http.Request) {
 
 // TaskDelete is http handler for DELETE /tasks/<taskID> route
 func TaskDelete(w http.ResponseWriter, r *http.Request) {
-	api.Infof("[%s] received deleteTask request", r.RemoteAddr)
-	defer api.Infof("[%s] responsed deleteTask request", r.RemoteAddr)
+	apilogger.Infof("[%s] received deleteTask request", r.RemoteAddr)
+	defer apilogger.Infof("[%s] responsed deleteTask request", r.RemoteAddr)
 
 	vars := mux.Vars(r)
 	taskID := vars["taskId"]
@@ -68,8 +68,8 @@ func TaskDelete(w http.ResponseWriter, r *http.Request) {
 
 // TaskUpdate is http handler for PATCH /tasks/<taskID> route
 func TaskUpdate(w http.ResponseWriter, r *http.Request) {
-	api.Infof("[%s] received updateTask request", r.RemoteAddr)
-	defer api.Infof("[%s] responsed updateTask request", r.RemoteAddr)
+	apilogger.Infof("[%s] received updateTask request", r.RemoteAddr)
+	defer apilogger.Infof("[%s] responsed updateTask request", r.RemoteAddr)
 
 	vars := mux.Vars(r)
 	taskID := vars["taskId"]
@@ -86,7 +86,7 @@ func TaskUpdate(w http.ResponseWriter, r *http.Request) {
 
 	dec := json.NewDecoder(r.Body)
 	if err := dec.Decode(&s); err != nil {
-		api.Errorf("failed to update task status, decode json fail : %s", err)
+		apilogger.Errorf("failed to update task status, decode json fail : %s", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -99,19 +99,19 @@ func TaskUpdate(w http.ResponseWriter, r *http.Request) {
 
 	t, exists := tasks.FindTaskByID(ID)
 	if !exists {
-		api.Warningf("failed to update task status(%s) invalid task,ID(%d)",
+		apilogger.Warningf("failed to update task status(%s) invalid task,ID(%d)",
 			s.Status, ID)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
 	if err := tasks.UpdateStatus(ID, s.Status); err != nil {
-		api.Errorf("failed to update task status(%s), task(%s), error(%s)",
+		apilogger.Errorf("failed to update task status(%s), task(%s), error(%s)",
 			s.Status, t, err.Error())
 		w.WriteHeader(http.StatusConflict)
 		return
 	}
 
-	api.Infof("updated task status(%s),task(%s)", s.Status, t)
+	apilogger.Infof("updated task status(%s),task(%s)", s.Status, t)
 	w.WriteHeader(http.StatusOK)
 }

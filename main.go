@@ -10,6 +10,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/castisdev/cfm/api"
 	"github.com/castisdev/cfm/common"
 	"github.com/castisdev/cfm/fmfm"
 	"github.com/castisdev/cfm/heartbeater"
@@ -21,7 +22,8 @@ import (
 )
 
 var tasks *tasker.Tasks
-var api common.MLogger
+
+var apilogger common.MLogger
 
 // App constant
 const (
@@ -43,11 +45,11 @@ func main() {
 	mgr := startManager(c)
 	tasks = mgr.Tasks()
 
-	api = common.MLogger{
+	apilogger = common.MLogger{
 		Logger: cilog.StdLogger(),
 		Mod:    "api"}
 
-	startHttpServer(c)
+	startHttpServer(c, mgr)
 }
 
 func doCli() {
@@ -198,8 +200,9 @@ func newTasker(c *Config) (tskr *tasker.Tasker) {
 	return tskr
 }
 
-func startHttpServer(c *Config) {
-	router := NewRouter()
+func startHttpServer(c *Config, m *fmfm.Manager) {
+	h := api.NewAPIHandler(m)
+	router := api.NewRouter(h)
 	s := &http.Server{
 		Addr:         c.ListenAddr,
 		Handler:      router,

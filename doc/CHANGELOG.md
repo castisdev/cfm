@@ -12,6 +12,13 @@ v1.0.0.qr3 / 2020-02
     - [tasker]-[task_timeout_sec]
   * 일부 로그 변경,추가
 
+[개선]
+  * 정보 조회용 api 개선. 추가
+    - /dashboard 개선
+    - /dashboard/hb 개선
+    - /dashboard/filemetas 추가
+  * linux inotify(파일 변경 감시 모듈) 연동
+
 v1.0.0.qr2 / 2020-01-23
 ===================
 
