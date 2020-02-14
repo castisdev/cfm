@@ -1,3 +1,19 @@
+[version 1.0.0.qr3]
+릴리즈 날짜 : 2020-02-17
+
+컴파일 환경
+- go1.13.4 limux/amd64
+- go1.9.2 limux/amd64
+
+개발내용
+1. 일부 설정 추가, 변경
+2. linux inotify(파일 변경 감시 모듈) 연동
+3. 정보 조회용 api 개선. 추가
+  - /dashboard 개선
+  - /dashboard/hb 개선
+  - /dashboard/filemetas 추가
+4. 일부 로그 수정
+
 [version 1.0.0.qr2]
 릴리즈 날짜 : 2020-01-23
 

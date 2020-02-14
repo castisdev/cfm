@@ -21,10 +21,6 @@ import (
 	"github.com/kardianos/osext"
 )
 
-var tasks *tasker.Tasks
-
-var apilogger common.MLogger
-
 // App constant
 const (
 	AppName      = "cfm"
@@ -43,11 +39,6 @@ func main() {
 	startHeartbeater(c)
 
 	mgr := startManager(c)
-	tasks = mgr.Tasks()
-
-	apilogger = common.MLogger{
-		Logger: cilog.StdLogger(),
-		Mod:    "api"}
 
 	startHttpServer(c, mgr)
 }

@@ -11,13 +11,14 @@ import (
 
 // FileMeta is struct to save file meta info
 type FileMeta struct {
-	Name        string
-	Grade       int32
-	Size        int64
-	RisingHit   int            // LB EventLog 에서 Hit 가 급격하게 오른 파일들의 Hit 수
-	ServerCount int            // 이 파일을 가지고 있는 서버 개수
-	ServerIPs   map[string]int // 이 파일을 가지고 있는 [서버 IP]개수
-	SrcFilePath string         // source file full path : cfm이 구함
+	Name         string
+	Grade        int32
+	Size         int64
+	RisingHit    int            // LB EventLog 에서 Hit 가 급격하게 오른 파일들의 Hit 수
+	ServerCount  int            // 이 파일을 가지고 있는 서버 개수
+	ServerIPs    map[string]int // 이 파일을 가지고 있는 [서버 IP]개수
+	SrcFilePath  string         // source file full path : cfm이 구함
+	ServerIPList string         // 이 파일을 가지고 있는 서버 IP list string
 }
 
 // NewFileMeta :
@@ -103,10 +104,15 @@ func parseHitcountFileAndUpdateFileMetas(hitcountfileName string, fmm map[string
 			}
 
 			vodIPs := strings.Split(vodIPList, " ")
-			for _, vodIP := range vodIPs {
+			for ix, vodIP := range vodIPs {
 				if _, found := serverIPs[vodIP]; found {
 					fm.ServerIPs[vodIP]++
 					fm.ServerCount++
+					if ix == 0 {
+						fm.ServerIPList = vodIP
+					} else {
+						fm.ServerIPList += ", " + vodIP
+					}
 				}
 			}
 			if fm.ServerCount > 1 {

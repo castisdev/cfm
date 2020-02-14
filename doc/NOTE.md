@@ -3,6 +3,23 @@
 * 개발자용 설정
 - 실제 사용할 때는 설정할 필요없음
 
+* file meta를 새로 읽지 않고, remover를 계속해서 실행할 때,
+  filemeta의 serverCount 값이 실제보다 작아져서 0이 되는 현상
+
+  - file meta 정보 중에 ServerCount 정보와 ServerIPs 의 count 정보는
+    원래 hitocunt.history 파일에 있는 정보를 사용하지만,
+
+    remover 가 실행되면
+    실제 서버의 file 존재 여부를 조사해서 없으면 serverCount 값을 감소시킨다.
+    조사가 끝난 후에도 이 값이 2이상인 경우, 삭제 요청을 한다.
+
+    file meta를 새로 읽지 않고, remover를 다시 실행하게 되면,
+    이 값이 다시 한 번 더 줄어들게 되고, 반복해서 실행하면 0까지 줄어든다.
+
+    remover는 이 값이 2 이상인 경우만 remover 명령을 내리기 때문에,
+    이 값이 실제보다 작은 것은 버그를 발생시키지 않지만,
+    serverCount 값이 실제 값보다 작아질 수 있다.
+
 runner:
   # 주기적으로 실행하는 설정(초): 기본값 : 0
   periodic_run_interval_sec : 0
