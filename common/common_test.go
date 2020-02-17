@@ -1,9 +1,11 @@
 package common_test
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"reflect"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -124,5 +126,75 @@ func TestGetIPv4ByInterfaceName(t *testing.T) {
 		}
 		assert.NotEmptyf(t, ip, "ip: %s", ip)
 	}
+}
 
+func TestGetDiskUsage(t *testing.T) {
+	efs := syscall.Statfs_t{
+		Bsize:  1000,
+		Blocks: 10, // total size
+		Bfree:  8,  // freesize
+		Bavail: 6,  // avail size
+	}
+	common.StatfsFunc =
+		func(path string, fs *syscall.Statfs_t) error {
+			fs.Bsize = efs.Bsize
+			fs.Blocks = efs.Blocks
+			fs.Bfree = efs.Bfree
+			fs.Bavail = efs.Bavail
+			return nil
+		}
+	du, err := common.GetDiskUsage(".")
+	assert.Equal(t, nil, err)
+	dudesc := fmt.Sprintf("%s", du)
+	t.Logf("du: %s", du)
+
+	assert.Equal(t, common.Disksize(uint64(efs.Bsize)*efs.Blocks), du.TotalSize)
+	assert.Equal(t, common.Disksize(uint64(efs.Bsize)*efs.Bfree), du.FreeSize)
+	assert.Equal(t, du.TotalSize-du.FreeSize, du.UsedSize)
+	assert.Equal(t, common.Disksize(uint64(efs.Bsize)*efs.Bavail), du.AvailSize)
+
+	assert.Equal(t, common.Disksize(10000), du.TotalSize)
+	assert.Equal(t, common.Disksize(8000), du.FreeSize)
+	assert.Equal(t, common.Disksize(2000), du.UsedSize)
+	assert.Equal(t, common.Disksize(6000), du.AvailSize)
+	assert.Equal(t, uint(25), du.UsedPercent)
+
+	assert.Equal(t, "totalSize(9.8KB), usedSize(2.0KB), availSize(5.9KB), usedPercent(25)", dudesc)
+}
+
+func TestGetLimitUsedSizeAndOverUsedSize(t *testing.T) {
+	efs := syscall.Statfs_t{
+		Bsize:  1000,
+		Blocks: 10, // total size
+		Bfree:  8,  // freesize
+		Bavail: 6,  // avail size
+	}
+	common.StatfsFunc =
+		func(path string, fs *syscall.Statfs_t) error {
+			fs.Bsize = efs.Bsize
+			fs.Blocks = efs.Blocks
+			fs.Bfree = efs.Bfree
+			fs.Bavail = efs.Bavail
+			return nil
+		}
+	du, err := common.GetDiskUsage(".")
+	t.Logf("du: %s", du)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, common.Disksize(10000), du.TotalSize)
+	assert.Equal(t, common.Disksize(8000), du.FreeSize)
+	assert.Equal(t, common.Disksize(2000), du.UsedSize)
+	assert.Equal(t, common.Disksize(6000), du.AvailSize)
+	assert.Equal(t, uint(25), du.UsedPercent)
+
+	limitsize := du.GetLimitUsedSize(du.UsedPercent)
+	assert.Equal(t, du.UsedSize, limitsize)
+	oversize := du.GetOverUsedSize(du.UsedPercent)
+	assert.Equal(t, common.Disksize(0), oversize)
+
+	limitsize = du.GetLimitUsedSize(20)
+	assert.Equal(t, common.Disksize(1600), limitsize)
+
+	oversize = du.GetOverUsedSize(20)
+	t.Logf("limit: %s, over: %s", limitsize, oversize)
+	assert.Equal(t, common.Disksize(400), oversize)
 }

@@ -268,6 +268,10 @@ func FormatByte(b uint64) string {
 	return str
 }
 
+var (
+	StatfsFunc func(string, *syscall.Statfs_t) error = syscall.Statfs
+)
+
 // GetDiskUsage :
 //
 // |<-------------------------------f_blocks---------------------------------->|
@@ -290,7 +294,7 @@ func FormatByte(b uint64) string {
 func GetDiskUsage(path string) (DiskUsage, error) {
 	du := DiskUsage{}
 	fs := syscall.Statfs_t{}
-	err := syscall.Statfs(path, &fs)
+	err := StatfsFunc(path, &fs)
 	if err != nil {
 		return du, err
 	}
@@ -299,7 +303,12 @@ func GetDiskUsage(path string) (DiskUsage, error) {
 	du.UsedSize = du.TotalSize - du.FreeSize
 	du.AvailSize = Disksize(fs.Bavail * uint64(fs.Bsize))
 
-	used_f := float64(du.UsedSize) / float64(du.UsedSize+du.AvailSize)
+	var used_f float64
+	if float64(du.UsedSize+du.AvailSize) == float64(0) {
+		used_f = float64(0)
+	} else {
+		used_f = float64(du.UsedSize) / float64(du.UsedSize+du.AvailSize)
+	}
 	du.UsedPercent = uint(used_f*100.0 + 0.5)
 	return du, nil
 }

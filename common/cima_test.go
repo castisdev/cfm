@@ -126,3 +126,22 @@ func TestDeleteNotExistFileOnRemote(t *testing.T) {
 	err := common.DeleteFileOnRemote(&h, NotExistfileNameToDelete)
 	assert.EqualError(t, err, "404 Not Found")
 }
+
+func TestGetHeartbeat(t *testing.T) {
+	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		assert.Equal(t, "HEAD", r.Method)
+		assert.Equal(t, "/hb", r.URL.EscapedPath())
+	}))
+	l, _ := net.Listen("tcp", "127.0.0.1:18888")
+	h := common.Host{IP: "127.0.0.1", Port: 18888, Addr: "127.0.0.1:18888"}
+
+	ts.Listener.Close()
+	ts.Listener = l
+	ts.Start()
+	defer ts.Close()
+
+	rc, err := common.Heartbeat(&h, 2)
+	assert.Equal(t, true, rc)
+	assert.Equal(t, nil, err)
+}
